@@ -1,0 +1,44 @@
+name: Release
+
+# Push a tag like v0.2.1 (matching version.py) and this builds Cinder.exe
+# and publishes it as a GitHub release. Cinder's built-in updater picks it up.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check tag matches version.py
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: python
+        run: |
+          import os, sys
+          sys.path.insert(0, ".")
+          from version import VERSION
+          tag = os.environ["GITHUB_REF_NAME"].lstrip("vV")
+          if tag != VERSION:
+              sys.exit(f"Tag {tag} does not match version.py ({VERSION}); bump version.py first")
+
+      - name: Install
+        run: pip install -r requirements.txt pyinstaller
+
+      - name: Build Cinder.exe
+        run: pyinstaller --noconfirm --clean --onefile --noconsole --name Cinder --add-data "ui;ui" --add-data "themes;themes" main.py
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Cinder.exe
+          generate_release_notes: true

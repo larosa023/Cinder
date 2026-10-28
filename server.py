@@ -12,8 +12,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from steamlib import ART, IS_WIN
-
-VERSION = "0.1.0"
+from version import VERSION
 THEME_META = re.compile(r"@(\w+)\s+([^\n*]+)")
 
 
@@ -33,8 +32,12 @@ def list_themes(dirs: list[Path]) -> list[dict]:
 
 
 class Context:
-    def __init__(self, *, token, steam, config, ui_dir, theme_dirs, data_dir, window_api=None):
+    def __init__(self, *, token, steam, config, ui_dir, theme_dirs, data_dir,
+                 updater, steam_updater, restart, window_api=None):
         self.token = token
+        self.updater = updater
+        self.steam_updater = steam_updater
+        self.restart = restart
         self.steam = steam
         self.config = config
         self.ui_dir = ui_dir
@@ -126,6 +129,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(self._state())
         if path == "/api/status":
             return self._json({"ok": True, "steam": self._steam_status()})
+        if path == "/api/updates":
+            return self._json({"ok": True, "cinder": c.updater.snapshot(), "steam": c.steam_updater.snapshot()})
         if path == "/api/library":
             return self._json({"ok": True, "games": c.steam.library()})
         return self._json({"ok": False, "error": "unknown endpoint"}, 404)
@@ -214,6 +219,18 @@ class Handler(BaseHTTPRequestHandler):
             s.steam_url("steam://open/friends")
         elif action == "steam_exit":
             s.shutdown()
+        elif action == "cinder_check":
+            return self._json({"ok": True, "cinder": c.updater.check()})
+        elif action == "cinder_update":
+            if not c.updater.apply_async():
+                return self._json({"ok": False, "error": "No update to install"})
+        elif action == "cinder_restart":
+            c.restart()
+        elif action == "steam_check":
+            return self._json({"ok": True, "steam": c.steam_updater.check()})
+        elif action == "steam_update":
+            if not c.steam_updater.update_async():
+                return self._json({"ok": False, "error": "A Steam update is already running"})
         elif action == "themes_folder":
             _open_path(str(c.data_dir / "themes"))
         else:

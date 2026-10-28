@@ -18,6 +18,8 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 - **Steam update freeze**: one toggle writes or removes `steam.cfg`
 - Starts Steam silently with the freeze flags when Cinder opens (optional)
 - 5 built-in themes, plus drop-in custom CSS themes
+- **Built-in updates for Cinder**: checks GitHub releases and installs new versions in place, so you never re-download the exe
+- **On-demand Steam updates**: shows your locked Steam build vs. the newest one, and updates Steam with one click, then re-blocks it
 - Borderless window with its own title bar
 - Tiny: Python standard library plus `pywebview` (uses the Edge WebView2 built into Windows 10/11)
 
@@ -64,6 +66,41 @@ Steam usually lives in `C:\Program Files (x86)`, which can need admin rights to 
 
 This only stops the **Steam client** from updating. Individual games still update through Steam as normal.
 
+## Updates
+
+Settings → **Updates** has both updaters. With "Check for updates when Cinder opens" on, Cinder only *checks*. Nothing installs until you click.
+
+### Cinder
+
+Cinder checks this repo's latest GitHub release. When a newer version is out, a banner appears; click **Update**, then **Restart**.
+
+| How you run Cinder | What Update does |
+| --- | --- |
+| `Cinder.exe` | Downloads the new `Cinder.exe` from the release, verifies its SHA-256, swaps it in, keeps the old one until the next launch |
+| `run.bat` from a `git clone` | `git pull --ff-only`, then refreshes dependencies |
+| `run.bat` from a downloaded zip | Unpacks the release's source over the folder (your `.venv` is left alone) |
+
+**Publishing a new version** (for the repo owner):
+
+1. Bump `VERSION` in `version.py`, e.g. `0.2.1`.
+2. Commit and push.
+3. Tag it: `git tag v0.2.1 && git push origin v0.2.1`. Or create a release on GitHub with tag `v0.2.1`.
+
+The **Release** GitHub Action builds `Cinder.exe` on Windows and attaches it to the release, usually within a few minutes. Every copy of Cinder will then offer the update.
+
+### Steam
+
+Steam stays blocked by default. When you choose to update it (Settings → **Update Steam now**), Cinder:
+
+1. Closes Steam.
+2. Removes the update block.
+3. Opens Steam normally so it downloads and installs its update.
+4. Re-blocks updates once the new build is in place, or after a few minutes if there was nothing to download.
+
+The Steam row shows your installed build (the number in *About Steam*) and, when Valve's update server is reachable, the newest build. A new Steam build can break Steamidra until you re-apply it, so update Steam only when you're ready to.
+
+If Cinder is closed mid-update, it re-blocks Steam updates the next time it opens.
+
 ## Themes
 
 Themes are plain CSS files. The built-in ones are in `themes/`. Your own go in:
@@ -107,9 +144,12 @@ The `@swatch` colors are what the theme picker shows. A user theme with the same
 
 | File | What it does |
 | --- | --- |
-| `steamlib.py` | Finds Steam, parses `libraryfolders.vdf`, `appmanifest_*.acf`, `loginusers.vdf` and `localconfig.vdf`, finds cached artwork, starts Steam and handles the freeze |
+| `steamlib.py` | Finds Steam, parses `libraryfolders.vdf`, `appmanifest_*.acf`, `loginusers.vdf` and `localconfig.vdf`, finds cached artwork, starts Steam, handles the freeze and the on-demand Steam updater |
 | `server.py` | Local-only HTTP server (127.0.0.1) that serves the UI and a small JSON API, guarded by a per-session token |
+| `updater.py` | Cinder self-updater (GitHub releases) |
+| `version.py` | Current version and the repo updates come from |
 | `main.py` | Starts everything and opens the window |
+| `.github/workflows/release.yml` | Builds and publishes `Cinder.exe` when a `v*` tag is pushed |
 | `ui/` | The interface (plain HTML/CSS/JS, no frameworks) |
 | `themes/` | Built-in themes |
 

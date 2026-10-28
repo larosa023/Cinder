@@ -13,8 +13,9 @@ DEFAULTS = {
     "autostart_steam": True,
     "frameless": True,
     "steam_path": "",
+    "check_updates": True,
 }
-EDITABLE = {"theme", "sort", "card_size", "freeze_updates", "autostart_steam", "frameless", "steam_path"}
+EDITABLE = {"theme", "sort", "card_size", "freeze_updates", "autostart_steam", "frameless", "steam_path", "check_updates"}
 
 
 def data_dir() -> Path:

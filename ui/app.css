@@ -135,6 +135,19 @@ select {
 .empty { padding: 80px 20px; text-align: center; color: var(--text-dim); }
 .empty strong { display: block; color: var(--text); font-size: 16px; margin-bottom: 6px; }
 
+.banner {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; margin-bottom: 22px;
+  border-radius: var(--radius); background: var(--surface); border: 1px solid var(--accent);
+  animation: rise .25s ease;
+}
+.banner > svg { color: var(--accent); flex: none; }
+.banner span { font-weight: 500; }
+.bar { height: 4px; border-radius: 4px; background: var(--border); margin-top: 8px; overflow: hidden; width: 220px; }
+.bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+.bar.indeterminate i { width: 35%; animation: slide 1.1s ease-in-out infinite; }
+@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+.btn:disabled { opacity: .5; cursor: default; }
+
 /* ---------- Overlays ---------- */
 .overlay {
   position: fixed; inset: 52px 0 0; background: rgba(0,0,0,.55); backdrop-filter: blur(6px);

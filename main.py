@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import secrets
 import sys
 import threading
@@ -11,11 +12,19 @@ from pathlib import Path
 
 from config import Config, data_dir
 from server import Context, make_server
-from steamlib import Steam
+from steamlib import Steam, SteamUpdater
+from updater import Updater
 
 
 def resource_dir() -> Path:
     return Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+
+
+def app_dir() -> Path:
+    """Where Cinder lives on disk (the exe's folder, or the source folder)."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
 
 
 class WindowApi:
@@ -57,8 +66,27 @@ def main() -> None:
         if cfg["autostart_steam"] and not args.no_steam and not steam.running():
             steam.start(silent=True)
 
+    updater = Updater(app_dir())
+    updater.cleanup()
+    steam_updater = SteamUpdater(steam, keep_blocked=lambda: bool(cfg["freeze_updates"]))
+    if cfg["check_updates"]:
+        updater.check_async()
+        if steam.found:
+            steam_updater.check_async()
+
     res = resource_dir()
     window_api = None if args.browser else WindowApi()
+
+    def restart():
+        def go():
+            import time
+            time.sleep(0.4)  # let the HTTP response go out first
+            updater.spawn_new()
+            if window_api and window_api._window:
+                window_api._window.destroy()
+            os._exit(0)
+        threading.Thread(target=go, daemon=True).start()
+
     ctx = Context(
         token=secrets.token_urlsafe(24),
         steam=steam,
@@ -66,6 +94,9 @@ def main() -> None:
         ui_dir=res / "ui",
         theme_dirs=[res / "themes", ddir / "themes"],
         data_dir=ddir,
+        updater=updater,
+        steam_updater=steam_updater,
+        restart=restart,
         window_api=window_api,
     )
     srv = make_server(ctx, args.port)

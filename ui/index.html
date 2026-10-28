@@ -37,6 +37,13 @@
 </header>
 
 <main id="main">
+  <div class="banner" id="banner" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4 19h16"/></svg>
+    <span id="banner-text"></span>
+    <div class="spacer"></div>
+    <button class="btn sm primary" id="banner-go"></button>
+    <button class="icon-btn" id="banner-x" title="Dismiss"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
   <section id="recent" class="recent" hidden>
     <h2>Jump back in</h2>
     <div class="recent-row" id="recent-row"></div>
@@ -119,6 +126,27 @@
         <button class="btn sm" data-act="steam_open">Open Steam</button>
         <button class="btn sm" data-act="steam_exit">Exit Steam</button>
       </div>
+    </div>
+
+    <h3>Updates</h3>
+    <div class="row">
+      <div><strong>Cinder <span id="u-cur"></span></strong><small id="u-cinder">Not checked yet</small>
+        <div class="bar" id="u-bar" hidden><i></i></div></div>
+      <div class="btns">
+        <button class="btn sm" id="u-check">Check</button>
+        <button class="btn sm primary" id="u-go" hidden>Update</button>
+      </div>
+    </div>
+    <div class="row">
+      <div><strong>Steam client</strong><small id="u-steam">Not checked yet</small></div>
+      <div class="btns">
+        <button class="btn sm" id="s-check">Check</button>
+        <button class="btn sm" id="s-go">Update Steam now</button>
+      </div>
+    </div>
+    <div class="row">
+      <div><strong>Check for updates when Cinder opens</strong><small>Only checks. Nothing installs until you click Update.</small></div>
+      <label class="switch"><input type="checkbox" id="set-checkupd"><span></span></label>
     </div>
 
     <h3>Appearance</h3>

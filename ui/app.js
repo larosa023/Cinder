@@ -234,6 +234,111 @@ async function refreshStatus() {
   } catch { /* server gone */ }
 }
 
+
+// ---------- updates ----------
+const U = { cinder: null, steam: null, timer: null };
+
+function bannerDismissed(key) { try { return localStorage.getItem("cinder.dismiss") === key; } catch { return false; } }
+function dismissBanner(key) { try { localStorage.setItem("cinder.dismiss", key); } catch {} $("#banner").hidden = true; }
+
+function renderUpdates() {
+  const c = U.cinder, st = U.steam;
+  if (c) {
+    $("#u-cur").textContent = `v${c.current}`;
+    let txt;
+    if (c.busy) txt = c.phase + (c.progress != null ? ` · ${Math.round(c.progress * 100)}%` : "…");
+    else if (c.ready) txt = "Update installed. Restart to finish.";
+    else if (c.error) txt = c.error;
+    else if (c.available) txt = `Version ${c.latest} is available`;
+    else if (c.checked_at) txt = `You're up to date${c.latest ? ` (latest is ${c.latest})` : ""}`;
+    else txt = "Not checked yet";
+    $("#u-cinder").textContent = txt;
+    const bar = $("#u-bar");
+    bar.hidden = !c.busy;
+    bar.classList.toggle("indeterminate", c.busy && c.progress == null);
+    $("#u-bar i").style.width = c.progress != null ? `${c.progress * 100}%` : "";
+    const go = $("#u-go");
+    go.hidden = !(c.available || c.ready);
+    go.disabled = c.busy;
+    go.textContent = c.ready ? "Restart" : `Update to ${c.latest}`;
+    $("#u-check").disabled = c.busy;
+  }
+  if (st) {
+    let txt;
+    if (st.busy) txt = st.phase || "Working…";
+    else {
+      const parts = [`Installed build ${st.installed || "unknown"}`];
+      if (st.latest) parts.push(st.available ? `newer build ${st.latest} available` : "this is the latest build");
+      if (st.error) parts.push(st.error);
+      else if (st.phase) parts.push(st.phase);
+      txt = parts.join(" · ");
+    }
+    $("#u-steam").textContent = txt;
+    $("#s-go").disabled = st.busy || !S.steam.found;
+    $("#s-check").disabled = st.busy;
+  }
+
+  // Banner: Cinder first, then Steam.
+  const banner = $("#banner");
+  if (c && (c.ready || c.available || c.busy)) {
+    const key = `cinder:${c.latest}`;
+    banner.hidden = !c.busy && !c.ready && bannerDismissed(key);
+    banner.dataset.key = key;
+    banner.dataset.kind = "cinder";
+    $("#banner-text").textContent = c.busy ? `Updating Cinder: ${c.phase.toLowerCase()}…`
+      : c.ready ? `Cinder ${c.latest} is installed. Restart to start using it.`
+      : `Cinder ${c.latest} is available (you have ${c.current}).`;
+    $("#banner-go").textContent = c.ready ? "Restart" : "Update";
+    $("#banner-go").hidden = c.busy;
+  } else if (st && (st.busy || st.available)) {
+    const key = `steam:${st.latest}`;
+    banner.hidden = !st.busy && bannerDismissed(key);
+    banner.dataset.key = key;
+    banner.dataset.kind = "steam";
+    $("#banner-text").textContent = st.busy ? `Steam update: ${st.phase}`
+      : `A newer Steam build (${st.latest}) is out. Yours is locked at ${st.installed}.`;
+    $("#banner-go").textContent = "Details";
+    $("#banner-go").hidden = st.busy;
+  } else {
+    banner.hidden = true;
+  }
+}
+
+async function pollUpdates() {
+  try {
+    const r = await api("/api/updates");
+    const steamWasBusy = U.steam && U.steam.busy;
+    U.cinder = r.cinder; U.steam = r.steam;
+    renderUpdates();
+    if (steamWasBusy && !r.steam.busy) {
+      toast(r.steam.error ? r.steam.error : "Steam update finished - updates are blocked again", !!r.steam.error);
+      refreshStatus();
+    }
+    const busy = r.cinder.busy || r.steam.busy;
+    const watching = !$("#settings").hidden;
+    clearTimeout(U.timer);
+    if (busy || watching) U.timer = setTimeout(pollUpdates, busy ? 1200 : 4000);
+  } catch { /* offline */ }
+}
+
+async function cinderUpdate() {
+  if (U.cinder && U.cinder.ready) {
+    toast("Restarting Cinder…");
+    await act("cinder_restart");
+    return;
+  }
+  if (await act("cinder_update")) pollUpdates();
+}
+
+async function steamUpdate() {
+  const ok = window.confirm(
+    "Update Steam now?\n\n" +
+    "Cinder will close Steam, let it download its update, then block updates again.\n\n" +
+    "Heads up: a new Steam build can break Steamidra until you re-apply it or Steamidra releases a fix.");
+  if (!ok) return;
+  if (await act("steam_update")) { toast("Updating Steam…"); pollUpdates(); }
+}
+
 // ---------- events ----------
 function bind() {
   const search = $("#search");
@@ -270,7 +375,26 @@ function bind() {
   });
 
   $("#btn-refresh").addEventListener("click", () => loadLibrary());
-  $("#btn-settings").addEventListener("click", () => { $("#settings").hidden = false; refreshStatus(); });
+  $("#btn-settings").addEventListener("click", () => { $("#settings").hidden = false; refreshStatus(); pollUpdates(); });
+
+  $("#u-check").addEventListener("click", async () => {
+    $("#u-cinder").textContent = "Checking…";
+    try { U.cinder = (await api("/api/action", { action: "cinder_check" })).cinder; } catch (e) { toast(e.message, true); }
+    renderUpdates();
+  });
+  $("#u-go").addEventListener("click", cinderUpdate);
+  $("#s-check").addEventListener("click", async () => {
+    $("#u-steam").textContent = "Checking…";
+    try { U.steam = (await api("/api/action", { action: "steam_check" })).steam; } catch (e) { toast(e.message, true); }
+    renderUpdates();
+  });
+  $("#s-go").addEventListener("click", steamUpdate);
+  $("#set-checkupd").addEventListener("change", (e) => saveConfig({ check_updates: e.target.checked }));
+  $("#banner-x").addEventListener("click", () => dismissBanner($("#banner").dataset.key));
+  $("#banner-go").addEventListener("click", () => {
+    if ($("#banner").dataset.kind === "cinder") cinderUpdate();
+    else { $("#settings").hidden = false; pollUpdates(); }
+  });
   $("#btn-user").addEventListener("click", () => act("steam_friends"));
 
   $$(".overlay").forEach((o) => o.addEventListener("click", (e) => {
@@ -359,11 +483,14 @@ async function init() {
     $("#set-size").value = S.config.card_size;
     $("#set-autostart").checked = !!S.config.autostart_steam;
     $("#set-frameless").checked = !!S.config.frameless;
+    $("#set-checkupd").checked = !!S.config.check_updates;
     renderThemes();
     renderUser();
     renderSteam();
   } catch (e) { toast(e.message, true); }
   await loadLibrary(true);
+  pollUpdates();
+  setTimeout(pollUpdates, 5000);  // startup checks run in the background
 }
 
 init();

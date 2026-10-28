@@ -12,6 +12,8 @@ import re
 import subprocess
 import sys
 import threading
+import time
+import urllib.request
 from pathlib import Path
 
 IS_WIN = sys.platform == "win32"
@@ -320,11 +322,19 @@ class Steam:
         except Exception:
             return False
 
-    def start(self, silent: bool = True, extra: list[str] | None = None) -> bool:
+    def wait_stopped(self, timeout: float = 45) -> bool:
+        end = time.time() + timeout
+        while time.time() < end:
+            if not self.running():
+                return True
+            time.sleep(1.5)
+        return not self.running()
+
+    def start(self, silent: bool = True, extra: list[str] | None = None, freeze: bool = True) -> bool:
         exe = self.exe
         if not exe:
             return False
-        args = [str(exe), *FREEZE_ARGS]
+        args = [str(exe), *(FREEZE_ARGS if freeze else [])]
         if silent:
             args.append("-silent")
         args += extra or []
@@ -394,3 +404,143 @@ class Steam:
             return False, "No permission to write steam.cfg - run Cinder as admin once, or copy steam.cfg in manually"
         except OSError as e:
             return False, str(e)
+
+    # -- client version -----------------------------------------------------
+    def client_version(self) -> str | None:
+        """Installed Steam client build, e.g. '1788400362' (matches About Steam)."""
+        if not self.path:
+            return None
+        pkg = self.path / "package"
+        names = ["steam_client_win64.manifest", "steam_client_win32.manifest"]
+        names += [p.name for p in sorted(pkg.glob("steam_client_*.manifest"))] if pkg.is_dir() else []
+        for name in names:
+            data = read_vdf(pkg / name)
+            for node in data.values():
+                if isinstance(node, dict) and node.get("version"):
+                    return node["version"]
+        return None
+
+
+# --------------------------------------------------------------- Steam updater
+
+CLIENT_MANIFEST_URLS = [
+    "https://client-update.steamstatic.com/steam_client_win64",
+    "https://client-update.akamai.steamstatic.com/steam_client_win64",
+    "https://media.steampowered.com/client/steam_client_win64",
+]
+
+
+def latest_client_version() -> str | None:
+    """Newest Steam client build Valve is serving, or None if unreachable."""
+    for url in CLIENT_MANIFEST_URLS:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Cinder"})
+            with urllib.request.urlopen(req, timeout=10) as r:
+                data = parse_vdf(r.read().decode("utf-8", "replace"))
+            for node in data.values():
+                if isinstance(node, dict) and node.get("version"):
+                    return node["version"]
+        except Exception:
+            continue
+    return None
+
+
+class SteamUpdater:
+    """Lets Steam update once, on request, then locks it again.
+
+    Steps: close Steam -> remove the update block -> start Steam normally so it
+    downloads its update -> once the new build is in place (or nothing changed
+    after a few minutes) -> put the update block back.
+    """
+
+    NO_UPDATE_GRACE = 180   # seconds of Steam running with no version change
+    SETTLE = 20             # seconds after the version changes before re-locking
+    TIMEOUT = 20 * 60
+
+    def __init__(self, steam: Steam, keep_blocked=lambda: True):
+        self.steam = steam
+        self.keep_blocked = keep_blocked  # re-block afterwards only if the user wants that
+        self._lock = threading.Lock()
+        self.state = {
+            "installed": None, "latest": None, "available": None, "checked_at": 0,
+            "busy": False, "phase": "", "error": None,
+        }
+
+    def _set(self, **kw):
+        with self._lock:
+            self.state.update(kw)
+
+    def snapshot(self) -> dict:
+        with self._lock:
+            s = dict(self.state)
+        if not s["busy"]:
+            s["installed"] = self.steam.client_version()
+        return s
+
+    def check(self) -> dict:
+        installed = self.steam.client_version()
+        latest = latest_client_version()
+        avail = None
+        if installed and latest:
+            avail = _int(latest) > _int(installed)
+        self._set(installed=installed, latest=latest, available=avail, checked_at=time.time(),
+                  error=None if latest else "Couldn't reach Valve's update server")
+        return self.snapshot()
+
+    def check_async(self):
+        threading.Thread(target=self.check, daemon=True).start()
+
+    def update_async(self) -> bool:
+        with self._lock:
+            if self.state["busy"]:
+                return False
+            self.state.update(busy=True, error=None, phase="Closing Steam")
+        threading.Thread(target=self._run, daemon=True).start()
+        return True
+
+    def _run(self):
+        s = self.steam
+        relock_needed = False
+        try:
+            before = s.client_version()
+            if s.running():
+                s.shutdown()
+                if not s.wait_stopped(60):
+                    raise RuntimeError("Steam didn't close. Exit it from the tray and try again.")
+            self._set(phase="Allowing update")
+            ok, msg = s.set_freeze(False)
+            if not ok:
+                raise RuntimeError(msg)
+            relock_needed = True
+            self._set(phase="Steam is updating - leave it open")
+            if not s.start(silent=False, freeze=False):
+                raise RuntimeError("steam.exe not found")
+
+            start = time.time()
+            changed_at = None
+            first_seen_running = None
+            while time.time() - start < self.TIMEOUT:
+                time.sleep(4)
+                now = s.client_version()
+                if now and now != before and changed_at is None:
+                    changed_at = time.time()
+                    self._set(phase=f"Updated to {now} - finishing up")
+                if s.running():
+                    first_seen_running = first_seen_running or time.time()
+                if changed_at and s.running() and time.time() - changed_at > self.SETTLE:
+                    break
+                if not changed_at and first_seen_running and time.time() - first_seen_running > self.NO_UPDATE_GRACE:
+                    self._set(phase="No update was downloaded")
+                    break
+            after = s.client_version()
+            self._set(installed=after, available=False if after != before else self.state["available"])
+        except Exception as e:
+            self._set(error=str(e))
+        finally:
+            if relock_needed and self.keep_blocked():
+                ok, msg = s.set_freeze(True)
+                if not ok:
+                    self._set(error=f"Update done, but couldn't re-block updates: {msg}")
+            phase = self.state["phase"]
+            self._set(busy=False, phase="" if self.state["error"] else
+                      ("Done - updates blocked again" if "No update" not in phase else phase + " - updates blocked again"))
