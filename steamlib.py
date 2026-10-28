@@ -46,6 +46,51 @@ ART = {
 _NO_WINDOW = 0x08000000 if IS_WIN else 0
 
 
+# -------------------------------------------------------------------- downloads
+
+# Steam's app state flags (appmanifest StateFlags).
+_F_UPDATE_RUNNING, _F_UPDATE_PAUSED, _F_UPDATE_STARTED = 256, 512, 1024
+_F_VALIDATING, _F_PREALLOCATING = 131072, 524288
+_F_DOWNLOADING, _F_STAGING, _F_COMMITTING = 1048576, 2097152, 4194304
+
+
+def _download_info(st: dict, flags: int) -> dict | None:
+    """Download / update progress for one app, from its appmanifest. None if idle."""
+    to_dl, done_dl = _int(st.get("bytestodownload")), _int(st.get("bytesdownloaded"))
+    to_stage, done_stage = _int(st.get("bytestostage")), _int(st.get("bytesstaged"))
+    busy = flags & (_F_UPDATE_RUNNING | _F_UPDATE_STARTED | _F_DOWNLOADING | _F_STAGING |
+                    _F_COMMITTING | _F_VALIDATING | _F_PREALLOCATING)
+    pending = to_dl and done_dl < to_dl
+    if not busy and not pending and not (flags & _F_UPDATE_PAUSED):
+        return None
+    if flags & _F_UPDATE_PAUSED:
+        state = "paused"
+    elif flags & _F_VALIDATING:
+        state = "verifying"
+    elif flags & (_F_STAGING | _F_COMMITTING) or (to_dl and done_dl >= to_dl and to_stage and done_stage < to_stage):
+        state = "installing"
+    elif flags & (_F_DOWNLOADING | _F_UPDATE_RUNNING | _F_PREALLOCATING):
+        state = "downloading"
+    else:
+        state = "queued"
+    return {"state": state, "total": to_dl, "done": min(done_dl, to_dl) if to_dl else done_dl,
+            "stage_total": to_stage, "stage_done": min(done_stage, to_stage) if to_stage else done_stage}
+
+
+# ------------------------------------------------------------------ running game
+
+def running_appid() -> int:
+    """The Steam game running right now (0 if none). Steam keeps this in the registry."""
+    if not IS_WIN:
+        return 0
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam") as k:
+            return int(winreg.QueryValueEx(k, "RunningAppID")[0] or 0)
+    except (OSError, ValueError):
+        return 0
+
+
 # -------------------------------------------------------------------- processes
 
 def _process_running(exe_name: str) -> bool:
@@ -336,6 +381,9 @@ class Steam:
                     "installdir": str(lib / "steamapps" / "common" / st.get("installdir", "")),
                     "library": str(lib),
                 }
+                dl = _download_info(st, flags)
+                if dl:
+                    game["download"] = dl
                 prev = games.get(appid)
                 if not prev or (game["installed"] and not prev["installed"]):
                     games[appid] = game

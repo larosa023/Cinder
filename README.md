@@ -16,6 +16,17 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 - **Friends**: your friends list. With an API key you also see who's online and what they're playing. **Message** opens Steam chat.
 - **Profile**: your profile or a friend's, with avatar, status, about, play stats, recently played and most played.
 
+**While you play**
+
+- A "Now playing" pill in the top bar with a session timer (click it for the game page)
+- Cinder minimizes or hides to the tray when a game starts and comes back when it closes (Settings → General)
+- Downloads panel: install and update progress, speed and time left, read from Steam's own files
+
+**Organize**
+
+- Favorites stay pinned to the top; hide games you never play (right-click any game, or use its page)
+- "Pick for me" opens a random installed game, nudging toward ones you haven't played
+
 **Status and quiet launching**
 
 - Click your name in the top bar to set your Steam status: Online, Away, Invisible or Offline. After each change Cinder checks what friends actually see (your public profile, or the Web API with a key) and warns you if Steam hasn't applied it
@@ -163,6 +174,7 @@ The `@swatch` colors are what the theme picker shows. A user theme with the same
 | `version.py` | Current version and the repo updates come from |
 | `install.py` | Install location, shortcuts, start with Windows, swapping in updates after exit |
 | `tray.py` | Tray icon, its menu, and Windows notifications |
+| `playing.py` | Notices when a game starts and stops (Steam's RunningAppID) |
 | `main.py` | Starts everything and opens the window |
 | `.github/workflows/release.yml` | Builds and publishes `Cinder.exe` when a `v*` tag is pushed |
 | `ui/` | The interface (plain HTML/CSS/JS, no frameworks), one script per tab in `ui/js/` |

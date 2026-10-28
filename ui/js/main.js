@@ -17,7 +17,6 @@ function bindGlobal() {
   $("#btn-refresh").addEventListener("click", () => C.views[C.route.tab].refresh?.());
   $("#btn-settings").addEventListener("click", () => C.openSettings());
   $("#btn-user").addEventListener("click", () => C.toggleStatusMenu());
-  $("#btn-downloads").addEventListener("click", () => C.act("steam_downloads"));
 
   $$(".overlay").forEach((o) => o.addEventListener("click", (e) => {
     if (e.target === o || e.target.closest("[data-close]")) C.closeOverlays();
@@ -25,7 +24,7 @@ function bindGlobal() {
 
   document.addEventListener("keydown", (e) => {
     const typing = e.target.matches("input, select, textarea");
-    if (e.key === "Escape") { C.closeOverlays(); C.toggleStatusMenu(false); }
+    if (e.key === "Escape") { C.closeOverlays(); C.toggleStatusMenu(false); C.activity.toggleDownloads(false); $("#card-menu").hidden = true; }
     else if (e.key === "F5") { e.preventDefault(); C.views[C.route.tab].refresh?.(); }
     else if ((e.key === "/" && !typing) || (e.key.toLowerCase() === "f" && e.ctrlKey)) {
       e.preventDefault(); search.focus(); search.select();
@@ -56,6 +55,7 @@ async function init() {
   Object.values(C.views).forEach((v) => v.init && v.init());
   C.settings.init();
   C.style.init();
+  C.activity.init();
   const libraryLoad = C.library.load(true);  // start reading the library right away
   try {
     const st = await C.api("/api/state");

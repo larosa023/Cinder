@@ -59,6 +59,7 @@ const statusLabel = (p) => (STATUSES.find((x) => x[0] === p) || STATUSES[0])[1];
 
 function renderSteam() {
   const s = S.steam;
+  if (C.activity) { C.activity.renderPlaying(); C.activity.renderBadge(); }
   const dot = $("#steam-dot");
   const persona = S.config.persona || "online";
   dot.dataset.p = s.running ? persona : "closed";
@@ -365,6 +366,8 @@ function bind() {
     if (!(await C.saveConfig({ start_with_windows: e.target.checked }))) e.target.checked = !e.target.checked;
   });
   $("#set-tray").addEventListener("change", (e) => C.saveConfig({ close_to_tray: e.target.checked }));
+  $("#set-playing").addEventListener("change", (e) => C.saveConfig({ when_playing: e.target.value }));
+  $("#set-restore").addEventListener("change", (e) => C.saveConfig({ restore_after_play: e.target.checked }));
 }
 
 function renderSteamUpdToggle() {
@@ -382,6 +385,8 @@ function fill() {
   $("#set-checkupd").checked = !!c.check_updates;
   $("#set-quiet").checked = c.hide_steam_on_launch !== false;
   $("#set-tray").checked = c.close_to_tray !== false;
+  $("#set-playing").value = c.when_playing || "minimize";
+  $("#set-restore").checked = c.restore_after_play !== false;
   const inst = S.install || {};
   $("#set-startup").checked = !!inst.startup;
   $("#set-startup").disabled = !inst.frozen;

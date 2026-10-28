@@ -142,6 +142,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": True, "steam": self._steam_status()})
         if path == "/api/updates":
             return self._json({"ok": True, "cinder": c.updater.snapshot(), "steam": c.steam_updater.snapshot()})
+        if path == "/api/downloads":
+            items = [{"appid": g["appid"], "name": g["name"], **g["download"]}
+                     for g in c.steam.library() if g.get("download")]
+            order = {"downloading": 0, "installing": 1, "verifying": 2, "queued": 3, "paused": 4}
+            items.sort(key=lambda d: order.get(d["state"], 9))
+            return self._json({"ok": True, "items": items})
         if path == "/api/library":
             return self._json({"ok": True, "games": self._library()})
         try:
@@ -222,11 +228,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def _steam_status(self) -> dict:
         s = self.ctx.steam
+        playing = getattr(self.ctx, "playing", lambda: None)()
+        if playing:
+            g = next((x for x in s.library() if x["appid"] == playing["appid"]), None)
+            playing["name"] = g["name"] if g else f"App {playing['appid']}"
+        downloads = [g for g in s.library() if g.get("download")]
         return {
             "found": s.found,
             "path": str(s.path) if s.path else "",
             "running": s.running(),
             "frozen": s.freeze_enabled(),
+            "playing": playing,
+            "downloads": sum(1 for g in downloads if g["download"]["state"] != "paused"),
         }
 
     def _state(self) -> dict:
@@ -291,6 +304,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": False, "error": "bad style"}, 400)
         if "api_key" in body:
             body["api_key"] = re.sub(r"[^0-9A-Fa-f]", "", str(body["api_key"]))[:64]
+        for k in ("favorites", "hidden"):
+            if k in body:
+                if not isinstance(body[k], list):
+                    return self._json({"ok": False, "error": f"bad {k}"}, 400)
+                body[k] = sorted({int(x) for x in body[k] if str(x).isdigit()})[:5000]
+        if "when_playing" in body and body["when_playing"] not in ("minimize", "tray", "nothing"):
+            return self._json({"ok": False, "error": "bad when_playing"}, 400)
         if "store_region" in body:
             body["store_region"] = re.sub(r"[^A-Za-z]", "", str(body["store_region"]))[:2].upper() or "US"
         c.config.update(body)

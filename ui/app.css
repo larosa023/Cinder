@@ -19,7 +19,7 @@ body {
 button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; background: none; border: 0; padding: 0; }
 svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
-svg.fill { fill: currentColor; stroke: none; }
+svg.fill, svg .fill { fill: currentColor; stroke: none; }
 [hidden] { display: none !important; }
 /* Scrollbars follow the theme: a thin accent-tinted thumb on a clear track. */
 :root { color-scheme: dark; --scroll-thumb: color-mix(in srgb, var(--text-dim) 35%, transparent); }
@@ -341,3 +341,52 @@ body.no-motion *, body.no-motion *::before { animation: none !important; transit
   .d-stats { grid-template-columns: repeat(2, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* ---------- Now playing ---------- */
+.playing {
+  display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px 0 10px; margin-right: 6px; border-radius: 99px;
+  background: color-mix(in srgb, var(--ok) 14%, var(--surface)); border: 1px solid color-mix(in srgb, var(--ok) 40%, transparent);
+  font-size: 13px; font-weight: 600; max-width: 320px; flex: none; transition: filter .15s;
+}
+.playing:hover { filter: brightness(1.15); }
+.playing i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px var(--ok); animation: beat 1.6s ease-in-out infinite; flex: none; }
+@keyframes beat { 50% { opacity: .35; } }
+.playing span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.playing b { font-weight: 600; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+/* ---------- Count badge on the downloads button ---------- */
+#btn-downloads { position: relative; }
+.count-badge {
+  position: absolute; top: 3px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 99px;
+  background: var(--accent); color: var(--accent-text); font-size: 10px; font-weight: 800; display: grid; place-items: center;
+}
+
+/* ---------- Favorites ---------- */
+.star {
+  position: absolute; right: 8px; top: 8px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  background: rgba(0,0,0,.55); color: #ffd25e; backdrop-filter: blur(4px);
+}
+.star svg { width: 15px; height: 15px; }
+.btn.on { border-color: color-mix(in srgb, #ffd25e 60%, transparent); color: #ffd25e; }
+
+/* ---------- Right-click menu ---------- */
+.menu.ctx { width: 220px; top: auto; right: auto; padding: 6px; }
+.menu.ctx button svg { width: 15px; height: 15px; }
+
+/* ---------- Downloads ---------- */
+.menu.downloads { width: 380px; right: 110px; padding: 10px; }
+.dl-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 10px; }
+.dl-head .link { margin: 0; }
+#dl-list { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; }
+.dl-item { display: grid; grid-template-columns: 92px 1fr; gap: 10px; align-items: center; padding: 6px; border-radius: 10px; cursor: pointer; }
+.dl-item:hover { background: var(--surface-hover); }
+.dl-item img { width: 92px; aspect-ratio: 460 / 215; object-fit: cover; border-radius: 6px; }
+.dl-main { min-width: 0; }
+.dl-top { display: flex; justify-content: space-between; gap: 8px; }
+.dl-top .name { font-size: 13px; }
+.dl-state { font-size: 11px; font-weight: 700; color: var(--accent); flex: none; }
+.dl-item.paused .dl-state, .dl-item.queued .dl-state { color: var(--text-dim); }
+.dl-item .bar { width: 100%; margin: 6px 0 4px; }
+.dl-item.paused .bar i { background: var(--text-dim); }
+.dl-sub { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.dl-empty { padding: 18px 8px; text-align: center; color: var(--text-dim); font-size: 13px; }

@@ -24,8 +24,11 @@
     <kbd>/</kbd>
   </label>
   <div class="drag"></div>
+  <button class="playing" id="now-playing" hidden title="Now playing (click for the game page)">
+    <i></i><span id="np-name"></span><b id="np-time"></b>
+  </button>
   <div class="tb-actions">
-    <button class="icon-btn" id="btn-downloads" title="Steam downloads"><svg viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg></button>
+    <button class="icon-btn" id="btn-downloads" title="Downloads"><svg viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg><span class="count-badge" id="dl-badge" hidden></span></button>
     <button class="icon-btn" id="btn-refresh" title="Refresh (F5)"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg></button>
     <button class="icon-btn" id="btn-settings" title="Settings (Ctrl+,)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></button>
     <button class="user" id="btn-user" title="Status and profile">
@@ -68,12 +71,15 @@
         <h2>Library <span class="count" id="count"></span></h2>
         <div class="chips" id="filters">
           <button data-filter="all" class="on">All</button>
+          <button data-filter="favorites" id="chip-favorites" hidden>Favorites</button>
           <button data-filter="installed" id="chip-installed" hidden>Installed</button>
           <button data-filter="played">Played</button>
           <button data-filter="unplayed">Unplayed</button>
           <button data-filter="updates">Updates</button>
+          <button data-filter="hidden" id="chip-hidden" hidden>Hidden</button>
         </div>
         <div class="spacer"></div>
+        <button class="btn sm" id="btn-random" title="Pick a random installed game"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2" class="fill"/><circle cx="15" cy="15" r="1.2" class="fill"/><circle cx="15" cy="9" r="1.2" class="fill"/><circle cx="9" cy="15" r="1.2" class="fill"/></svg>Pick for me</button>
         <select id="sort" title="Sort">
           <option value="recent">Recently played</option>
           <option value="name">Name</option>
@@ -108,6 +114,8 @@
         <button class="btn" id="d-folder" title="Open install folder">Folder</button>
         <button class="btn" id="d-props" title="Steam game properties">Properties</button>
         <button class="btn" id="d-store" title="Store page">Store page</button>
+        <button class="btn" id="d-fav" title="Keep it at the top of your library"></button>
+        <button class="btn" id="d-hide" title="Hide it from your library"></button>
         <button class="btn danger" id="d-uninstall">Uninstall</button>
       </div>
       <dl class="d-stats">
@@ -197,6 +205,16 @@
           <label class="switch"><input type="checkbox" id="set-startup"><span></span></label></div>
         <div class="row"><div><strong>Closing Cinder keeps it in the tray</strong><small>Like Steam: the window closes, Cinder stays by the clock. Right-click the tray icon to quit.</small></div>
           <label class="switch"><input type="checkbox" id="set-tray"><span></span></label></div>
+        <h3>While you play</h3>
+        <div class="row"><div><strong>When a game starts</strong><small>Works for games launched from Cinder or Steam.</small></div>
+          <select id="set-playing">
+            <option value="minimize">Minimize Cinder</option>
+            <option value="tray">Hide Cinder to the tray</option>
+            <option value="nothing">Leave Cinder open</option>
+          </select></div>
+        <div class="row"><div><strong>Bring Cinder back when the game closes</strong></div>
+          <label class="switch"><input type="checkbox" id="set-restore"><span></span></label></div>
+        <h3>Window</h3>
         <div class="row"><div><strong>Borderless window</strong><small>Custom title bar with snapping. Takes effect next time Cinder opens.</small></div>
           <label class="switch"><input type="checkbox" id="set-frameless"><span></span></label></div>
         <h3>Shortcuts</h3>
@@ -272,6 +290,15 @@
 <div class="rz rz-ne" data-edge="ne"></div><div class="rz rz-nw" data-edge="nw"></div>
 <div class="rz rz-se" data-edge="se"></div><div class="rz rz-sw" data-edge="sw"></div>
 
+<!-- Downloads -->
+<div class="menu downloads" id="dl-menu" hidden>
+  <div class="dl-head"><strong>Downloads</strong><button class="link" id="dl-steam">Manage in Steam</button></div>
+  <div id="dl-list"></div>
+</div>
+
+<!-- Right-click menu on games -->
+<div class="menu ctx" id="card-menu" hidden></div>
+
 <!-- Status menu (opened from your name in the top bar) -->
 <div class="menu" id="status-menu" hidden>
   <div class="menu-head"><span class="avatar" id="sm-avatar"></span>
@@ -292,6 +319,7 @@
 <script src="/ui/js/friends.js"></script>
 <script src="/ui/js/profile.js"></script>
 <script src="/ui/js/settings.js"></script>
+<script src="/ui/js/activity.js"></script>
 <script src="/ui/js/main.js"></script>
 </body>
 </html>

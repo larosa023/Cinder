@@ -211,6 +211,7 @@ def main() -> None:
         window_api=window_api,
     )
     ctx.migrated_from = args.migrated_from
+    ctx.playing = lambda: None
     ctx.activate = lambda: None
     ctx.notify = lambda title, text: None
     srv = make_server(ctx, args.port)
@@ -268,6 +269,29 @@ def main() -> None:
         tray.start()
         ctx.notify = tray.notify
     ctx.activate = show_window
+
+    # While you play: tuck Cinder away, and bring it back when the game closes.
+    from playing import GameWatcher
+    tucked = {"how": None}
+
+    def on_game_start(appid):
+        how = cfg["when_playing"]
+        if how == "minimize":
+            window.minimize()
+        elif how == "tray" and tray:
+            window.hide()
+        else:
+            return
+        tucked["how"] = how
+
+    def on_game_stop(appid, seconds):
+        if tucked["how"] and cfg["restore_after_play"]:
+            show_window()
+        tucked["how"] = None
+
+    watcher = GameWatcher(on_start=on_game_start, on_stop=on_game_stop)
+    watcher.start()
+    ctx.playing = watcher.snapshot
 
     def on_closing():
         # Closing keeps Cinder in the tray (like Steam), unless you quit or it's restarting.
