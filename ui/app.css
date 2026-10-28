@@ -252,6 +252,13 @@ img[data-loaded] { opacity: 1; transition: opacity .3s; }
   background: var(--accent); color: var(--accent-text);
 }
 .badge.muted { background: rgba(0,0,0,.65); color: #fff; }
+.badge.upd { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; padding-left: 5px; transition: filter .15s, transform .15s; }
+.badge.upd svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.badge.upd:hover { filter: brightness(1.15); transform: scale(1.05); }
+.dl-section { display: flex; align-items: center; justify-content: space-between; padding: 10px 4px 6px; font-size: 12px;
+  font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dim); }
+.dl-act { flex: none; align-self: center; }
+.dl-act svg { width: 14px; height: 14px; }
 .meta { padding: 8px 2px 0; }
 body.hide-labels .meta { display: none; }
 .name { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -391,7 +398,7 @@ body.no-motion *, body.no-motion *::before { animation: none !important; transit
 .dl-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 10px; }
 .dl-head .link { margin: 0; }
 #dl-list { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; }
-.dl-item { display: grid; grid-template-columns: 92px 1fr; gap: 10px; align-items: center; padding: 6px; border-radius: 10px; cursor: pointer; }
+.dl-item { display: grid; grid-template-columns: 92px 1fr auto; gap: 10px; align-items: center; padding: 6px; border-radius: 10px; cursor: pointer; }
 .dl-item:hover { background: var(--surface-hover); }
 .dl-item img { width: 92px; aspect-ratio: 460 / 215; object-fit: cover; border-radius: 6px; }
 .dl-main { min-width: 0; }

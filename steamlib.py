@@ -262,6 +262,8 @@ class Steam:
         self.path = find_steam_path(path_override)
         self.arts = None  # steamart.ArtFinder, created on first use
         self.quiet = None  # steamquiet.SteamQuiet, set by main
+        self.bridge = None  # steambridge.SteamBridge, set by main
+        self.extra_flags: list[str] = []  # added every time Cinder starts Steam
         self._sc_cache: tuple[float | None, list] = (None, [])
         self._col_cache: tuple = (None, [])
         self._running, self._running_at = False, -10.0
@@ -562,6 +564,7 @@ class Steam:
         args = [str(exe), *(FREEZE_ARGS if freeze else [])]
         if silent:
             args.append("-silent")
+        args += [f for f in self.extra_flags if f not in args]
         args += extra or []
         kw = {"cwd": str(self.path)}
         if IS_WIN:

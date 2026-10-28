@@ -163,6 +163,11 @@ def main() -> None:
     cfg = Config(ddir / "config.json")
     steam = Steam(cfg["steam_path"] or None)
     steam.quiet = SteamQuiet(enabled=lambda: bool(cfg["hide_steam_on_launch"]))
+    from steambridge import SteamBridge, LAUNCH_FLAG
+    steam.bridge = SteamBridge(steam)
+    if steam.found and cfg["steam_bridge"]:
+        steam.extra_flags = [LAUNCH_FLAG]
+        steam.bridge.set_enabled(True)  # best effort; the flag above covers it when Cinder starts Steam
 
     if steam.found:
         if cfg["freeze_updates"] and not steam.freeze_enabled():

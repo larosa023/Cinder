@@ -29,6 +29,29 @@ C.act = async (action, extra = {}) => {
   } catch (e) { C.toast(e.message, true); return false; }
 };
 
+/** Update games through Steam without opening its window. */
+C.updateGames = async (appids, label) => {
+  const what = label || (appids.length === 1 ? "the update" : `${appids.length} updates`);
+  try {
+    let r = await C.api("/api/action", { action: "game_update", appids });
+    if (r.state === "need_restart") {
+      const ok = window.confirm("To update games without opening Steam, Cinder needs to restart Steam once in the background "
+        + "(that turns on Cinder's connection to Steam; after this it just works).\n\nRestart Steam now?");
+      if (!ok) return false;
+      r = await C.api("/api/action", { action: "game_update", appids, restart: true });
+    }
+    const msg = {
+      queued: `Downloading ${what}. Progress is in Downloads`,
+      starting: `Starting Steam in the background, then downloading ${what}…`,
+      restarting: `Restarting Steam in the background, then downloading ${what}…`,
+      steam: "Opened the game in Steam; click Update there",
+    }[r.state];
+    if (msg) C.toast(msg);
+    setTimeout(() => { C.refreshStatus && C.refreshStatus(); C.library.load(true); }, r.state === "queued" ? 2500 : 30000);
+    return true;
+  } catch (e) { C.toast(e.message, true); return false; }
+};
+
 // ---------- formatting ----------
 // Play time and dates follow Settings → Appearance → Game cards.
 const fmtOpt = (k, d) => (C.style && C.style.get()[k]) || d;

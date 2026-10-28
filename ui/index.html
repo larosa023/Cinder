@@ -115,6 +115,7 @@
       </div>
       <div class="d-actions">
         <button class="btn primary" id="d-play"></button>
+        <button class="btn primary" id="d-update" hidden></button>
         <button class="btn" id="d-folder" title="Open install folder">Folder</button>
         <button class="btn" id="d-props" title="Steam game properties">Properties</button>
         <button class="btn" id="d-store" title="Store page">Store page</button>
@@ -269,6 +270,8 @@
           <label class="switch"><input type="checkbox" id="set-autostart"><span></span></label></div>
         <div class="row"><div><strong>Keep Steam's window hidden when launching games</strong><small>Hides Steam's library window and its "Starting game" popup when you launch a game. If a Steam popup is still open after 10 seconds it probably needs you (cloud save conflict, launch options, shader processing), so Cinder shows it again.</small></div>
           <label class="switch"><input type="checkbox" id="set-quiet"><span></span></label></div>
+        <div class="row"><div><strong>Update games from Cinder</strong><small>Update buttons and download pause/resume go through Steam's own interface, so no Steam window opens. The first time you use it, Steam restarts once in the background. This switches on Steam's local debugging connection, which only programs on this PC can reach.</small></div>
+          <label class="switch"><input type="checkbox" id="set-bridge"><span></span></label></div>
         <div class="row"><div><strong>Steam status</strong><small id="steam-info"></small></div>
           <div class="btns">
             <button class="btn sm" data-act="steam_start">Start</button>

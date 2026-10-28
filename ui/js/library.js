@@ -101,7 +101,7 @@ function cardHTML(g) {
   return `<button class="card${g.installed ? "" : " not-installed"}${fav ? " fav" : ""}" data-appid="${g.appid}" title="${esc(g.name)}">
     <div class="art" data-name="${name}">${art}
       ${fav ? `<span class="star" title="Favorite">${STAR}</span>` : ""}
-      ${g.update_pending ? '<span class="badge">Update</span>' : ""}
+      ${g.update_pending && g.installed && !g.download ? `<span class="badge upd" data-update="${g.appid}" title="Update now">${ICON.down}Update</span>` : g.download ? `<span class="badge${g.download.state === "paused" ? " muted" : ""}">${g.download.state === "paused" ? "Paused" : g.installed ? "Updating" : "Downloading"}</span>` : g.update_pending ? '<span class="badge">Update</span>' : ""}
       ${g.installed ? "" : '<span class="badge muted">Not installed</span>'}
       ${achHTML(g)}
       <span class="play" data-play="${g.appid}" title="${g.installed ? "Play" : "Install"}">${g.installed ? ICON.play : ICON.down}</span>
@@ -161,6 +161,8 @@ function setGames(games, json) {
   S.games = games;
   if (C.route.tab === "library") render();
   C.style && C.style.refreshArt();
+  C.activity && C.activity.renderBadge();
+  if (L.current) { const g = games.find((x) => x.appid === L.current.appid); if (g) { L.current = g; paintUpdate(g); } }
   return true;
 }
 
@@ -216,7 +218,8 @@ function openDetail(appid) {
   $("#d-size").textContent = C.fmtSize(g.size);
   $("#d-appid").textContent = g.appid;
   $("#d-path").textContent = g.installdir;
-  $("#d-play").innerHTML = g.installed ? `${ICON.play}${g.update_pending ? "Update & Play" : "Play"}` : `${ICON.down}Install`;
+  $("#d-play").innerHTML = g.installed ? `${ICON.play}Play` : `${ICON.down}Install`;
+  paintUpdate(g);
   $("#d-folder").hidden = $("#d-uninstall").hidden = $("#d-props").hidden = !g.installed;
   renderDetailToggles(g.appid);
   if (g.shortcut) { $("#d-size").textContent = "—"; $("#d-path").textContent = g.exe || g.installdir; }
@@ -259,6 +262,24 @@ function pickRandom() {
   C.toast(g.playtime ? `How about ${g.name}?` : `How about ${g.name}? You haven't played it yet`);
 }
 
+// ---------- updates ----------
+async function updateOne(appid) {
+  const g = S.games.find((x) => x.appid === appid);
+  const ok = await C.updateGames([appid], g ? C.gname(g.name) : "the update");
+  if (ok && g && !g.download) {
+    g.download = { state: "queued" };
+    render();
+    if (L.current && L.current.appid === appid) paintUpdate(g);
+  }
+}
+
+function paintUpdate(g) {
+  const b = $("#d-update");
+  b.hidden = !(g.installed && g.update_pending && !g.shortcut);
+  b.disabled = !!g.download;
+  b.innerHTML = `${ICON.down}${g.download ? "Updating…" : "Update"}`;
+}
+
 // ---------- right-click menu ----------
 function cardMenu(e, appid) {
   const g = S.games.find((x) => x.appid === appid);
@@ -268,6 +289,7 @@ function cardMenu(e, appid) {
   const m = $("#card-menu");
   m.innerHTML = `
     <button data-cm="play">${g.installed ? ICON.play + "Play" : ICON.down + "Install"}</button>
+    ${g.installed && g.update_pending && !g.shortcut ? `<button data-cm="update">${ICON.down}Update now</button>` : ""}
     <button data-cm="fav">${STAR}${fav ? "Remove from favorites" : "Favorite"}</button>
     <button data-cm="hide">${hid ? "Unhide" : "Hide from library"}</button>
     <button data-cm="list">Add to list…</button>
@@ -296,6 +318,7 @@ function bind() {
     $("#card-menu").hidden = true;
     ({
       play: () => C.launch(id),
+      update: () => updateOne(id),
       fav: () => toggleList("favorites", id),
       list: () => { const r = $("#card-menu").getBoundingClientRect(); C.lists.picker(id, r.left, r.top); },
       hide: () => toggleList("hidden", id),
@@ -317,6 +340,8 @@ function bind() {
   });
 
   const onCard = (e) => {
+    const upd = e.target.closest("[data-update]");
+    if (upd) { e.stopPropagation(); return updateOne(+upd.dataset.update); }
     const play = e.target.closest("[data-play]");
     if (play) { e.stopPropagation(); return C.launch(+play.dataset.play); }
     const card = e.target.closest("[data-appid]");
@@ -340,6 +365,7 @@ function bind() {
     render();
     C.saveConfig({ sort: e.target.value });
   });
+  $("#d-update").addEventListener("click", () => updateOne(L.current.appid));
   $("#d-play").addEventListener("click", () => { const id = L.current.appid; C.closeOverlays(); C.launch(id); });
   $("#d-folder").addEventListener("click", () => C.act("folder", { appid: L.current.appid }));
   $("#d-props").addEventListener("click", () => C.act("properties", { appid: L.current.appid }));
@@ -349,7 +375,7 @@ function bind() {
   });
 }
 
-C.library = { load, render, paintCached, openDetail, sorts: SORTS, visible, ensureAch };
+C.library = { updateOne, load, render, paintCached, openDetail, sorts: SORTS, visible, ensureAch };
 C.views.library = {
   placeholder: "Search your library",
   show() { render(); },

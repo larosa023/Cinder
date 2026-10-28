@@ -286,6 +286,7 @@ function bind() {
     if (b) setTheme(b.dataset.theme);
   });
   $("#open-themes").addEventListener("click", () => C.act("themes_folder"));
+  $("#set-bridge").addEventListener("change", (e) => C.saveConfig({ steam_bridge: e.target.checked }));
   $("#set-quiet").addEventListener("change", (e) => C.saveConfig({ hide_steam_on_launch: e.target.checked }));
   $("#status-menu").addEventListener("click", async (e) => {
     const st = e.target.closest("[data-status]");
@@ -385,6 +386,7 @@ function fill() {
   $("#set-frameless").checked = !!c.frameless;
   $("#set-checkupd").checked = !!c.check_updates;
   $("#set-quiet").checked = c.hide_steam_on_launch !== false;
+  $("#set-bridge").checked = c.steam_bridge !== false;
   $("#set-tray").checked = c.close_to_tray !== false;
   $("#set-playing").value = c.when_playing || "minimize";
   $("#set-restore").checked = c.restore_after_play !== false;

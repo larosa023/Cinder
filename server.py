@@ -15,6 +15,7 @@ import threading
 
 import install
 import storeapi
+from cinderlog import log
 from steamlib import ART, IS_WIN
 from version import VERSION
 ALLOWED_WEB = {"https://steamcommunity.com/dev/apikey", "https://github.com/larosa023/Cinder"}
@@ -332,6 +333,12 @@ class Handler(BaseHTTPRequestHandler):
             if not install.set_startup(bool(body.pop("start_with_windows"))):
                 return self._json({"ok": False, "error": "Windows didn't allow changing the startup setting"})
             msg = "Cinder will start with Windows" if install.startup_enabled() else "Cinder won't start with Windows"
+        if "steam_bridge" in body:
+            on = bool(body["steam_bridge"])
+            if c.steam.bridge:
+                c.steam.bridge.set_enabled(on)
+            from steambridge import LAUNCH_FLAG
+            c.steam.extra_flags = [LAUNCH_FLAG] if on else []
         if "style" in body and not isinstance(body["style"], dict):
             return self._json({"ok": False, "error": "bad style"}, 400)
         if "api_key" in body:
@@ -401,6 +408,54 @@ class Handler(BaseHTTPRequestHandler):
         path = self.ctx.data_dir / "themes" / f"{slug}.css"
         path.write_text(css, encoding="utf-8")
         return self._json({"ok": True, "id": slug, "themes": list_themes(self.ctx.theme_dirs)})
+
+    def _bridge_action(self, action: str, body: dict):
+        """Update games or pause/resume downloads without opening a Steam window."""
+        import threading
+        import steambridge
+        from steamlib import running_appid
+        c, s = self.ctx, self.ctx.steam
+        b = s.bridge
+        raw = body.get("appids") or ([body["appid"]] if body.get("appid") is not None else [])
+        ids = [int(x) for x in raw if str(x).isdigit()]
+        games = {g["appid"]: g for g in s.library()}
+        ids = [a for a in ids if a in games and games[a].get("installed") and not games[a].get("shortcut")][:200]
+        if not ids:
+            return self._json({"ok": False, "error": "Nothing to update"})
+        pause = bool(body.get("pause"))
+
+        def do():
+            try:
+                r = b.update(ids) if action == "game_update" else b.pause(ids[0], pause)
+            except steambridge.BridgeError as e:
+                log.warning("bridge %s failed: %s", action, e)
+                return {"ok": False, "error": f"Steam didn't take the request ({e})"}
+            if isinstance(r, dict) and r.get("ok"):
+                return {"ok": True, "state": "queued"}
+            log.warning("bridge %s: unexpected reply %r", action, r)
+            return {"ok": False, "error": "This Steam build doesn't support that from Cinder. Use Manage in Steam."}
+
+        if not s.found or not b:
+            return self._json({"ok": False, "error": "Steam wasn't found"})
+        if not c.config["steam_bridge"]:
+            # Fallback: Steam's own page for the game, which has the Update button.
+            s.steam_url(f"steam://nav/games/details/{ids[0]}")
+            return self._json({"ok": True, "state": "steam"})
+        if not s.running():
+            def start_then():
+                s.start(silent=True)
+                if b.wait_ready(120):
+                    do()
+            threading.Thread(target=start_then, daemon=True).start()
+            return self._json({"ok": True, "state": "starting"})
+        if b.available():
+            return self._json(do())
+        if not body.get("restart"):
+            return self._json({"ok": True, "state": "need_restart"})
+        if running_appid():
+            return self._json({"ok": False, "error": "Close your game first; Steam has to restart once"})
+        threading.Thread(target=steambridge.restart_with_bridge, args=(s, b, do), daemon=True).start()
+        return self._json({"ok": True, "state": "restarting"})
 
     def _action(self, body: dict):
         c, s = self.ctx, self.ctx.steam
@@ -480,6 +535,8 @@ class Handler(BaseHTTPRequestHandler):
             s.steam_url("steam://store")
         elif action == "steam_exit":
             s.shutdown()
+        elif action in ("game_update", "download_pause"):
+            return self._bridge_action(action, body)
         elif action == "cinder_check":
             return self._json({"ok": True, "cinder": c.updater.check()})
         elif action == "cinder_update":
