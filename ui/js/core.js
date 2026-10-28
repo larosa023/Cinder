@@ -230,3 +230,63 @@ document.addEventListener("error", (e) => {
   else img.style.visibility = "hidden";
 }, true);
 })();
+
+/* Click-and-drag scrolling for horizontal rows, with a little momentum on release.
+   A press that doesn't move still counts as a normal click. */
+(() => {
+  const ROWS = ".srow-items, .recent-row, .sp-thumbs";
+  const THRESHOLD = 6;
+  let row = null, startX = 0, startLeft = 0, dragged = false, lastX = 0, lastT = 0, vel = 0, glide = 0;
+
+  const stopGlide = () => { cancelAnimationFrame(glide); glide = 0; };
+  const finish = () => { if (row) row.classList.remove("dragging"); row = null; };
+
+  document.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
+    const r = e.target.closest(ROWS);
+    if (!r || r.scrollWidth <= r.clientWidth) return;
+    stopGlide();
+    row = r; startX = lastX = e.clientX; startLeft = r.scrollLeft; lastT = performance.now();
+    dragged = false; vel = 0;
+    e.preventDefault();  // no text selection / image ghost while dragging
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    if (!row) return;
+    if (!(e.buttons & 1)) return finish();
+    const dx = e.clientX - startX;
+    if (!dragged && Math.abs(dx) < THRESHOLD) return;
+    if (!dragged) { dragged = true; row.classList.add("dragging"); }
+    row.scrollLeft = startLeft - dx;
+    const now = performance.now();
+    const dt = Math.max(1, now - lastT);
+    vel = 0.8 * vel + 0.2 * ((lastX - e.clientX) / dt);  // px per ms, smoothed
+    lastX = e.clientX; lastT = now;
+  });
+
+  window.addEventListener("mouseup", () => {
+    if (!row) return;
+    const r = row;
+    finish();
+    if (!dragged) return;
+    // Swallow the click that follows a drag so it doesn't open a game.
+    // (Only if it comes right away; a release outside the window sends no click.)
+    const swallow = (c) => { c.stopPropagation(); c.preventDefault(); };
+    window.addEventListener("click", swallow, { capture: true, once: true });
+    setTimeout(() => { window.removeEventListener("click", swallow, { capture: true }); dragged = false; }, 60);
+    // Glide to a stop.
+    let v = vel * 16;  // px per frame
+    if (Math.abs(v) < 1) return;
+    r.classList.add("gliding");
+    const step = () => {
+      r.scrollLeft += v;
+      v *= 0.94;
+      if (Math.abs(v) > 0.5) glide = requestAnimationFrame(step);
+      else { glide = 0; r.classList.remove("gliding"); }
+    };
+    glide = requestAnimationFrame(step);
+  });
+
+  // Scrolling the wheel over a row while gliding stops the glide.
+  document.addEventListener("wheel", (e) => { if (glide && e.target.closest(ROWS)) stopGlide(); }, { passive: true });
+})();

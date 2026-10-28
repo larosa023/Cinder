@@ -25,6 +25,12 @@ svg.fill { fill: currentColor; stroke: none; }
 :root { color-scheme: dark; --scroll-thumb: color-mix(in srgb, var(--text-dim) 35%, transparent); }
 * { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
 *:hover { --scroll-thumb: color-mix(in srgb, var(--text-dim) 55%, transparent); }
+/* Horizontal rows: drag to scroll. */
+.srow-items, .recent-row, .sp-thumbs { cursor: grab; }
+.srow-items img, .recent-row img, .sp-thumbs img { -webkit-user-drag: none; }
+.dragging, .gliding { scroll-snap-type: none !important; scroll-behavior: auto !important; }
+.dragging { cursor: grabbing; }
+.dragging > * { pointer-events: none; }
 /* Horizontal rows scroll with their arrows, so their bar only shows while you hover the row. */
 .srow-items, .recent-row, .sp-thumbs { scrollbar-color: transparent transparent; }
 .srow-items:hover, .recent-row:hover, .sp-thumbs:hover { scrollbar-color: color-mix(in srgb, var(--accent) 60%, transparent) transparent; }
