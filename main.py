@@ -116,6 +116,14 @@ def main() -> None:
 
     updater = Updater(app_dir())
     updater.cleanup()
+    # Right after an update the previous copy may still be closing, which keeps its
+    # old exe locked; try again a few times in the background.
+    def _retry_cleanup():
+        import time
+        for _ in range(6):
+            time.sleep(5)
+            updater.cleanup()
+    threading.Thread(target=_retry_cleanup, daemon=True).start()
     steam_updater = SteamUpdater(steam, keep_blocked=lambda: bool(cfg["freeze_updates"]))
     if cfg["check_updates"]:
         updater.check_async()
