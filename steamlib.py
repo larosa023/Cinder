@@ -230,7 +230,8 @@ class Steam:
         p = self.path / "config" / "avatarcache" / f"{steamid}.png"
         return p if p.exists() else None
 
-    def _localconfig_apps(self) -> dict:
+    def _localconfig(self) -> dict:
+        """Parsed UserLocalConfigStore for the signed-in user (cached by mtime)."""
         u = self.user()
         if not u or not u["accountid"]:
             return {}
@@ -240,17 +241,24 @@ class Steam:
         except OSError:
             return {}
         with self._lock:
-            cp, cm, apps = self._lc
+            cp, cm, data = self._lc
             if cp == p and cm == mtime:
-                return apps
-        data = read_vdf(p)
-        node = data.get("userlocalconfigstore", {})
+                return data
+        data = read_vdf(p).get("userlocalconfigstore", {})
+        with self._lock:
+            self._lc = (p, mtime, data)
+        return data
+
+    def _localconfig_apps(self) -> dict:
+        node = self._localconfig()
         for k in ("software", "valve", "steam", "apps"):
             node = node.get(k, {}) if isinstance(node, dict) else {}
-        apps = node if isinstance(node, dict) else {}
-        with self._lock:
-            self._lc = (p, mtime, apps)
-        return apps
+        return node if isinstance(node, dict) else {}
+
+    def local_friends(self) -> dict:
+        """Steam's on-disk friends cache: {accountid: {name, avatar, ...}}."""
+        node = self._localconfig().get("friends", {})
+        return node if isinstance(node, dict) else {}
 
     # -- library ------------------------------------------------------------
     def library(self) -> list[dict]:

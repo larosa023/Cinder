@@ -8,20 +8,40 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 
 ## Features
 
-- Cover-art grid of every installed game across all your Steam library folders
-- "Jump back in" row for recently played games
-- Instant search (`/` or `Ctrl+F`, `Enter` launches the top result)
-- Filters (played / unplayed / needs update) and sorting (recent, name, play time, size, last updated)
-- Game page with hero art, logo, play time, last played, size and install path
-- Play, open folder, Steam properties, store page and uninstall
-- Shows your Steam name and avatar, plus a live Steam status dot
-- **Steam update freeze**: one toggle writes or removes `steam.cfg`
-- Starts Steam silently with the freeze flags when Cinder opens (optional)
-- 5 built-in themes, plus drop-in custom CSS themes
-- **Built-in updates for Cinder**: checks GitHub releases and installs new versions in place, so you never re-download the exe
-- **On-demand Steam updates**: shows your locked Steam build vs. the newest one, and updates Steam with one click, then re-blocks it
+**Tabs, like Steam, on your theme**
+
+- **Library**: cover grid of installed games across every Steam library folder, a "Jump back in" row, instant search (`/`, `Enter` launches the top result), filters and sorting. With an API key it also shows owned games you haven't installed, with an Install button.
+- **Store**: featured deals, top sellers, new releases and coming soon, store search, and full game pages with screenshots, details, tags and price. **Buy in Steam** opens the checkout in your real Steam client.
+- **Wishlist**: your wishlist with live prices and discounts, total value, sorting and an "On sale" filter.
+- **Friends**: your friends list. With an API key you also see who's online and what they're playing. **Message** opens Steam chat.
+- **Profile**: your profile or a friend's, with avatar, status, about, play stats, recently played and most played.
+
+**Make it yours**
+
+- 5 built-in themes plus drop-in CSS themes
+- **Quick style**, layered on any theme: accent color, top bar or sidebar navigation, tall or wide covers, corners, density, font, background (solid, glow, or blurred art from your last played game), shadows, blur, animations, cover size
+- **Save as theme** turns your current look into a theme file
+
+**Window**
+
 - Borderless window with its own title bar
-- Tiny: Python standard library plus `pywebview` (uses the Edge WebView2 built into Windows 10/11)
+- Drag to the top of the screen to maximize; drag to the left or right edge to snap to half the screen
+- Drag a maximized window to restore it; double-click the title bar to maximize or restore
+- Resize from any edge or corner
+
+**Steam and updates**
+
+- Launches games through your installed Steam; never asks for your password
+- **Steam update freeze**: keeps the client on its current build; update it on demand from Settings
+- **Built-in Cinder updater**: new versions install from GitHub releases, so you don't re-download the exe
+
+Shortcuts: `Ctrl+1`–`5` switch tabs, `Alt+←` / mouse back button goes back, `F5` refreshes, `Ctrl+,` opens Settings.
+
+## Optional: Steam Web API key
+
+Everything works without one. Adding a key (Settings → **Account**) unlocks live friend status, your Steam level and owned-but-not-installed games. Get one free at https://steamcommunity.com/dev/apikey; any domain name works, e.g. `localhost`. The key is saved only in `%APPDATA%\Cinder\config.json` and is never shown back in the app.
+
+For the Wishlist and Profile tabs, Steam needs your profile and game details set to **Public** (Steam → Profile → Edit Profile → Privacy Settings).
 
 ## Run it
 
@@ -109,7 +129,7 @@ Themes are plain CSS files. The built-in ones are in `themes/`. Your own go in:
 %APPDATA%\Cinder\themes\
 ```
 
-(Settings → **Open my themes folder**.) A theme sets color variables and can override any other style:
+(Settings → **Open my themes folder**.) Quick style (Settings → Appearance) works on top of any theme. **Save as theme** writes your current look into this folder. By hand, a theme sets color variables and can override any other style:
 
 ```css
 /*
@@ -145,12 +165,14 @@ The `@swatch` colors are what the theme picker shows. A user theme with the same
 | File | What it does |
 | --- | --- |
 | `steamlib.py` | Finds Steam, parses `libraryfolders.vdf`, `appmanifest_*.acf`, `loginusers.vdf` and `localconfig.vdf`, finds cached artwork, starts Steam, handles the freeze and the on-demand Steam updater |
+| `storeapi.py` | Store, wishlist, friends and profile data from Steam's public endpoints, with caching |
+| `winsnap.py` | Moving, snapping and resizing for the borderless window |
 | `server.py` | Local-only HTTP server (127.0.0.1) that serves the UI and a small JSON API, guarded by a per-session token |
 | `updater.py` | Cinder self-updater (GitHub releases) |
 | `version.py` | Current version and the repo updates come from |
 | `main.py` | Starts everything and opens the window |
 | `.github/workflows/release.yml` | Builds and publishes `Cinder.exe` when a `v*` tag is pushed |
-| `ui/` | The interface (plain HTML/CSS/JS, no frameworks) |
+| `ui/` | The interface (plain HTML/CSS/JS, no frameworks), one script per tab in `ui/js/` |
 | `themes/` | Built-in themes |
 
 Games launch through `steam://rungameid/<appid>`. If Steam isn't running, Cinder starts it with the freeze flags and `-applaunch`.

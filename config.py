@@ -14,8 +14,13 @@ DEFAULTS = {
     "frameless": True,
     "steam_path": "",
     "check_updates": True,
+    "store_region": "US",
+    "api_key": "",
+    "start_tab": "library",
+    "style": {},
 }
-EDITABLE = {"theme", "sort", "card_size", "freeze_updates", "autostart_steam", "frameless", "steam_path", "check_updates"}
+EDITABLE = {"theme", "sort", "card_size", "freeze_updates", "autostart_steam", "frameless", "steam_path", "check_updates",
+            "store_region", "api_key", "start_tab", "style"}
 
 
 def data_dir() -> Path:
@@ -34,6 +39,12 @@ class Config:
             self.data.update(json.loads(path.read_text(encoding="utf-8")))
         except (OSError, ValueError):
             pass
+
+    def public(self) -> dict:
+        """Config safe to send to the UI (the API key is never sent back)."""
+        d = dict(self.data)
+        d["api_key_set"] = bool(d.pop("api_key", ""))
+        return d
 
     def __getitem__(self, key):
         return self.data.get(key, DEFAULTS.get(key))

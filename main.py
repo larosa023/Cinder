@@ -14,6 +14,7 @@ from config import Config, data_dir
 from server import Context, make_server
 from steamlib import Steam, SteamUpdater
 from updater import Updater
+from winsnap import IS_WIN, WinSnap
 
 
 def resource_dir() -> Path:
@@ -32,18 +33,37 @@ class WindowApi:
 
     def __init__(self):
         self._window = None
-        self._max = False
+        self._snap = WinSnap("Cinder")
+        self._snap.on_state = self._push_state
+
+    def _attach(self, window):
+        self._window = window
+        self._snap.window = window
+
+    def _push_state(self, state):
+        try:
+            self._window.evaluate_js(f"window.cinderWinState && window.cinderWinState({state!r})")
+        except Exception:
+            pass
 
     def minimize(self):
         self._window.minimize()
 
     def toggle_maximize(self):
-        if self._max:
-            self._window.restore()
-        else:
-            self._window.maximize()
-        self._max = not self._max
-        return self._max
+        if IS_WIN:
+            return self._snap.toggle_maximize()
+        self._window.toggle_fullscreen()
+        return "max"
+
+    def drag(self):
+        self._snap.drag()
+
+    def resize(self, edge):
+        if isinstance(edge, str) and edge in {"n", "s", "e", "w", "ne", "nw", "se", "sw"}:
+            self._snap.resize(edge)
+
+    def state(self):
+        return self._snap.state
 
     def close(self):
         self._window.destroy()
@@ -125,7 +145,7 @@ def main() -> None:
         background_color="#0b0d12",
         js_api=window_api,
     )
-    window_api._window = window
+    window_api._attach(window)
     webview.start(private_mode=False, storage_path=str(ddir / "webview"))
     srv.shutdown()
 

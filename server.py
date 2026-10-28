@@ -9,10 +9,12 @@ import re
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
+import storeapi
 from steamlib import ART, IS_WIN
 from version import VERSION
+ALLOWED_WEB = {"https://steamcommunity.com/dev/apikey", "https://github.com/larosa023/Cinder"}
 THEME_META = re.compile(r"@(\w+)\s+([^\n*]+)")
 
 
@@ -95,7 +97,9 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- GET ------------------------------------------------------------------
     def do_GET(self):
-        path = urlsplit(self.path).path
+        parts = urlsplit(self.path)
+        path = parts.path
+        query = {k: v[0] for k, v in parse_qs(parts.query).items()}
         c = self.ctx
         if path in ("/", "/index.html"):
             html = (c.ui_dir / "index.html").read_text(encoding="utf-8")
@@ -132,10 +136,77 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/updates":
             return self._json({"ok": True, "cinder": c.updater.snapshot(), "steam": c.steam_updater.snapshot()})
         if path == "/api/library":
-            return self._json({"ok": True, "games": c.steam.library()})
+            return self._json({"ok": True, "games": self._library()})
+        try:
+            return self._steam_data(path, query)
+        except storeapi.SteamDataError as e:
+            return self._json({"ok": False, "error": str(e)}, 502)
         return self._json({"ok": False, "error": "unknown endpoint"}, 404)
 
     do_HEAD = do_GET
+
+    # -- Steam data tabs --------------------------------------------------------
+    def _me(self) -> str:
+        u = self.ctx.steam.user()
+        return u["steamid"] if u else ""
+
+    def _library(self) -> list[dict]:
+        c = self.ctx
+        games = c.steam.library()
+        key, me = c.config["api_key"], self._me()
+        if key and me:
+            try:
+                local = {g["appid"]: g for g in games}
+                for o in storeapi.owned_games(key, me):
+                    g = local.get(o["appid"])
+                    if g:
+                        g["owned"] = True
+                        g["playtime"] = max(g["playtime"], o["playtime"])
+                        g["lastplayed"] = max(g["lastplayed"], o["lastplayed"])
+                    else:
+                        games.append({**o, "installed": False, "owned": True, "update_pending": False,
+                                      "size": 0, "lastupdated": 0, "installdir": "", "library": ""})
+            except storeapi.SteamDataError:
+                pass  # keep the local library
+        return games
+
+    def _steam_data(self, path: str, q: dict):
+        c = self.ctx
+        cc = (c.config["store_region"] or "US").upper()[:2]
+        key = c.config["api_key"] or ""
+        if path == "/api/store/home":
+            return self._json({"ok": True, **storeapi.store_home(cc)})
+        if path == "/api/store/search":
+            return self._json({"ok": True, **storeapi.store_search(q.get("q", ""), cc)})
+        m = re.fullmatch(r"/api/store/app/(\d+)", path)
+        if m:
+            app = storeapi.app_details(int(m.group(1)), cc)
+            local = next((g for g in c.steam.library() if g["appid"] == app["appid"]), None)
+            app["installed"] = bool(local and local["installed"])
+            return self._json({"ok": True, "app": app})
+        me = self._me()
+        if path == "/api/wishlist":
+            if not me:
+                raise storeapi.SteamDataError("Sign in to Steam once so Cinder knows your account")
+            return self._json({"ok": True, **storeapi.wishlist(me, cc, key)})
+        if path == "/api/friends":
+            return self._json({"ok": True, **storeapi.friends(c.steam.local_friends(), me, key)})
+        if path == "/api/profile":
+            sid = q.get("id") or me
+            if not sid or not sid.isdigit():
+                raise storeapi.SteamDataError("No Steam account found")
+            p = storeapi.profile(sid, key)
+            p["is_me"] = sid == me
+            if p["is_me"]:
+                lib = c.steam.library()
+                p["local"] = {
+                    "installed": sum(1 for g in lib if g["installed"]),
+                    "minutes": sum(g["playtime"] for g in lib),
+                    "disk": sum(g["size"] for g in lib),
+                    "recent": [g for g in sorted(lib, key=lambda g: -g["lastplayed"]) if g["lastplayed"]][:6],
+                }
+            return self._json({"ok": True, "profile": p})
+        return self._json({"ok": False, "error": "unknown endpoint"}, 404)
 
     def _steam_status(self) -> dict:
         s = self.ctx.steam
@@ -151,7 +222,8 @@ class Handler(BaseHTTPRequestHandler):
         return {
             "ok": True,
             "version": VERSION,
-            "config": c.config.data,
+            "config": c.config.public(),
+            "platform": sys.platform,
             "themes": list_themes(c.theme_dirs),
             "user": c.steam.user(),
             "steam": self._steam_status(),
@@ -169,6 +241,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._config(body)
             if path == "/api/action":
                 return self._action(body)
+            if path == "/api/theme":
+                return self._save_theme(body)
         except Exception as e:  # keep the UI alive on unexpected errors
             return self._json({"ok": False, "error": str(e)}, 500)
         return self._json({"ok": False, "error": "unknown endpoint"}, 404)
@@ -180,8 +254,26 @@ class Handler(BaseHTTPRequestHandler):
             ok, msg = c.steam.set_freeze(bool(body["freeze_updates"]))
             if not ok:
                 return self._json({"ok": False, "error": msg})
-        data = c.config.update(body)
-        return self._json({"ok": True, "config": data, "message": msg, "steam": self._steam_status()})
+        if "style" in body and not isinstance(body["style"], dict):
+            return self._json({"ok": False, "error": "bad style"}, 400)
+        if "api_key" in body:
+            body["api_key"] = re.sub(r"[^0-9A-Fa-f]", "", str(body["api_key"]))[:64]
+        if "store_region" in body:
+            body["store_region"] = re.sub(r"[^A-Za-z]", "", str(body["store_region"]))[:2].upper() or "US"
+        c.config.update(body)
+        return self._json({"ok": True, "config": c.config.public(), "message": msg, "steam": self._steam_status()})
+
+    def _save_theme(self, body: dict):
+        name = str(body.get("name", "")).strip()[:40]
+        css = str(body.get("css", ""))
+        slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+        if not slug or not css or len(css) > 100_000:
+            return self._json({"ok": False, "error": "Give your theme a name"}, 400)
+        if "</" in css or "@import" in css.lower():
+            return self._json({"ok": False, "error": "Theme contains unsupported content"}, 400)
+        path = self.ctx.data_dir / "themes" / f"{slug}.css"
+        path.write_text(css, encoding="utf-8")
+        return self._json({"ok": True, "id": slug, "themes": list_themes(self.ctx.theme_dirs)})
 
     def _action(self, body: dict):
         c, s = self.ctx, self.ctx.steam
@@ -217,6 +309,22 @@ class Handler(BaseHTTPRequestHandler):
                 s.start(silent=False)
         elif action == "steam_friends":
             s.steam_url("steam://open/friends")
+        elif action == "steam_downloads":
+            s.steam_url("steam://open/downloads")
+        elif action == "message" and str(body.get("steamid", "")).isdigit():
+            s.steam_url(f"steam://friends/message/{body['steamid']}")
+        elif action == "profile_in_steam" and str(body.get("steamid", "")).isdigit():
+            s.steam_url(f"steam://url/SteamIDPage/{body['steamid']}")
+        elif action == "wishlist_in_steam":
+            s.steam_url("steam://openurl/https://store.steampowered.com/wishlist/")
+        elif action == "open_web":
+            url = str(body.get("url", ""))
+            if url not in ALLOWED_WEB:
+                return self._json({"ok": False, "error": "link not allowed"}, 400)
+            import webbrowser
+            webbrowser.open(url)
+        elif action == "store_in_steam":
+            s.steam_url("steam://store")
         elif action == "steam_exit":
             s.shutdown()
         elif action == "cinder_check":
