@@ -198,6 +198,19 @@ class Handler(BaseHTTPRequestHandler):
             local = next((g for g in c.steam.library() if g["appid"] == app["appid"]), None)
             app["installed"] = bool(local and local["installed"])
             return self._json({"ok": True, "app": app})
+        m = re.fullmatch(r"/api/game/(\d+)/(news|achievements|dlc)", path)
+        if m:
+            appid, what = int(m.group(1)), m.group(2)
+            if appid >= 0x80000000:
+                raise storeapi.SteamDataError("Not available for non-Steam games")
+            if what == "news":
+                return self._json({"ok": True, "items": storeapi.news(appid)})
+            if what == "dlc":
+                return self._json({"ok": True, "items": storeapi.dlc(appid, cc, c.steam.installed_dlc(appid))})
+            me = self._me()
+            if not me:
+                raise storeapi.SteamDataError("Sign in to Steam once so Cinder knows your account")
+            return self._json({"ok": True, **storeapi.achievements(me, appid, key)})
         me = self._me()
         if path == "/api/wishlist":
             if not me:
@@ -410,6 +423,15 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": False, "error": "link not allowed"}, 400)
             import webbrowser
             webbrowser.open(url)
+        elif action == "steam_url_open":
+            url = str(body.get("url", ""))
+            if re.match(r"^https://(store\.steampowered\.com|steamcommunity\.com)/", url):
+                s.steam_url("steam://openurl/" + url)  # Steam pages open in Steam
+            elif re.match(r"^https?://[^\s]+$", url):
+                import webbrowser
+                webbrowser.open(url)  # other news sites open in your browser
+            else:
+                return self._json({"ok": False, "error": "link not allowed"}, 400)
         elif action == "store_in_steam":
             s.steam_url("steam://store")
         elif action == "steam_exit":

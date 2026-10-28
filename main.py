@@ -293,6 +293,10 @@ def main() -> None:
     watcher.start()
     ctx.playing = watcher.snapshot
 
+    if tray and steam.found:
+        from sales import SaleWatcher
+        SaleWatcher(steam, cfg, ddir, tray.notify).start()
+
     def on_closing():
         # Closing keeps Cinder in the tray (like Steam), unless you quit or it's restarting.
         if quitting.is_set() or restart_requested.is_set() or not tray or not cfg["close_to_tray"]:

@@ -204,6 +204,7 @@ def app_details(appid: int, cc: str) -> dict:
         "screenshots": [{"thumb": s.get("path_thumbnail"), "full": s.get("path_full")}
                         for s in (d.get("screenshots") or [])[:16]],
         "dlc_count": len(d.get("dlc") or []),
+        "dlc": [int(x) for x in (d.get("dlc") or [])][:120],
         "website": d.get("website") or "",
     }
 
@@ -442,3 +443,109 @@ def visible_status(steamid: str, api_key: str = "") -> dict:
     state = ("ingame" if online == "in-game" else "offline" if online == "offline" else
              "away" if "away" in msg or "snooze" in msg else "online")
     return {"state": state, "source": "profile"}
+
+
+# ---------------------------------------------------------------- game pages
+
+def _bbcode(text: str) -> str:
+    """Steam news uses BBCode and HTML; reduce it to plain text."""
+    text = re.sub(r"\[/?(?:b|i|u|h\d|list|olist|\*|quote|code|strike|spoiler|table|tr|td|th|hr|noparse)[^\]]*\]", " ", text or "")
+    text = re.sub(r"\[url=[^\]]*\](.*?)\[/url\]", r"\1", text)
+    text = re.sub(r"\[(?:img|previewyoutube|video)[^\]]*\].*?\[/(?:img|previewyoutube|video)\]", " ", text, flags=re.S)
+    text = re.sub(r"\[/?[a-z]+[^\]]*\]", " ", text)
+    text = re.sub(r"\{STEAM_CLAN_IMAGE\}\S*", " ", text)
+    return re.sub(r"\s+", " ", strip_html(text)).strip()
+
+
+def news(appid: int, count: int = 8) -> list[dict]:
+    data = _fetch(f"{API}/ISteamNews/GetNewsForApp/v2/?{_q(appid=appid, count=count, maxlength=600, format='json')}", ttl=1800)
+    out = []
+    for it in (data.get("appnews") or {}).get("newsitems") or []:
+        out.append({
+            "title": strip_html(it.get("title")),
+            "url": it.get("url") or "",
+            "date": _int(it.get("date")),
+            "source": it.get("feedlabel") or "",
+            "official": it.get("feedname") == "steam_community_announcements",
+            "patch": "patchnotes" in (it.get("tags") or []),
+            "text": _bbcode(it.get("contents"))[:500],
+        })
+    return out
+
+
+def achievements(steamid: str, appid: int, api_key: str = "") -> dict:
+    """Your achievements for a game: unlocked state, icons, descriptions, global rarity."""
+    items: list[dict] = []
+    if api_key:
+        try:
+            mine = _fetch(f"{API}/ISteamUserStats/GetPlayerAchievements/v1/?{_q(key=api_key, steamid=steamid, appid=appid, l='english')}", ttl=120)
+            schema = _fetch(f"{API}/ISteamUserStats/GetSchemaForGame/v2/?{_q(key=api_key, appid=appid, l='english')}", ttl=86400)
+            got = {a["apiname"]: a for a in (mine.get("playerstats") or {}).get("achievements") or []}
+            for a in ((schema.get("game") or {}).get("availableGameStats") or {}).get("achievements") or []:
+                m = got.get(a.get("name"), {})
+                unlocked = bool(m.get("achieved"))
+                items.append({"id": a.get("name"), "name": a.get("displayName") or a.get("name"),
+                              "desc": a.get("description") or ("Hidden achievement" if a.get("hidden") else ""),
+                              "icon": a.get("icon") if unlocked else a.get("icongray"),
+                              "unlocked": unlocked, "time": _int(m.get("unlocktime"))})
+        except SteamDataError:
+            items = []
+    if not items:
+        raw = _fetch(f"{COMMUNITY}/profiles/{steamid}/stats/{appid}/achievements/?xml=1&l=english", ttl=120, as_json=False)
+        try:
+            root = ET.fromstring(raw)
+        except ET.ParseError as e:
+            raise SteamDataError("This game has no achievements, or your game details are private") from e
+        err = _xml_text(root, "error")
+        if err or root.find("achievements") is None:
+            raise SteamDataError("This game has no achievements, or your game details are private")
+        for a in root.find("achievements"):
+            unlocked = a.get("closed") == "1"
+            items.append({"id": _xml_text(a, "apiname"), "name": _xml_text(a, "name"),
+                          "desc": _xml_text(a, "description"),
+                          "icon": _xml_text(a, "iconClosed") if unlocked else _xml_text(a, "iconOpen"),
+                          "unlocked": unlocked, "time": _int(_xml_text(a, "unlockTimestamp"))})
+    if not items:
+        raise SteamDataError("This game has no achievements")
+    try:
+        g = _fetch(f"{API}/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/?{_q(gameid=appid)}", ttl=86400)
+        pct = {x.get("name", "").lower(): float(x.get("percent") or 0)
+               for x in (g.get("achievementpercentages") or {}).get("achievements") or []}
+        for it in items:
+            it["percent"] = round(pct.get((it["id"] or "").lower(), 0), 1) if pct else None
+    except (SteamDataError, ValueError):
+        pass
+    items.sort(key=lambda x: (not x["unlocked"], -(x["time"] or 0) if x["unlocked"] else -(x.get("percent") or 0)))
+    return {"total": len(items), "unlocked": sum(1 for x in items if x["unlocked"]), "items": items}
+
+
+def dlc(appid: int, cc: str, installed: set[int]) -> list[dict]:
+    """The game's DLC from the store, with price and whether it's installed."""
+    data = _fetch(f"{STORE}/api/appdetails?{_q(appids=appid, cc=cc, l='english')}", ttl=3600)
+    node = (data or {}).get(str(appid)) or {}
+    ids = [int(x) for x in ((node.get("data") or {}).get("dlc") or [])][:120]
+    if not ids:
+        return []
+    names = _names(ids, cc)
+    price = prices(ids, cc)
+    out = [{"appid": i, "name": names.get(i) or f"DLC {i}", "installed": i in installed, "price": price.get(i),
+            "image": f"https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{i}/header.jpg"} for i in ids]
+    out.sort(key=lambda d: (not d["installed"], d["name"].lower()))
+    return out
+
+
+# ----------------------------------------------------------------- sale alerts
+
+def new_sales(wishlist_items: list[dict], seen: dict) -> tuple[list[dict], dict]:
+    """Wishlist items newly on sale (or on a deeper sale) since last time."""
+    fresh, now_seen = [], {}
+    for it in wishlist_items:
+        p = it.get("price") or {}
+        d = _int(p.get("discount"))
+        if d <= 0:
+            continue
+        key = str(it["appid"])
+        now_seen[key] = d
+        if d > _int(seen.get(key)):
+            fresh.append(it)
+    return fresh, now_seen

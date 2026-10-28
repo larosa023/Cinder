@@ -56,6 +56,7 @@ async function init() {
   C.settings.init();
   C.style.init();
   C.activity.init();
+  C.gamepage.init();
   const libraryLoad = C.library.load(true);  // start reading the library right away
   try {
     const st = await C.api("/api/state");

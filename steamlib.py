@@ -46,6 +46,11 @@ ART = {
 _NO_WINDOW = 0x08000000 if IS_WIN else 0
 
 
+def is_shortcut(appid: int) -> bool:
+    """Non-Steam game shortcuts get app ids with the top bit set; real Steam apps never do."""
+    return int(appid) >= 0x80000000
+
+
 # -------------------------------------------------------------------- downloads
 
 # Steam's app state flags (appmanifest StateFlags).
@@ -257,6 +262,7 @@ class Steam:
         self.path = find_steam_path(path_override)
         self.arts = None  # steamart.ArtFinder, created on first use
         self.quiet = None  # steamquiet.SteamQuiet, set by main
+        self._sc_cache: tuple[float | None, list] = (None, [])
         self._running, self._running_at = False, -10.0
         self._lc: tuple[Path | None, float, dict] = (None, 0.0, {})
         self._lock = threading.Lock()
@@ -387,7 +393,85 @@ class Steam:
                 prev = games.get(appid)
                 if not prev or (game["installed"] and not prev["installed"]):
                     games[appid] = game
-        return sorted(games.values(), key=lambda g: g["name"].lower())
+        result = list(games.values()) + self.shortcuts()
+        return sorted(result, key=lambda g: g["name"].lower())
+
+    def installed_dlc(self, appid: int) -> set[int]:
+        """DLC app ids whose content is installed for this game (from its appmanifest)."""
+        for lib in self.library_dirs():
+            st = read_vdf(lib / "steamapps" / f"appmanifest_{appid}.acf").get("appstate", {})
+            if st:
+                depots = st.get("installeddepots") or {}
+                return {_int(d.get("dlcappid")) for d in depots.values()
+                        if isinstance(d, dict) and _int(d.get("dlcappid"))}
+        return set()
+
+    # -- non-Steam games -----------------------------------------------------
+    def _userdata(self) -> Path | None:
+        u = self.user()
+        if not self.path or not u or not u["accountid"]:
+            return None
+        return self.path / "userdata" / str(u["accountid"])
+
+    def shortcuts(self) -> list[dict]:
+        """Non-Steam games you've added to Steam (userdata/<id>/config/shortcuts.vdf)."""
+        ud = self._userdata()
+        if not ud:
+            return []
+        p = ud / "config" / "shortcuts.vdf"
+        try:
+            mtime = p.stat().st_mtime
+        except OSError:
+            return []
+        if self._sc_cache[0] == mtime:
+            return self._sc_cache[1]
+        out = []
+        try:
+            from steamart import parse_binary_vdf
+            root = parse_binary_vdf(p.read_bytes())
+            entries = next((v for k, v in root.items() if k.lower() == "shortcuts"), {})
+            for e in entries.values():
+                if not isinstance(e, dict):
+                    continue
+                e = {k.lower(): v for k, v in e.items()}
+                appid = int(e.get("appid") or 0) & 0xFFFFFFFF
+                name = e.get("appname") or e.get("appName") or ""
+                if not appid or not name or e.get("ishidden"):
+                    continue
+                exe = str(e.get("exe") or "").strip('"')
+                out.append({
+                    "appid": appid,
+                    "name": name,
+                    "shortcut": True,
+                    "gameid": str((appid << 32) | 0x02000000),
+                    "installed": True,
+                    "update_pending": False,
+                    "size": 0,
+                    "lastupdated": 0,
+                    "lastplayed": _int(e.get("lastplaytime")),
+                    "playtime": 0,
+                    "installdir": str(e.get("startdir") or "").strip('"') or str(Path(exe).parent),
+                    "library": "",
+                    "exe": exe,
+                })
+        except Exception as ex:
+            from cinderlog import log
+            log.warning("couldn't read shortcuts.vdf: %r", ex)
+        self._sc_cache = (mtime, out)
+        return out
+
+    def shortcut_art(self, appid: int, kind: str) -> Path | None:
+        """Custom art you've set for a non-Steam game (userdata/<id>/config/grid)."""
+        ud = self._userdata()
+        if not ud:
+            return None
+        grid = ud / "config" / "grid"
+        stem = {"portrait": f"{appid}p", "header": f"{appid}", "hero": f"{appid}_hero", "logo": f"{appid}_logo"}[kind]
+        for ext in ("png", "jpg", "jpeg", "webp"):
+            f = grid / f"{stem}.{ext}"
+            if f.is_file():
+                return f
+        return None
 
     # -- art ----------------------------------------------------------------
     def _art_finder(self):
@@ -399,10 +483,13 @@ class Steam:
 
     def art(self, appid: int, kind: str):
         """("file", path) / ("url", url) for a game's art, or None. See steamart.py."""
+        if is_shortcut(appid):
+            f = self.shortcut_art(appid, kind)
+            return ("file", str(f)) if f else None
         return self._art_finder().find(appid, kind)
 
     def prefetch_art(self, appids: list[int]) -> None:
-        self._art_finder().prefetch(appids)
+        self._art_finder().prefetch([a for a in appids if not is_shortcut(a)])
 
     # -- process control ----------------------------------------------------
     def running(self) -> bool:
@@ -471,8 +558,11 @@ class Steam:
         """Launch through Steam, keeping Steam's main window from popping up."""
         before = self.quiet.snapshot() if self.quiet else set()
         was_running = self.running()
+        gameid = (appid << 32) | 0x02000000 if is_shortcut(appid) else appid
         if was_running:
-            self.open_url(f"steam://rungameid/{appid}")
+            self.open_url(f"steam://rungameid/{gameid}")
+        elif is_shortcut(appid):
+            self.start(silent=True, extra=[f"steam://rungameid/{gameid}"])
         else:
             self.start(silent=True, extra=["-applaunch", str(appid)])
         if self.quiet:

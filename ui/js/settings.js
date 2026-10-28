@@ -368,6 +368,7 @@ function bind() {
   $("#set-tray").addEventListener("change", (e) => C.saveConfig({ close_to_tray: e.target.checked }));
   $("#set-playing").addEventListener("change", (e) => C.saveConfig({ when_playing: e.target.value }));
   $("#set-restore").addEventListener("change", (e) => C.saveConfig({ restore_after_play: e.target.checked }));
+  $("#set-sales").addEventListener("change", (e) => C.saveConfig({ sale_alerts: e.target.checked }));
 }
 
 function renderSteamUpdToggle() {
@@ -387,6 +388,7 @@ function fill() {
   $("#set-tray").checked = c.close_to_tray !== false;
   $("#set-playing").value = c.when_playing || "minimize";
   $("#set-restore").checked = c.restore_after_play !== false;
+  $("#set-sales").checked = c.sale_alerts !== false;
   const inst = S.install || {};
   $("#set-startup").checked = !!inst.startup;
   $("#set-startup").disabled = !inst.frozen;

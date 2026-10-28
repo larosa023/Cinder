@@ -50,7 +50,7 @@ function cardHTML(g) {
       <span class="play" data-play="${g.appid}" title="${g.installed ? "Play" : "Install"}">${g.installed ? ICON.play : ICON.down}</span>
     </div>
     <div class="meta"><span class="name">${esc(g.name)}</span>
-      <span class="sub">${g.playtime ? C.fmtPlay(g.playtime) + " played" : "Not played yet"}</span></div>
+      <span class="sub">${g.shortcut ? "Non-Steam game" : g.playtime ? C.fmtPlay(g.playtime) + " played" : "Not played yet"}</span></div>
   </button>`;
 }
 
@@ -159,6 +159,8 @@ function openDetail(appid) {
   $("#d-play").innerHTML = g.installed ? `${ICON.play}${g.update_pending ? "Update & Play" : "Play"}` : `${ICON.down}Install`;
   $("#d-folder").hidden = $("#d-uninstall").hidden = $("#d-props").hidden = !g.installed;
   renderDetailToggles(g.appid);
+  if (g.shortcut) { $("#d-size").textContent = "—"; $("#d-path").textContent = g.exe || g.installdir; }
+  C.gamepage.open(g);
   $("#detail").hidden = false;
   $("#d-play").focus();
 }
@@ -210,8 +212,8 @@ function cardMenu(e, appid) {
     <button data-cm="hide">${hid ? "Unhide" : "Hide from library"}</button>
     <hr>
     <button data-cm="details">Details</button>
-    <button data-cm="store">Store page</button>
-    ${g.installed ? '<button data-cm="folder">Open install folder</button><button data-cm="props">Steam properties</button>' : ""}`;
+    ${g.shortcut ? '<button data-cm="folder">Open folder</button>' : `<button data-cm="store">Store page</button>
+    ${g.installed ? '<button data-cm="folder">Open install folder</button><button data-cm="props">Steam properties</button>' : ""}`}`;
   m.dataset.appid = appid;
   m.hidden = false;
   const w = m.offsetWidth, h = m.offsetHeight;

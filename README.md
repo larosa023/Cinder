@@ -22,6 +22,12 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 - Cinder minimizes or hides to the tray when a game starts and comes back when it closes (Settings → General)
 - Downloads panel: install and update progress, speed and time left, read from Steam's own files
 
+**Game pages**
+
+- Tabs for Achievements (unlock dates and how rare each one is), News and patch notes, and DLC (with what you have installed)
+- Non-Steam games you've added to Steam show up too, with any custom art you've set, and launch through Steam
+- Wishlist sale alerts: a Windows notification when something on your wishlist goes on sale (Settings → Account)
+
 **Organize**
 
 - Favorites stay pinned to the top; hide games you never play (right-click any game, or use its page)
@@ -175,6 +181,7 @@ The `@swatch` colors are what the theme picker shows. A user theme with the same
 | `install.py` | Install location, shortcuts, start with Windows, swapping in updates after exit |
 | `tray.py` | Tray icon, its menu, and Windows notifications |
 | `playing.py` | Notices when a game starts and stops (Steam's RunningAppID) |
+| `sales.py` | Checks your wishlist every few hours for new sales |
 | `main.py` | Starts everything and opens the window |
 | `.github/workflows/release.yml` | Builds and publishes `Cinder.exe` when a `v*` tag is pushed |
 | `ui/` | The interface (plain HTML/CSS/JS, no frameworks), one script per tab in `ui/js/` |

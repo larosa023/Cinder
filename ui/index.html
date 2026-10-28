@@ -118,6 +118,14 @@
         <button class="btn" id="d-hide" title="Hide it from your library"></button>
         <button class="btn danger" id="d-uninstall">Uninstall</button>
       </div>
+      <nav class="d-tabs" id="d-tabs">
+        <button data-dtab="overview" class="on">Overview</button>
+        <button data-dtab="achievements">Achievements</button>
+        <button data-dtab="news">News</button>
+        <button data-dtab="dlc">DLC</button>
+      </nav>
+      <div class="d-pane" id="d-pane" hidden></div>
+      <div id="d-overview">
       <dl class="d-stats">
         <div><dt>Play time</dt><dd id="d-playtime"></dd></div>
         <div><dt>Last played</dt><dd id="d-last"></dd></div>
@@ -125,6 +133,7 @@
         <div><dt>App ID</dt><dd id="d-appid"></dd></div>
       </dl>
       <p class="d-path" id="d-path"></p>
+      </div>
     </div>
   </div>
 </div>
@@ -258,6 +267,8 @@
             <button class="btn sm primary" id="key-save">Save</button>
             <button class="btn sm" id="key-clear">Remove</button>
             <button class="btn sm" id="key-get">Get a key</button></div></div>
+        <div class="row"><div><strong>Wishlist sale alerts</strong><small>Checks your wishlist every few hours and shows a Windows notification when something goes on sale.</small></div>
+          <label class="switch"><input type="checkbox" id="set-sales"><span></span></label></div>
         <p class="note">Cinder never asks for your Steam password. Buying, chat and wishlist changes open in the real Steam client.</p>
       </div>
 
@@ -320,6 +331,7 @@
 <script src="/ui/js/profile.js"></script>
 <script src="/ui/js/settings.js"></script>
 <script src="/ui/js/activity.js"></script>
+<script src="/ui/js/gamepage.js"></script>
 <script src="/ui/js/main.js"></script>
 </body>
 </html>
