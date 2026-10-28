@@ -28,7 +28,7 @@
     <button class="icon-btn" id="btn-downloads" title="Steam downloads"><svg viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg></button>
     <button class="icon-btn" id="btn-refresh" title="Refresh (F5)"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg></button>
     <button class="icon-btn" id="btn-settings" title="Settings (Ctrl+,)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></button>
-    <button class="user" id="btn-user" title="Your profile">
+    <button class="user" id="btn-user" title="Status and profile">
       <span class="avatar" id="avatar"></span>
       <span class="user-name" id="user-name">…</span>
       <span class="dot" id="steam-dot" title="Steam status"></span>
@@ -214,6 +214,8 @@
           <label class="switch"><input type="checkbox" id="set-freeze"><span></span></label></div>
         <div class="row"><div><strong>Start Steam in the background</strong><small>Launches Steam silently with update-blocking flags when Cinder opens.</small></div>
           <label class="switch"><input type="checkbox" id="set-autostart"><span></span></label></div>
+        <div class="row"><div><strong>Keep Steam's window hidden when launching games</strong><small>If Steam pops its library window up when a game starts, Cinder sends it straight back to the tray. Steam's small prompts (launch options, cloud saves, sign-in) still show.</small></div>
+          <label class="switch"><input type="checkbox" id="set-quiet"><span></span></label></div>
         <div class="row"><div><strong>Steam status</strong><small id="steam-info"></small></div>
           <div class="btns">
             <button class="btn sm" data-act="steam_start">Start</button>
@@ -265,6 +267,16 @@
 <div class="rz rz-e" data-edge="e"></div><div class="rz rz-w" data-edge="w"></div>
 <div class="rz rz-ne" data-edge="ne"></div><div class="rz rz-nw" data-edge="nw"></div>
 <div class="rz rz-se" data-edge="se"></div><div class="rz rz-sw" data-edge="sw"></div>
+
+<!-- Status menu (opened from your name in the top bar) -->
+<div class="menu" id="status-menu" hidden>
+  <div class="menu-head"><span class="avatar" id="sm-avatar"></span>
+    <div><strong id="sm-name"></strong><small id="sm-state"></small></div></div>
+  <div class="menu-list" id="sm-list"></div>
+  <hr>
+  <button data-sm="profile">View profile</button>
+  <button data-sm="friends">Open Steam friends</button>
+</div>
 
 <div class="toast" id="toast" role="status"></div>
 

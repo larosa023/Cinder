@@ -312,11 +312,22 @@ class Handler(BaseHTTPRequestHandler):
             if not s.start(silent=bool(body.get("silent", True))):
                 return self._json({"ok": False, "error": "steam.exe not found"})
         elif action == "steam_open":
+            if s.quiet:
+                s.quiet.cancel()
             if s.running():
                 s.open_url("steam://open/main")
             else:
                 s.start(silent=False)
+        elif action == "status":
+            status = str(body.get("status", ""))
+            if status not in ("online", "away", "busy", "invisible", "offline", "trade", "play"):
+                return self._json({"ok": False, "error": "unknown status"}, 400)
+            s.set_status(status)
+            c.config.update({"persona": status})
+            return self._json({"ok": True, "persona": status})
         elif action == "steam_friends":
+            if s.quiet:
+                s.quiet.cancel()
             s.steam_url("steam://open/friends")
         elif action == "steam_downloads":
             s.steam_url("steam://open/downloads")

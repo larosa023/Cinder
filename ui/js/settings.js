@@ -47,11 +47,18 @@ function renderThemes() {
   $$(".theme").forEach((b) => b.classList.toggle("on", b.dataset.theme === S.config.theme));
 }
 
+const STATUSES = [
+  ["online", "Online"], ["away", "Away"], ["busy", "Busy"], ["invisible", "Invisible", "Appear offline to friends"],
+  ["offline", "Offline", "Sign out of friends"], ["play", "Looking to play"], ["trade", "Looking to trade"],
+];
+const statusLabel = (p) => (STATUSES.find((x) => x[0] === p) || STATUSES[0])[1];
+
 function renderSteam() {
   const s = S.steam;
   const dot = $("#steam-dot");
-  dot.classList.toggle("on", !!s.running);
-  dot.title = s.running ? "Steam is running" : "Steam is not running";
+  const persona = S.config.persona || "online";
+  dot.dataset.p = s.running ? persona : "closed";
+  dot.title = s.running ? `Steam: ${statusLabel(persona)}` : "Steam is not running";
   $("#steam-info").textContent = !s.found ? "Steam folder not found"
     : `${s.running ? "Running" : "Not running"} · ${s.frozen ? "updates blocked" : "updates allowed"} · ${s.path}`;
   $("#set-freeze").checked = !!s.frozen;
@@ -72,6 +79,27 @@ function renderAccount() {
   $("#key-clear").hidden = !set;
   $("#set-region").value = S.config.store_region || "US";
 }
+
+function renderStatusMenu() {
+  const persona = S.config.persona || "online";
+  const u = S.user;
+  $("#sm-name").textContent = u ? u.name : "Not signed in";
+  $("#sm-state").textContent = S.steam.running ? statusLabel(persona) : "Steam isn't running (choosing a status starts it)";
+  const av = $("#sm-avatar");
+  if (u && u.has_avatar) { av.style.backgroundImage = "url(/avatar)"; av.textContent = ""; }
+  else { av.style.backgroundImage = ""; av.textContent = u ? u.name[0].toUpperCase() : "?"; }
+  $("#sm-list").innerHTML = STATUSES.map(([v, label, hint]) => `
+    <button data-status="${v}" class="${v === persona ? "on" : ""}">
+      <span class="dot" data-p="${v}"></span><span>${label}${hint ? `<br><small>${hint}</small>` : ""}</span>
+      <svg class="check" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></button>`).join("");
+}
+
+C.toggleStatusMenu = (force) => {
+  const m = $("#status-menu");
+  const open = force ?? m.hidden;
+  if (open) renderStatusMenu();
+  m.hidden = !open;
+};
 
 function showPane(name) {
   $$("#set-nav [data-pane]").forEach((b) => b.classList.toggle("on", b.dataset.pane === name));
@@ -192,6 +220,29 @@ function bind() {
     if (b) setTheme(b.dataset.theme);
   });
   $("#open-themes").addEventListener("click", () => C.act("themes_folder"));
+  $("#set-quiet").addEventListener("change", (e) => C.saveConfig({ hide_steam_on_launch: e.target.checked }));
+  $("#status-menu").addEventListener("click", async (e) => {
+    const st = e.target.closest("[data-status]");
+    if (st) {
+      C.toggleStatusMenu(false);
+      try {
+        await C.api("/api/action", { action: "status", status: st.dataset.status });
+        S.config.persona = st.dataset.status;
+        renderSteam();
+        C.toast(`Status: ${statusLabel(st.dataset.status)}`);
+        setTimeout(C.refreshStatus, 3000);
+      } catch (err) { C.toast(err.message, true); }
+      return;
+    }
+    const a = e.target.closest("[data-sm]");
+    if (!a) return;
+    C.toggleStatusMenu(false);
+    if (a.dataset.sm === "profile") C.go("profile");
+    else C.act("steam_friends");
+  });
+  document.addEventListener("mousedown", (e) => {
+    if (!$("#status-menu").hidden && !e.target.closest("#status-menu, #btn-user")) C.toggleStatusMenu(false);
+  });
   $("#set-freeze").addEventListener("change", (e) => C.saveConfig({ freeze_updates: e.target.checked }));
   $("#set-autostart").addEventListener("change", (e) => C.saveConfig({ autostart_steam: e.target.checked }));
   $("#set-frameless").addEventListener("change", (e) => C.saveConfig({ frameless: e.target.checked }));
@@ -258,6 +309,7 @@ function fill() {
   $("#set-autostart").checked = !!c.autostart_steam;
   $("#set-frameless").checked = !!c.frameless;
   $("#set-checkupd").checked = !!c.check_updates;
+  $("#set-quiet").checked = c.hide_steam_on_launch !== false;
   $("#set-start").value = c.start_tab || "library";
   $("#sort").value = c.sort;
   $("#theme-css").href = `/themes/${encodeURIComponent(c.theme)}.css`;

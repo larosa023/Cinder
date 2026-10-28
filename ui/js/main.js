@@ -16,7 +16,7 @@ function bindGlobal() {
   $("#nav-back").addEventListener("click", () => history.back());
   $("#btn-refresh").addEventListener("click", () => C.views[C.route.tab].refresh?.());
   $("#btn-settings").addEventListener("click", () => C.openSettings());
-  $("#btn-user").addEventListener("click", () => C.go("profile"));
+  $("#btn-user").addEventListener("click", () => C.toggleStatusMenu());
   $("#btn-downloads").addEventListener("click", () => C.act("steam_downloads"));
 
   $$(".overlay").forEach((o) => o.addEventListener("click", (e) => {
@@ -25,7 +25,7 @@ function bindGlobal() {
 
   document.addEventListener("keydown", (e) => {
     const typing = e.target.matches("input, select, textarea");
-    if (e.key === "Escape") C.closeOverlays();
+    if (e.key === "Escape") { C.closeOverlays(); C.toggleStatusMenu(false); }
     else if (e.key === "F5") { e.preventDefault(); C.views[C.route.tab].refresh?.(); }
     else if ((e.key === "/" && !typing) || (e.key.toLowerCase() === "f" && e.ctrlKey)) {
       e.preventDefault(); search.focus(); search.select();

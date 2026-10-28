@@ -19,9 +19,12 @@ DEFAULTS = {
     "start_tab": "library",
     "style": {},
     "show_steam_updates": False,
+    "hide_steam_on_launch": True,
+    "persona": "online",
 }
 EDITABLE = {"theme", "sort", "card_size", "freeze_updates", "autostart_steam", "frameless", "steam_path", "check_updates",
-            "store_region", "api_key", "start_tab", "style", "show_steam_updates"}
+            "store_region", "api_key", "start_tab", "style", "show_steam_updates",
+            "hide_steam_on_launch", "persona"}
 
 
 def data_dir() -> Path:

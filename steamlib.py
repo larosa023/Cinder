@@ -211,6 +211,7 @@ class Steam:
     def __init__(self, path_override: str | None = None):
         self.path = find_steam_path(path_override)
         self.arts = None  # steamart.ArtFinder, created on first use
+        self.quiet = None  # steamquiet.SteamQuiet, set by main
         self._running, self._running_at = False, -10.0
         self._lc: tuple[Path | None, float, dict] = (None, 0.0, {})
         self._lock = threading.Lock()
@@ -405,18 +406,35 @@ class Steam:
         else:
             subprocess.Popen(["xdg-open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    def steam_url(self, url: str) -> None:
-        """Send a steam:// URL; if Steam is closed, start it frozen first."""
+    def steam_url(self, url: str, quiet_titles=None) -> None:
+        """Send a steam:// URL; if Steam is closed, start it frozen first.
+
+        quiet_titles: Steam windows to keep in the tray if this makes them pop up.
+        """
+        before = self.quiet.snapshot(quiet_titles) if quiet_titles and self.quiet else set()
         if self.running():
             self.open_url(url)
         else:
             self.start(silent=True, extra=[url])
+        if quiet_titles and self.quiet:
+            self.quiet.watch(before, titles=quiet_titles)
 
     def launch(self, appid: int) -> None:
-        if self.running():
+        """Launch through Steam, keeping Steam's main window from popping up."""
+        before = self.quiet.snapshot() if self.quiet else set()
+        was_running = self.running()
+        if was_running:
             self.open_url(f"steam://rungameid/{appid}")
         else:
             self.start(silent=True, extra=["-applaunch", str(appid)])
+        if self.quiet:
+            # A cold Steam start takes a while before it would show its window.
+            self.quiet.watch(before, seconds=15 if was_running else 45)
+
+    def set_status(self, status: str) -> None:
+        """Online / away / busy / invisible / offline / trade / play (Steam's friends status)."""
+        from steamquiet import SteamQuiet
+        self.steam_url(f"steam://friends/status/{status}", quiet_titles=SteamQuiet.MAIN + SteamQuiet.FRIENDS)
 
     def shutdown(self) -> None:
         if self.running() and self.exe:

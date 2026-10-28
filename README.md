@@ -16,6 +16,11 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 - **Friends**: your friends list. With an API key you also see who's online and what they're playing. **Message** opens Steam chat.
 - **Profile**: your profile or a friend's, with avatar, status, about, play stats, recently played and most played.
 
+**Status and quiet launching**
+
+- Click your name in the top bar to set your Steam status: Online, Away, Busy, Invisible, Offline, Looking to play or Looking to trade
+- When you launch a game, if Steam pops its library window up, Cinder sends it straight back to the tray (Settings → Steam; Steam's small prompts like launch options or cloud saves still show)
+
 **Make it yours**
 
 - 5 built-in themes plus drop-in CSS themes
@@ -162,6 +167,7 @@ The `@swatch` colors are what the theme picker shows. A user theme with the same
 | `storeapi.py` | Store, wishlist, friends and profile data from Steam's public endpoints, with caching |
 | `winsnap.py` | Moving, snapping and resizing for the borderless window |
 | `steamart.py` | Finds every game's art: Steam's local cache and asset index (`assetcache.vdf`), Steam's image servers, then the store API |
+| `steamquiet.py` | Keeps Steam's main window in the tray while Cinder launches games or changes your status |
 | `server.py` | Local-only HTTP server (127.0.0.1) that serves the UI and a small JSON API, guarded by a per-session token |
 | `updater.py` | Cinder self-updater (GitHub releases) |
 | `version.py` | Current version and the repo updates come from |

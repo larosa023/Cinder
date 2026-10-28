@@ -13,6 +13,7 @@ from pathlib import Path
 from config import Config, data_dir
 from server import Context, make_server
 from steamlib import Steam, SteamUpdater
+from steamquiet import SteamQuiet
 from updater import Updater
 from cinderlog import log, setup as setup_log
 from winsnap import IS_WIN, WinSnap
@@ -107,6 +108,7 @@ def main() -> None:
     clean_stale_temp()
     cfg = Config(ddir / "config.json")
     steam = Steam(cfg["steam_path"] or None)
+    steam.quiet = SteamQuiet(enabled=lambda: bool(cfg["hide_steam_on_launch"]))
 
     if steam.found:
         if cfg["freeze_updates"] and not steam.freeze_enabled():
