@@ -48,9 +48,13 @@ function renderThemes() {
 }
 
 const STATUSES = [
-  ["online", "Online"], ["away", "Away"], ["busy", "Busy"], ["invisible", "Invisible", "Appear offline to friends"],
-  ["offline", "Offline", "Sign out of friends"], ["play", "Looking to play"], ["trade", "Looking to trade"],
+  ["online", "Online"], ["away", "Away"],
+  ["invisible", "Invisible", "Friends see you as offline"], ["offline", "Offline", "Signed out of friends and chat"],
 ];
+const SEEN = { online: "online", away: "away", ingame: "in game", offline: "offline" };
+// What friends should see for each status. The public profile can't always tell Away from Online.
+const EXPECT = { online: ["online", "ingame"], away: ["away"], invisible: ["offline"], offline: ["offline"] };
+const P = { seen: null, checkedAt: 0, verifying: null };
 const statusLabel = (p) => (STATUSES.find((x) => x[0] === p) || STATUSES[0])[1];
 
 function renderSteam() {
@@ -84,7 +88,10 @@ function renderStatusMenu() {
   const persona = S.config.persona || "online";
   const u = S.user;
   $("#sm-name").textContent = u ? u.name : "Not signed in";
-  $("#sm-state").textContent = S.steam.running ? statusLabel(persona) : "Steam isn't running (choosing a status starts it)";
+  let line = S.steam.running ? statusLabel(persona) : "Steam isn't running (choosing a status starts it)";
+  if (P.verifying) line = `Setting ${statusLabel(P.verifying).toLowerCase()}… checking what friends see`;
+  else if (P.seen) line += ` · friends see you as ${SEEN[P.seen.state] || P.seen.state}`;
+  $("#sm-state").textContent = line;
   const av = $("#sm-avatar");
   if (u && u.has_avatar) { av.style.backgroundImage = "url(/avatar)"; av.textContent = ""; }
   else { av.style.backgroundImage = ""; av.textContent = u ? u.name[0].toUpperCase() : "?"; }
@@ -97,9 +104,47 @@ function renderStatusMenu() {
 C.toggleStatusMenu = (force) => {
   const m = $("#status-menu");
   const open = force ?? m.hidden;
-  if (open) renderStatusMenu();
+  if (open) {
+    renderStatusMenu();
+    if (!P.verifying && Date.now() - P.checkedAt > 20000) checkPresence().then(renderStatusMenu).catch(() => {});
+  }
   m.hidden = !open;
 };
+
+async function checkPresence() {
+  const r = await C.api("/api/presence");
+  P.seen = r; P.checkedAt = Date.now();
+  return r;
+}
+
+const okFor = (status, seen) =>
+  EXPECT[status].includes(seen.state) || (status === "away" && seen.source === "profile" && seen.state === "online");
+
+/** Set a status, then confirm from Steam's side what other people actually see. */
+async function setStatus(status) {
+  await C.api("/api/action", { action: "status", status });
+  S.config.persona = status;
+  P.verifying = status;
+  renderSteam();
+  C.toast(`Setting status to ${statusLabel(status)}…`);
+  let seen = null;
+  for (const wait of [4, 8, 12, 20, 30]) {  // Steam can take up to a minute to update
+    await new Promise((r) => setTimeout(r, wait * 1000));
+    if (P.verifying !== status) return;  // another status was picked meanwhile
+    try { seen = await checkPresence(); } catch (e) { seen = { error: e.message }; break; }
+    if (okFor(status, seen)) break;
+  }
+  P.verifying = null;
+  renderStatusMenu();
+  if (seen && seen.error) {
+    C.toast(`${statusLabel(status)} set, but Cinder couldn't confirm it: ${seen.error}. Adding an API key in Settings → Account fixes this.`, true);
+  } else if (seen && okFor(status, seen)) {
+    const note = status === "away" && seen.source === "profile" ? " (your public profile shows Away as Online)" : "";
+    C.toast(`${statusLabel(status)} ✓ friends see you as ${SEEN[seen.state] || seen.state}${note}`);
+  } else {
+    C.toast(`Steam still shows you as ${SEEN[seen?.state] || "online"} to friends. Try again, or set it in Steam's friends list.`, true);
+  }
+}
 
 function showPane(name) {
   $$("#set-nav [data-pane]").forEach((b) => b.classList.toggle("on", b.dataset.pane === name));
@@ -225,13 +270,7 @@ function bind() {
     const st = e.target.closest("[data-status]");
     if (st) {
       C.toggleStatusMenu(false);
-      try {
-        await C.api("/api/action", { action: "status", status: st.dataset.status });
-        S.config.persona = st.dataset.status;
-        renderSteam();
-        C.toast(`Status: ${statusLabel(st.dataset.status)}`);
-        setTimeout(C.refreshStatus, 3000);
-      } catch (err) { C.toast(err.message, true); }
+      try { await setStatus(st.dataset.status); } catch (err) { P.verifying = null; C.toast(err.message, true); }
       return;
     }
     const a = e.target.closest("[data-sm]");

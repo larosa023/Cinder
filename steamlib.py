@@ -432,7 +432,7 @@ class Steam:
             self.quiet.watch(before, seconds=15 if was_running else 45)
 
     def set_status(self, status: str) -> None:
-        """Online / away / busy / invisible / offline / trade / play (Steam's friends status)."""
+        """Online / away / invisible / offline (Steam's friends status)."""
         from steamquiet import SteamQuiet
         self.steam_url(f"steam://friends/status/{status}", quiet_titles=SteamQuiet.MAIN + SteamQuiet.FRIENDS)
 

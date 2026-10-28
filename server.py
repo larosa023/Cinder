@@ -194,6 +194,10 @@ class Handler(BaseHTTPRequestHandler):
             if not me:
                 raise storeapi.SteamDataError("Sign in to Steam once so Cinder knows your account")
             return self._json({"ok": True, **storeapi.wishlist(me, cc, key)})
+        if path == "/api/presence":
+            if not me:
+                raise storeapi.SteamDataError("No Steam account found")
+            return self._json({"ok": True, **storeapi.visible_status(me, key)})
         if path == "/api/friends":
             return self._json({"ok": True, **storeapi.friends(c.steam.local_friends(), me, key)})
         if path == "/api/profile":
@@ -320,7 +324,7 @@ class Handler(BaseHTTPRequestHandler):
                 s.start(silent=False)
         elif action == "status":
             status = str(body.get("status", ""))
-            if status not in ("online", "away", "busy", "invisible", "offline", "trade", "play"):
+            if status not in ("online", "away", "invisible", "offline"):
                 return self._json({"ok": False, "error": "unknown status"}, 400)
             s.set_status(status)
             c.config.update({"persona": status})

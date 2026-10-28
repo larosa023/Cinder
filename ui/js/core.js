@@ -81,7 +81,7 @@ C.toast = (msg, err = false) => {
   t.textContent = msg;
   t.className = "toast show" + (err ? " err" : "");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (t.className = "toast"), 2800);
+  toastTimer = setTimeout(() => (t.className = "toast"), Math.max(2800, Math.min(8000, msg.length * 70)));
 };
 
 C.loading = (text = "Loading…") => `<div class="state"><span class="spinner"></span>${C.esc(text)}</div>`;

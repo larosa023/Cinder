@@ -85,9 +85,8 @@ kbd { font: 11px var(--font); padding: 1px 6px; border: 1px solid var(--border);
 }
 .user-name { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); }
-.dot.on, .dot[data-p="online"], .dot[data-p="trade"], .dot[data-p="play"] { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+.dot.on, .dot[data-p="online"] { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
 .dot[data-p="away"] { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
-.dot[data-p="busy"] { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
 .dot[data-p="invisible"] { background: transparent; box-shadow: inset 0 0 0 2px var(--text-dim); }
 .dot[data-p="offline"], .dot[data-p="closed"] { background: var(--text-dim); box-shadow: none; }
 

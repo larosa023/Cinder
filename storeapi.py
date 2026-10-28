@@ -406,3 +406,39 @@ def owned_games(api_key: str, steamid: str) -> list[dict]:
             "lastplayed": _int(g.get("rtime_last_played")),
         })
     return out
+
+
+# --------------------------------------------------------------------- presence
+
+def visible_status(steamid: str, api_key: str = "") -> dict:
+    """What other people currently see for this account: online / away / ingame / offline.
+
+    Uses the Web API when a key is set (it distinguishes Away), otherwise the public
+    profile. Invisible shows as offline to everyone else, which is the point.
+    Always fetched fresh (Steam's own servers can still lag by up to a minute).
+    """
+    bust = int(time.time())
+    if api_key:
+        try:
+            data = _fetch(f"{API}/ISteamUser/GetPlayerSummaries/v2/?{_q(key=api_key, steamids=steamid)}&_={bust}", ttl=0)
+            players = (data.get("response") or {}).get("players") or []
+            if players:
+                pl = players[0]
+                st = _int(pl.get("personastate"))
+                state = ("ingame" if pl.get("gameextrainfo") else
+                         "offline" if st == 0 else "away" if st in (3, 4) else "online")
+                return {"state": state, "source": "api"}
+        except SteamDataError:
+            pass  # fall back to the profile
+    raw = _fetch(f"{COMMUNITY}/profiles/{steamid}/?xml=1&_={bust}", ttl=0, as_json=False)
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError as e:
+        raise SteamDataError("Couldn't read your profile") from e
+    online = _xml_text(root, "onlineState")
+    if not online:
+        raise SteamDataError("Your profile doesn't show online status publicly")
+    msg = strip_html(_xml_text(root, "stateMessage")).lower()
+    state = ("ingame" if online == "in-game" else "offline" if online == "offline" else
+             "away" if "away" in msg or "snooze" in msg else "online")
+    return {"state": state, "source": "profile"}

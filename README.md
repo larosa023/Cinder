@@ -18,7 +18,7 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 
 **Status and quiet launching**
 
-- Click your name in the top bar to set your Steam status: Online, Away, Busy, Invisible, Offline, Looking to play or Looking to trade
+- Click your name in the top bar to set your Steam status: Online, Away, Invisible or Offline. After each change Cinder checks what friends actually see (your public profile, or the Web API with a key) and warns you if Steam hasn't applied it
 - When you launch a game, if Steam pops its library window up, Cinder sends it straight back to the tray (Settings → Steam; Steam's small prompts like launch options or cloud saves still show)
 
 **Make it yours**
