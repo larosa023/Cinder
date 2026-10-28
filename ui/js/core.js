@@ -144,19 +144,79 @@ C.bindWindow = () => {
   const w = window.pywebview.api;
   const frameless = C.S.platform === "win32" && C.S.config.frameless;
   document.body.classList.toggle("native", !!frameless);
-  if (!frameless) return;
+  if (!frameless || C.boundWindow) return;
+  C.boundWindow = true;
   $("#win-min").onclick = () => w.minimize();
   $("#win-max").onclick = async () => C.winState(await w.toggle_maximize());
   $("#win-close").onclick = () => w.close();
-  // Drag anywhere on the title bar that isn't a control. Double-click toggles maximize.
-  $("#titlebar").addEventListener("mousedown", async (e) => {
+
+  // Moves are sent one at a time: while one is in flight, newer pointer moves are coalesced.
+  const pump = (fn) => {
+    let busy = false, again = false;
+    const run = async () => {
+      if (busy) { again = true; return; }
+      busy = true;
+      try { await fn(); } catch { /* ignore */ }
+      busy = false;
+      if (again) { again = false; run(); }
+    };
+    return run;
+  };
+  const dragMove = pump(() => w.drag_move());
+  const resizeMove = pump(() => w.resize_move());
+
+  // Title bar: drag anywhere that isn't a control. Double-click toggles maximize.
+  const bar = $("#titlebar");
+  let dragging = false, dragTimer = null;
+  bar.addEventListener("pointerdown", async (e) => {
     if (e.button !== 0 || e.target.closest("button, input, select, a, label, .navtabs")) return;
-    if (e.detail >= 2) { C.winState(await w.toggle_maximize()); return; }
-    w.drag();
+    bar.setPointerCapture(e.pointerId);
+    dragging = true;
+    await w.drag_begin();
+    // Keep following the cursor even if the browser skips move events while the window moves.
+    clearInterval(dragTimer);
+    dragTimer = setInterval(() => { if (dragging) dragMove(); }, 16);
   });
-  $$(".rz").forEach((el) => el.addEventListener("mousedown", (e) => {
-    if (e.button === 0) { e.preventDefault(); w.resize(el.dataset.edge); }
-  }));
+  bar.addEventListener("pointermove", () => { if (dragging) dragMove(); });
+  const endDrag = async (e) => {
+    if (!dragging) return;
+    dragging = false;
+    clearInterval(dragTimer);
+    try { bar.releasePointerCapture(e.pointerId); } catch {}
+    C.winState(await w.drag_end());
+  };
+  bar.addEventListener("pointerup", endDrag);
+  bar.addEventListener("pointercancel", endDrag);
+  bar.addEventListener("lostpointercapture", endDrag);
+  bar.addEventListener("dblclick", async (e) => {
+    if (e.target.closest("button, input, select, a, label, .navtabs")) return;
+    C.winState(await w.toggle_maximize());
+  });
+
+  // Window edges and corners resize.
+  $$(".rz").forEach((el) => {
+    let on = false, timer = null;
+    el.addEventListener("pointerdown", async (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      el.setPointerCapture(e.pointerId);
+      on = true;
+      await w.resize_begin(el.dataset.edge);
+      clearInterval(timer);
+      timer = setInterval(() => { if (on) resizeMove(); }, 16);
+    });
+    el.addEventListener("pointermove", () => { if (on) resizeMove(); });
+    const end = (e) => {
+      if (!on) return;
+      on = false;
+      clearInterval(timer);
+      try { el.releasePointerCapture(e.pointerId); } catch {}
+      w.resize_end();
+    };
+    el.addEventListener("pointerup", end);
+    el.addEventListener("pointercancel", end);
+    el.addEventListener("lostpointercapture", end);
+  });
   w.state().then(C.winState).catch(() => {});
 };
 

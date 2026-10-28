@@ -136,7 +136,7 @@ function renderUpdates() {
       : `Cinder ${c.latest} is available (you have ${c.current}).`;
     $("#banner-go").textContent = c.ready ? "Restart" : "Update";
     $("#banner-go").hidden = c.busy;
-  } else if (st && (st.busy || st.available)) {
+  } else if (st && S.config.show_steam_updates && (st.busy || st.available)) {
     const key = `steam:${st.latest}`;
     banner.hidden = !st.busy && dismissed(key);
     Object.assign(banner.dataset, { key, kind: "steam" });
@@ -232,12 +232,23 @@ function bind() {
     renderUpdates();
   });
   $("#s-go").addEventListener("click", steamUpdate);
+  $("#steam-upd-toggle").addEventListener("click", async () => {
+    await C.saveConfig({ show_steam_updates: !S.config.show_steam_updates });
+    renderSteamUpdToggle();
+    renderUpdates();
+  });
   $("#set-checkupd").addEventListener("change", (e) => C.saveConfig({ check_updates: e.target.checked }));
   $("#banner-x").addEventListener("click", () => dismiss($("#banner").dataset.key));
   $("#banner-go").addEventListener("click", () => {
     if ($("#banner").dataset.kind === "cinder") cinderUpdate();
     else C.openSettings("updates");
   });
+}
+
+function renderSteamUpdToggle() {
+  const on = !!S.config.show_steam_updates || (U.steam && U.steam.busy);
+  $("#steam-upd-row").hidden = !on;
+  $("#steam-upd-toggle").textContent = on ? "Hide Steam client update controls" : "Show Steam client update controls";
 }
 
 function fill() {
@@ -254,6 +265,7 @@ function fill() {
   renderUser();
   renderSteam();
   renderAccount();
+  renderSteamUpdToggle();
 }
 
 C.updates = { poll };

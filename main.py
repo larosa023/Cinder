@@ -55,12 +55,26 @@ class WindowApi:
         self._window.toggle_fullscreen()
         return "max"
 
-    def drag(self):
-        self._snap.drag()
+    # Called by the page's pointer events on the title bar and window edges.
+    def drag_begin(self):
+        return self._snap.begin_drag()
 
-    def resize(self, edge):
+    def drag_move(self):
+        self._snap.drag_move()
+
+    def drag_end(self):
+        return self._snap.end_drag()
+
+    def resize_begin(self, edge):
         if isinstance(edge, str) and edge in {"n", "s", "e", "w", "ne", "nw", "se", "sw"}:
-            self._snap.resize(edge)
+            return self._snap.begin_resize(edge)
+        return False
+
+    def resize_move(self):
+        self._snap.resize_move()
+
+    def resize_end(self):
+        self._snap.end_resize()
 
     def state(self):
         return self._snap.state
@@ -91,20 +105,26 @@ def main() -> None:
     steam_updater = SteamUpdater(steam, keep_blocked=lambda: bool(cfg["freeze_updates"]))
     if cfg["check_updates"]:
         updater.check_async()
-        if steam.found:
+        if steam.found and cfg["show_steam_updates"]:
             steam_updater.check_async()
 
     res = resource_dir()
     window_api = None if args.browser else WindowApi()
 
+    restart_requested = threading.Event()
+
     def restart():
+        # Close this copy first, then start the new one once it has fully exited
+        # (see the end of main), so nothing is still holding its files.
+        restart_requested.set()
+
         def go():
             import time
             time.sleep(0.4)  # let the HTTP response go out first
-            updater.spawn_new()
             if window_api and window_api._window:
                 window_api._window.destroy()
-            os._exit(0)
+            else:
+                srv.shutdown()
         threading.Thread(target=go, daemon=True).start()
 
     ctx = Context(
@@ -129,6 +149,8 @@ def main() -> None:
             srv.serve_forever()
         except KeyboardInterrupt:
             pass
+        if restart_requested.is_set():
+            updater.spawn_new()
         return
 
     threading.Thread(target=srv.serve_forever, daemon=True).start()
@@ -148,6 +170,8 @@ def main() -> None:
     window_api._attach(window)
     webview.start(private_mode=False, storage_path=str(ddir / "webview"))
     srv.shutdown()
+    if restart_requested.is_set():
+        updater.spawn_new()
 
 
 if __name__ == "__main__":

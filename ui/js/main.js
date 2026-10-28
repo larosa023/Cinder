@@ -59,9 +59,15 @@ async function init() {
     C.style.load(st.config.style);
   } catch (e) { C.toast(e.message, true); }
 
-  const native = () => C.bindWindow();
-  if (window.pywebview && window.pywebview.api) native();
-  else window.addEventListener("pywebviewready", native);
+  // Bind the window controls once pywebview's bridge has its methods (it can be ready
+  // before or after this point, so check both ways).
+  const ready = () => window.pywebview && window.pywebview.api && typeof window.pywebview.api.drag_begin === "function";
+  const tryBind = () => { if (ready()) { C.bindWindow(); return true; } return false; };
+  if (!tryBind()) {
+    window.addEventListener("pywebviewready", tryBind);
+    let tries = 0;
+    const t = setInterval(() => { if (tryBind() || ++tries > 100) clearInterval(t); }, 100);
+  }
 
   await C.library.load(true);
   C.onRoute();

@@ -236,7 +236,14 @@ class Updater:
         return [sys.executable, str(self.app_dir / "main.py"), *sys.argv[1:]]
 
     def spawn_new(self) -> None:
-        kw = {"cwd": str(self.app_dir)}
+        env = dict(os.environ)
+        # Make the new Cinder.exe unpack into its own temp folder instead of reusing
+        # this one's, so this copy can clean up after itself when it exits.
+        env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+        for k in list(env):
+            if k.startswith("_PYI_") or k in ("_MEIPASS2", "_PYI_ONEDIR_MODE"):
+                env.pop(k, None)
+        kw = {"cwd": str(self.app_dir), "env": env}
         if sys.platform == "win32":
             kw["creationflags"] = 0x00000008 | 0x00000200  # detached, new process group
         else:

@@ -16,8 +16,6 @@ from __future__ import annotations
 
 import os
 import sys
-import threading
-import time
 
 IS_WIN = sys.platform == "win32"
 
@@ -56,7 +54,8 @@ class WinSnap:
         self._hwnd = None
         self.state = "normal"       # normal | max | left | right
         self._restore = None        # (x, y, w, h) before max/snap
-        self._busy = threading.Lock()
+        self._drag = None
+        self._resize = None
         self.on_state = None        # callback(state) so the UI can update its icons
 
     # ---------------------------------------------------------------- helpers
@@ -163,100 +162,101 @@ class WinSnap:
         return self.state
 
     # ------------------------------------------------------------------ drag
-    def drag(self):
-        """Called on mouse-down in the title bar. Runs until the button is released."""
-        if not IS_WIN or not self.hwnd() or not self._busy.acquire(blocking=False):
+    # The page drives these from its own pointer events (begin on press, move on
+    # every pointer move, end on release); the cursor position comes from Windows.
+    def begin_drag(self):
+        if not IS_WIN or not self.hwnd():
+            return False
+        x, y, w, h = self._rect()
+        start = self._cursor()
+        self._drag = {
+            "start": (start.x, start.y),
+            "rect": (x, y, w, h),
+            "pre": (x, y, w, h) if self.state == "normal" else None,
+            "popped": self.state == "normal",
+            "off": (start.x - x, start.y - y),
+            "moved": False,
+        }
+        return True
+
+    def drag_move(self):
+        d = self._drag
+        if not d:
             return
-        threading.Thread(target=self._drag_loop, daemon=True).start()
+        pt = self._cursor()
+        sx, sy = d["start"]
+        if not d["popped"]:
+            # A maximized/snapped window only pops out once it's really being dragged.
+            if abs(pt.x - sx) <= RESTORE_DRAG_PX and abs(pt.y - sy) <= RESTORE_DRAG_PX:
+                return
+            x, y, w, h = d["rect"]
+            frac = (sx - x) / max(w, 1)
+            rw, rh = (self._restore[2], self._restore[3]) if self._restore else (int(w * .7), int(h * .7))
+            d["off"] = (int(rw * frac), min(sy - y, int(24 * self._scale())))
+            self._place(pt.x - d["off"][0], pt.y - d["off"][1], rw, rh)
+            self._set_state("normal")
+            d["popped"] = True
+        else:
+            self._place(pt.x - d["off"][0], pt.y - d["off"][1])
+        d["moved"] = True
 
-    def _drag_loop(self):
-        try:
-            start = self._cursor()
-            x, y, w, h = self._rect()
-            offx, offy = start.x - x, start.y - y
-            pre_drag = (x, y, w, h) if self.state == "normal" else None
-
-            if self.state != "normal":
-                # Wait for a real drag before popping out of max/snap (a click is not a drag).
-                while self._button_down():
-                    pt = self._cursor()
-                    if abs(pt.x - start.x) > RESTORE_DRAG_PX or abs(pt.y - start.y) > RESTORE_DRAG_PX:
-                        break
-                    time.sleep(0.008)
-                else:
-                    return
-                frac = offx / max(w, 1)
-                rw, rh = (self._restore[2], self._restore[3]) if self._restore else (int(w * .7), int(h * .7))
-                offx, offy = int(rw * frac), min(offy, int(24 * self._scale()))
-                pt = self._cursor()
-                self._place(pt.x - offx, pt.y - offy, rw, rh)
-                self._set_state("normal")
-
-            last = None
-            while self._button_down():
-                pt = self._cursor()
-                if (pt.x, pt.y) != last:
-                    self._place(pt.x - offx, pt.y - offy)
-                    last = (pt.x, pt.y)
-                time.sleep(0.006)
-
-            pt = self._cursor()
-            mon, _ = self._monitor(pt=pt)
+    def end_drag(self):
+        d, self._drag = self._drag, None
+        if not d or not d["moved"]:
+            return self.state
+        pt = self._cursor()
+        mon, _ = self._monitor(pt=pt)
+        target = None
+        if pt.y <= mon.top + EDGE_PX:
+            target = "max"
+        elif pt.x <= mon.left + EDGE_PX:
+            target = "left"
+        elif pt.x >= mon.right - 1 - EDGE_PX:
+            target = "right"
+        if target:
             # Remember where the window was before this drag, like Windows does.
-            target = None
-            if pt.y <= mon.top + EDGE_PX:
-                target = "max"
-            elif pt.x <= mon.left + EDGE_PX:
-                target = "left"
-            elif pt.x >= mon.right - 1 - EDGE_PX:
-                target = "right"
-            if target:
-                if pre_drag:
-                    self._restore = pre_drag
-                elif self._restore is None:
-                    self._restore = self._rect()
-                if target == "max":
-                    self.maximize(pt, save=False)
-                else:
-                    self.snap(target, pt, save=False)
-        finally:
-            self._busy.release()
+            if d["pre"]:
+                self._restore = d["pre"]
+            elif self._restore is None:
+                self._restore = self._rect()
+            if target == "max":
+                self.maximize(pt, save=False)
+            else:
+                self.snap(target, pt, save=False)
+        return self.state
 
     # ---------------------------------------------------------------- resize
-    def resize(self, edge: str):
+    def begin_resize(self, edge: str):
         """edge: any of n, s, e, w, ne, nw, se, sw."""
-        if not IS_WIN or not self.hwnd() or not self._busy.acquire(blocking=False):
-            return
-        threading.Thread(target=self._resize_loop, args=(edge,), daemon=True).start()
+        if not IS_WIN or not self.hwnd():
+            return False
+        start = self._cursor()
+        s = self._scale()
+        self._resize = {"edge": edge, "start": (start.x, start.y), "rect": self._rect(),
+                        "min": (int(self.min_w * s), int(self.min_h * s))}
+        if self.state != "normal":
+            self._set_state("normal")
+        return True
 
-    def _resize_loop(self, edge):
-        try:
-            start = self._cursor()
-            x, y, w, h = self._rect()
-            s = self._scale()
-            mw, mh = int(self.min_w * s), int(self.min_h * s)
-            if self.state != "normal":
-                self._set_state("normal")
-            last = None
-            while self._button_down():
-                pt = self._cursor()
-                if (pt.x, pt.y) == last:
-                    time.sleep(0.006)
-                    continue
-                last = (pt.x, pt.y)
-                dx, dy = pt.x - start.x, pt.y - start.y
-                nx, ny, nw, nh = x, y, w, h
-                if "e" in edge:
-                    nw = max(mw, w + dx)
-                if "s" in edge:
-                    nh = max(mh, h + dy)
-                if "w" in edge:
-                    nw = max(mw, w - dx)
-                    nx = x + w - nw
-                if "n" in edge:
-                    nh = max(mh, h - dy)
-                    ny = y + h - nh
-                self._place(nx, ny, nw, nh)
-                time.sleep(0.006)
-        finally:
-            self._busy.release()
+    def resize_move(self):
+        r = self._resize
+        if not r:
+            return
+        pt = self._cursor()
+        edge, (sx, sy), (x, y, w, h), (mw, mh) = r["edge"], r["start"], r["rect"], r["min"]
+        dx, dy = pt.x - sx, pt.y - sy
+        nx, ny, nw, nh = x, y, w, h
+        if "e" in edge:
+            nw = max(mw, w + dx)
+        if "s" in edge:
+            nh = max(mh, h + dy)
+        if "w" in edge:
+            nw = max(mw, w - dx)
+            nx = x + w - nw
+        if "n" in edge:
+            nh = max(mh, h - dy)
+            ny = y + h - nh
+        self._place(nx, ny, nw, nh)
+
+    def end_resize(self):
+        self._resize = None
