@@ -31,10 +31,10 @@ function progress(d) {
   return { total, done, pct: total ? Math.min(100, (100 * done) / total) : 0 };
 }
 
-async function load() {
+async function load(first = false) {
   clearTimeout(DL.timer);
   try {
-    const d = await C.api("/api/downloads");
+    const d = await C.api("/api/downloads" + (first ? "?first=1" : ""));
     // Remember games that finish while you watch (Steam's live queue lists them itself).
     const now = new Set(d.items.filter((x) => x.state !== "done").map((x) => x.appid));
     for (const [id, it] of Object.entries(DL.seen)) {
@@ -232,7 +232,7 @@ C.views.downloads = {
   placeholder: "Search",
   show() {
     if (DL.data) render(); else if (!el().querySelector(".dlp-page")) el().innerHTML = C.loading("Checking downloads…");
-    load();
+    load(true);
   },
   search(q) { DL.q = q.trim().toLowerCase(); if (DL.data) render(); },
   refresh() { return load(); },

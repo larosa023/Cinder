@@ -200,21 +200,84 @@ class SteamBridge:
         raise ConnError("not connected")
 
     # -- actions -----------------------------------------------------------------
+    _INIT = """const D = SteamClient.Downloads;
+  let st = window.__cinderDl;
+  if (!st) {
+    st = window.__cinderDl = {};
+    try { D.RegisterForDownloadOverview((o) => { st.overview = o; st.at = Date.now(); }); } catch (e) { st.err = String(e); }
+    try { D.RegisterForDownloadItems((active, items) => { st.active = active; st.items = items; st.at = Date.now(); }); } catch (e) { st.err = String(e); }
+  }"""
+
     def update(self, appids: list[int]) -> object:
-        """Queue updates and move them to the front, like Steam's Update button."""
+        """Start updates now, like Steam's own Update button.
+
+        A scheduled ("update delayed") update ignores a plain re-queue, so an update that
+        isn't running is taken off the list and queued again as one you asked for.
+        Every step is reported back so problems show up in cinder.log.
+        """
         ids = json.dumps([int(a) for a in appids])
         return self.run(f"""(async () => {{
-  const D = SteamClient.Downloads, ids = {ids}, done = [];
-  if (!D || !D.QueueAppUpdate) return {{ok: false, missing: Object.keys(D || {{}})}};
-  try {{ D.EnableAllDownloads && await D.EnableAllDownloads(true); }} catch (e) {{}}
+  {self._INIT}
+  const ids = {ids}, log = [];
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const find = (id) => (st.items || []).find((i) => i.appid === id);
+  const step = async (name, ...args) => {{
+    if (typeof D[name] !== "function") {{ log.push(name + ": missing"); return false; }}
+    try {{ const r = D[name](...args); if (r && r.then) await r; log.push(name + "(" + args.join(",") + ")"); return true; }}
+    catch (e) {{ log.push(name + ": " + e); return false; }}
+  }};
+  if (typeof D.QueueAppUpdate !== "function") return {{ok: false, missing: Object.keys(D || {{}})}};
+  const before = ids.map((id) => find(id) || {{appid: id, missing: true}});
+  await step("EnableAllDownloads", true);
   for (const id of ids.slice().reverse()) {{
-    await D.QueueAppUpdate(id);
-    try {{ D.SetQueueIndex && await D.SetQueueIndex(id, 0); }} catch (e) {{}}
-    try {{ D.ResumeAppUpdate && await D.ResumeAppUpdate(id); }} catch (e) {{}}
-    done.push(id);
+    const it = find(id);
+    if (it && !it.active && !it.completed) {{ await step("RemoveFromDownloadList", id); await sleep(500); }}
+    await step("QueueAppUpdate", id);
+    await sleep(400);
+    await step("SetQueueIndex", id, 0);
+    await step("ResumeAppUpdate", id);
   }}
-  return {{ok: true, done}};
-}})()""")
+  return {{ok: true, log, before, overview: st.overview || null}};
+}})()""", 30)
+
+    def item(self, appid: int) -> dict:
+        """Steam's live queue entry for one app plus the overview, for diagnostics."""
+        r = self.run(f"""(() => {{
+  {self._INIT}
+  return {{item: (st.items || []).find((i) => i.appid === {int(appid)}) || null, overview: st.overview || null,
+          keys: Object.keys(D)}};
+}})()""", 5)
+        return r if isinstance(r, dict) else {}
+
+    # -- learning what Steam's own buttons do -------------------------------------
+    _REC = """(() => {
+  if (typeof SteamClient !== "object" || !SteamClient.Downloads) return "no";
+  if (window.__cinderRec) return "already";
+  window.__cinderRec = [];
+  const D = SteamClient.Downloads;
+  for (const k of Object.keys(D)) {
+    if (typeof D[k] !== "function" || k.startsWith("Register")) continue;
+    const f = D[k];
+    try { D[k] = function (...a) { try { window.__cinderRec.push([Date.now(), k, JSON.stringify(a).slice(0, 200)]); if (window.__cinderRec.length > 60) window.__cinderRec.shift(); } catch (e) {} return f.apply(this, a); }; } catch (e) {}
+  }
+  return "on";
+})()"""
+
+    def record_steam_ui(self) -> list:
+        """Note what Steam's own windows call when you press their download buttons."""
+        seen = []
+        for t in self._targets():
+            url = t.get("webSocketDebuggerUrl")
+            if not url:
+                continue
+            try:
+                _evaluate(url, self._REC, 3)
+                rec = _evaluate(url, "(() => { const r = window.__cinderRec || []; window.__cinderRec = window.__cinderRec ? [] : undefined; return r; })()", 3)
+                for row in rec or []:
+                    seen.append([t.get("title", "")] + list(row))
+            except (OSError, BridgeError):
+                continue
+        return seen
 
     def command(self, cmd: str, appids: list[int]) -> object:
         """pause / resume / top / remove for given apps; pause_all / resume_all for the queue."""
@@ -238,16 +301,10 @@ class SteamBridge:
 
     def snapshot(self) -> dict | None:
         """Steam's live download queue: {overview, items}. Listens once, then reads what Steam pushed."""
-        r = self.run("""(() => {
-  const D = SteamClient.Downloads;
-  let st = window.__cinderDl;
-  if (!st) {
-    st = window.__cinderDl = {};
-    try { D.RegisterForDownloadOverview((o) => { st.overview = o; st.at = Date.now(); }); } catch (e) { st.err = String(e); }
-    try { D.RegisterForDownloadItems((active, items) => { st.active = active; st.items = items; st.at = Date.now(); }); } catch (e) { st.err = String(e); }
-  }
-  return {overview: st.overview || null, items: st.items || null, active: !!st.active, err: st.err || null};
-})()""", 5)
+        r = self.run(f"""(() => {{
+  {self._INIT}
+  return {{overview: st.overview || null, items: st.items || null, active: !!st.active, err: st.err || null}};
+}})()""", 5)
         return r if isinstance(r, dict) else None
 
 

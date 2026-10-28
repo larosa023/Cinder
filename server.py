@@ -157,6 +157,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": True, **c.ach.hub()})
             return self._json({"ok": False, "error": "Not available"})
         if path == "/api/downloads":
+            if query.get("first") and self.ctx.steam.bridge and self._bridge_state() == "on":
+                try:  # what Steam's own download buttons called since last time (helps support new Steam builds)
+                    for row in self.ctx.steam.bridge.record_steam_ui():
+                        log.info("steam ui: %s", json.dumps(row)[:400])
+                except Exception:
+                    log.exception("recording Steam's download calls failed")
             return self._json(self._downloads())
         if path == "/api/library":
             return self._json({"ok": True, "games": self._library()})
@@ -470,6 +476,21 @@ class Handler(BaseHTTPRequestHandler):
                           if g.get("installed") and g.get("update_pending") and not g.get("shortcut") and a not in busy]
         return out
 
+    def _check_started(self, ids: list[int]) -> None:
+        """A few seconds after an update request, note in the log whether Steam actually started it."""
+        import time
+        import steambridge
+        time.sleep(8)
+        try:
+            for a in ids[:3]:
+                d = self.ctx.steam.bridge.item(a)
+                it, ov = d.get("item") or {}, d.get("overview") or {}
+                started = it.get("active") or int(ov.get("update_appid") or 0) == a
+                log.info("bridge check %s: %s | item: %s | overview: %s", a, "downloading" if started else "NOT STARTED",
+                         json.dumps(it)[:1200], json.dumps(ov)[:800])
+        except steambridge.BridgeError as e:
+            log.info("bridge check failed: %s", e)
+
     def _bridge_action(self, action: str, body: dict):
         """Update games and control the download queue without opening a Steam window."""
         import threading
@@ -500,6 +521,11 @@ class Handler(BaseHTTPRequestHandler):
                 return {"ok": False, "error": f"Steam didn't take the request ({e})"}
             if isinstance(r, dict) and r.get("ok"):
                 log.info("bridge %s %s", cmd, ids)
+                if cmd == "update":
+                    log.info("bridge update steps: %s", "; ".join(r.get("log") or []))
+                    log.info("bridge update before: %s | overview: %s", json.dumps(r.get("before"))[:1500],
+                             json.dumps(r.get("overview"))[:800])
+                    threading.Thread(target=self._check_started, args=(ids,), daemon=True).start()
                 return {"ok": True, "state": "queued" if cmd == "update" else "done"}
             log.warning("bridge %s: unexpected reply %r", cmd, r)
             return {"ok": False, "error": "This Steam build doesn't support that from Cinder. Use Manage in Steam."}
