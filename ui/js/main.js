@@ -61,7 +61,7 @@ async function init() {
 
   // Bind the window controls once pywebview's bridge has its methods (it can be ready
   // before or after this point, so check both ways).
-  const ready = () => window.pywebview && window.pywebview.api && typeof window.pywebview.api.drag_begin === "function";
+  const ready = () => window.pywebview && window.pywebview.api && typeof window.pywebview.api.drag === "function";
   const tryBind = () => { if (ready()) { C.bindWindow(); return true; } return false; };
   if (!tryBind()) {
     window.addEventListener("pywebviewready", tryBind);

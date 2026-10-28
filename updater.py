@@ -88,10 +88,19 @@ class Updater:
         }
 
     # -- housekeeping -------------------------------------------------------
+    def _old_exe_path(self) -> Path:
+        """Where the previous exe is parked during an update (out of sight, same drive if possible)."""
+        tmp = Path(tempfile.gettempdir())
+        if self.exe and tmp.drive.lower() == self.exe.drive.lower():
+            return tmp / f"Cinder-previous-{os.getpid()}.exe"
+        return self.exe.with_name(self.exe.name + ".old")
+
     def cleanup(self) -> None:
-        """Remove the previous exe left behind by an update."""
-        if self.exe:
-            old = self.exe.with_name(self.exe.name + ".old")
+        """Remove previous exes left behind by updates (they can't be deleted while running)."""
+        if not self.exe:
+            return
+        olds = [self.exe.with_name(self.exe.name + ".old"), *Path(tempfile.gettempdir()).glob("Cinder-previous-*.exe")]
+        for old in olds:
             try:
                 old.unlink(missing_ok=True)
             except OSError:
@@ -164,7 +173,7 @@ class Updater:
         if not asset:
             raise RuntimeError("Release has no Cinder.exe")
         new = self.exe.with_name(self.exe.name + ".new")
-        old = self.exe.with_name(self.exe.name + ".old")
+        old = self._old_exe_path()
         self._set(phase="Downloading")
         _download(asset["browser_download_url"], new, lambda p: self._set(progress=p))
 
@@ -181,7 +190,13 @@ class Updater:
 
         self._set(phase="Installing")
         old.unlink(missing_ok=True)
-        os.replace(self.exe, old)  # renaming the running exe is allowed on Windows
+        try:
+            os.replace(self.exe, old)  # moving the running exe is allowed on Windows (same drive)
+        except OSError:
+            old = self.exe.with_name(self.exe.name + ".old")
+            old.unlink(missing_ok=True)
+            os.replace(self.exe, old)
+            _hide(old)
         try:
             os.replace(new, self.exe)
         except OSError:
@@ -236,16 +251,48 @@ class Updater:
         return [sys.executable, str(self.app_dir / "main.py"), *sys.argv[1:]]
 
     def spawn_new(self) -> None:
-        env = dict(os.environ)
-        # Make the new Cinder.exe unpack into its own temp folder instead of reusing
-        # this one's, so this copy can clean up after itself when it exits.
-        env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
-        for k in list(env):
-            if k.startswith("_PYI_") or k in ("_MEIPASS2", "_PYI_ONEDIR_MODE"):
-                env.pop(k, None)
+        """Start the new Cinder. Call as the last thing before this process exits."""
+        env = clean_env()
         kw = {"cwd": str(self.app_dir), "env": env}
-        if sys.platform == "win32":
-            kw["creationflags"] = 0x00000008 | 0x00000200  # detached, new process group
-        else:
+        if sys.platform != "win32":
             kw["start_new_session"] = True
-        subprocess.Popen(self.restart_command(), **kw)
+            subprocess.Popen(self.restart_command(), **kw)
+            return
+        if self.frozen:
+            # Start it a moment later, from a hidden cmd, so this copy has fully exited and
+            # cleaned up its temp folder before the new one starts.
+            cmd = 'cmd.exe /d /c ping -n 3 127.0.0.1 >nul & start "" ' + subprocess.list2cmdline(self.restart_command())
+            subprocess.Popen(cmd, creationflags=_NO_WINDOW | 0x00000200, **kw)
+        else:
+            subprocess.Popen(self.restart_command(), creationflags=0x00000008 | 0x00000200, **kw)
+
+
+def clean_env() -> dict:
+    """This process's environment minus anything pointing into PyInstaller's temp folder.
+
+    pywebview adds that folder to PATH; if the new Cinder inherited it, it would load
+    DLLs from the old copy's temp folder and stop it being cleaned up.
+    """
+    env = dict(os.environ)
+    mei = os.path.normcase(str(getattr(sys, "_MEIPASS", "") or ""))
+    if mei:
+        for k in [k for k in env if k.lower() == "path"]:
+            env[k] = os.pathsep.join(p for p in env[k].split(os.pathsep)
+                                     if p and not os.path.normcase(p).startswith(mei))
+        for k in list(env):
+            if k.lower() != "path" and mei in os.path.normcase(env[k]):
+                env.pop(k)
+    for k in list(env):
+        if k.startswith(("_PYI_", "PYTHONNET_")) or k in ("_MEIPASS2", "PYTHONHOME", "PYTHONPATH"):
+            env.pop(k)
+    env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    return env
+
+
+def _hide(path: Path) -> None:
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.kernel32.SetFileAttributesW(str(path), 0x2)  # FILE_ATTRIBUTE_HIDDEN
+        except Exception:
+            pass

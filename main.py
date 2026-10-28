@@ -58,17 +58,10 @@ class WindowApi:
     def __init__(self):
         self._window = None
         self._snap = WinSnap("Cinder")
-        self._snap.on_state = self._push_state
 
     def _attach(self, window):
         self._window = window
         self._snap.window = window
-
-    def _push_state(self, state):
-        try:
-            self._window.evaluate_js(f"window.cinderWinState && window.cinderWinState({state!r})")
-        except Exception:
-            pass
 
     def minimize(self):
         self._window.minimize()
@@ -83,40 +76,16 @@ class WindowApi:
         """Lets the page write to cinder.log."""
         log.info("page: %s", str(msg)[:500])
 
-    # Called by the page's pointer events on the title bar and window edges.
-    def drag_begin(self):
-        try:
-            ok = self._snap.begin_drag()
-            if not ok:
-                log.warning("drag_begin: no window handle")
-            return ok
-        except Exception:
-            log.exception("drag_begin failed")
-            return False
+    def drag(self):
+        """Title bar pressed: Windows moves the window until the button is released."""
+        state = self._snap.drag()
+        log.info("drag finished: %s", state)
+        return state
 
-    def drag_move(self):
-        try:
-            self._snap.drag_move()
-        except Exception:
-            log.exception("drag_move failed")
-
-    def drag_end(self):
-        try:
-            return self._snap.end_drag()
-        except Exception:
-            log.exception("drag_end failed")
-            return self._snap.state
-
-    def resize_begin(self, edge):
-        if isinstance(edge, str) and edge in {"n", "s", "e", "w", "ne", "nw", "se", "sw"}:
-            return self._snap.begin_resize(edge)
-        return False
-
-    def resize_move(self):
-        self._snap.resize_move()
-
-    def resize_end(self):
-        self._snap.end_resize()
+    def resize(self, edge):
+        if isinstance(edge, str):
+            return self._snap.resize(edge)
+        return self._snap.state
 
     def state(self):
         return self._snap.state

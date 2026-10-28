@@ -130,6 +130,8 @@ C.renderNav = () => {
   $$("[data-tab]").forEach((b) => b.addEventListener("click", () => C.go(b.dataset.tab)));
 };
 
+C.log = (msg) => { C.api("/api/log", { msg: String(msg) }).catch(() => {}); };
+
 // ---------- window controls (borderless window on Windows) ----------
 C.winState = (state) => {
   document.body.classList.toggle("win-max", state && state !== "normal");
@@ -140,96 +142,65 @@ C.winState = (state) => {
 };
 window.cinderWinState = C.winState;
 
-C.log = (msg) => { C.api("/api/log", { msg: String(msg) }).catch(() => {}); };
-
 C.bindWindow = () => {
   const w = window.pywebview.api;
-  C.log(`window controls: platform=${C.S.platform} frameless=${C.S.config.frameless} api=${Object.keys(w).join(",")}`);
   const frameless = C.S.platform === "win32" && C.S.config.frameless;
   document.body.classList.toggle("native", !!frameless);
+  C.log(`window controls: platform=${C.S.platform} frameless=${C.S.config.frameless}`);
   if (!frameless || C.boundWindow) return;
   C.boundWindow = true;
   $("#win-min").onclick = () => w.minimize();
   $("#win-max").onclick = async () => C.winState(await w.toggle_maximize());
   $("#win-close").onclick = () => w.close();
 
-  // Moves are sent one at a time: while one is in flight, newer pointer moves are coalesced.
-  const pump = (fn) => {
-    let busy = false, again = false;
-    const run = async () => {
-      if (busy) { again = true; return; }
-      busy = true;
-      try { await fn(); } catch { /* ignore */ }
-      busy = false;
-      if (again) { again = false; run(); }
-    };
-    return run;
-  };
-  const dragMove = pump(() => w.drag_move());
-  const resizeMove = pump(() => w.resize_move());
-
-  // Title bar. Normal moves are done by pywebview's built-in drag on the
-  // .pywebview-drag-region elements. Cinder adds: snapping when you let go
-  // (top = maximize, left/right edge = half screen), and dragging a maximized
-  // window back out at its normal size, which pywebview's drag can't do.
+  // Title bar. Pressing it hands the drag to Windows (like a normal title bar);
+  // Cinder snaps the window when you let go. A maximized window only starts
+  // moving once you actually drag, so double-click still works.
   const bar = $("#titlebar");
-  const isControl = (t) => t.closest("button, input, select, a, label, .navtabs");
-  let dragging = false, unsnapping = false, dragTimer = null;
-  // While maximized/snapped, keep pywebview's drag out of it; Cinder moves the window itself.
-  bar.addEventListener("mousedown", (e) => {
-    if (document.body.classList.contains("win-max") && !isControl(e.target)) e.stopPropagation();
-  }, true);
-  bar.addEventListener("pointerdown", async (e) => {
-    if (e.button !== 0 || isControl(e.target)) return;
-    dragging = true;
-    unsnapping = document.body.classList.contains("win-max");
-    if (unsnapping) bar.setPointerCapture(e.pointerId);
-    try {
-      if (!(await w.drag_begin())) C.log("drag_begin returned false");
-    } catch (err) { C.log("drag_begin error: " + err); }
-    clearInterval(dragTimer);
-    if (unsnapping) dragTimer = setInterval(() => { if (dragging) dragMove(); }, 16);
-  });
-  bar.addEventListener("pointermove", () => { if (dragging && unsnapping) dragMove(); });
-  const endDrag = async (e) => {
-    if (!dragging) return;
-    dragging = false;
-    clearInterval(dragTimer);
-    try { bar.releasePointerCapture(e.pointerId); } catch {}
-    try { C.winState(await w.drag_end()); } catch (err) { C.log("drag_end error: " + err); }
+  const isControl = (t) => t.closest("button, input, select, a, label, .navtabs, kbd");
+  let lastDown = 0, lastX = 0, lastY = 0, pending = null, busy = false;
+
+  const startDrag = async () => {
+    if (busy) return;
+    busy = true;
+    try { C.winState(await w.drag()); }
+    catch (err) { C.log("drag error: " + err); }
+    busy = false;
   };
-  window.addEventListener("pointerup", endDrag);
-  window.addEventListener("mouseup", endDrag);
-  bar.addEventListener("pointercancel", endDrag);
-  bar.addEventListener("dblclick", async (e) => {
-    if (isControl(e.target)) return;
-    C.winState(await w.toggle_maximize());
+  const cancelPending = () => {
+    if (!pending) return;
+    window.removeEventListener("mousemove", pending.move);
+    window.removeEventListener("mouseup", cancelPending);
+    pending = null;
+  };
+
+  bar.addEventListener("mousedown", async (e) => {
+    if (e.button !== 0 || isControl(e.target)) return;
+    e.preventDefault();
+    const now = Date.now();
+    const dbl = now - lastDown < 450 && Math.abs(e.screenX - lastX) < 6 && Math.abs(e.screenY - lastY) < 6;
+    lastDown = dbl ? 0 : now; lastX = e.screenX; lastY = e.screenY;
+    if (dbl) { cancelPending(); C.winState(await w.toggle_maximize()); return; }
+    if (!document.body.classList.contains("win-max")) { startDrag(); return; }
+    // Maximized/snapped: wait for a real drag before popping it out.
+    cancelPending();
+    const sx = e.screenX, sy = e.screenY;
+    pending = {
+      move: (m) => {
+        if (!(m.buttons & 1)) return cancelPending();
+        if (Math.abs(m.screenX - sx) > 5 || Math.abs(m.screenY - sy) > 5) { cancelPending(); startDrag(); }
+      },
+    };
+    window.addEventListener("mousemove", pending.move);
+    window.addEventListener("mouseup", cancelPending);
   });
 
-  // Window edges and corners resize.
-  $$(".rz").forEach((el) => {
-    let on = false, timer = null;
-    el.addEventListener("pointerdown", async (e) => {
-      if (e.button !== 0) return;
-      e.preventDefault();
-      el.setPointerCapture(e.pointerId);
-      on = true;
-      await w.resize_begin(el.dataset.edge);
-      clearInterval(timer);
-      timer = setInterval(() => { if (on) resizeMove(); }, 16);
-    });
-    el.addEventListener("pointermove", () => { if (on) resizeMove(); });
-    const end = (e) => {
-      if (!on) return;
-      on = false;
-      clearInterval(timer);
-      try { el.releasePointerCapture(e.pointerId); } catch {}
-      w.resize_end();
-    };
-    el.addEventListener("pointerup", end);
-    el.addEventListener("pointercancel", end);
-    el.addEventListener("lostpointercapture", end);
-  });
+  // Window edges and corners: Windows' own resize.
+  $$(".rz").forEach((el) => el.addEventListener("mousedown", async (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    try { C.winState(await w.resize(el.dataset.edge)); } catch (err) { C.log("resize error: " + err); }
+  }));
   w.state().then(C.winState).catch(() => {});
 };
 
