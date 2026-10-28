@@ -84,7 +84,7 @@ Cinder checks this repo's latest GitHub release. When a newer version is out, a 
 
 1. Bump `VERSION` in `version.py`, e.g. `0.2.1`.
 2. Commit and push.
-3. Tag it: `git tag v0.2.1 && git push origin v0.2.1`. Or create a release on GitHub with tag `v0.2.1`.
+3. On GitHub, go to **Releases → Draft a new release**, type the tag `v0.2.1` (choose "create new tag on publish"), and click **Publish release**. Pushing a `v0.2.1` tag from git works too.
 
 The **Release** GitHub Action builds `Cinder.exe` on Windows and attaches it to the release, usually within a few minutes. Every copy of Cinder will then offer the update.
 

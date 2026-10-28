@@ -5,10 +5,18 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
   contents: write
+
+# Publishing a release from the website can fire both the tag and release
+# events; run one build per tag.
+concurrency:
+  group: release-${{ github.event.release.tag_name || github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -22,12 +30,14 @@ jobs:
 
       - name: Check tag matches version.py
         if: startsWith(github.ref, 'refs/tags/')
+        env:
+          TAG: ${{ github.event.release.tag_name || github.ref_name }}
         shell: python
         run: |
           import os, sys
           sys.path.insert(0, ".")
           from version import VERSION
-          tag = os.environ["GITHUB_REF_NAME"].lstrip("vV")
+          tag = os.environ["TAG"].lstrip("vV")
           if tag != VERSION:
               sys.exit(f"Tag {tag} does not match version.py ({VERSION}); bump version.py first")
 
@@ -40,5 +50,6 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.release.tag_name || github.ref_name }}
           files: dist/Cinder.exe
           generate_release_notes: true
