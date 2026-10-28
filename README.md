@@ -35,7 +35,7 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 - **Steam update freeze**: keeps the client on its current build; update it on demand from Settings
 - **Built-in Cinder updater**: new versions install from GitHub releases, so you don't re-download the exe
 
-Shortcuts: `Ctrl+1`–`5` switch tabs, `Alt+←` / mouse back button goes back, `F5` refreshes, `Ctrl+,` opens Settings.
+Shortcuts: `Ctrl+B` collapses the sidebar to icons, `Ctrl+1`–`5` switch tabs, `Alt+←` / mouse back button goes back, `F5` refreshes, `Ctrl+,` opens Settings.
 
 ## Optional: Steam Web API key
 
@@ -161,6 +161,7 @@ The `@swatch` colors are what the theme picker shows. A user theme with the same
 | `steamlib.py` | Finds Steam, parses `libraryfolders.vdf`, `appmanifest_*.acf`, `loginusers.vdf` and `localconfig.vdf`, finds cached artwork, starts Steam, handles the freeze and the on-demand Steam updater |
 | `storeapi.py` | Store, wishlist, friends and profile data from Steam's public endpoints, with caching |
 | `winsnap.py` | Moving, snapping and resizing for the borderless window |
+| `steamart.py` | Finds every game's art: Steam's local cache and asset index (`assetcache.vdf`), Steam's image servers, then the store API |
 | `server.py` | Local-only HTTP server (127.0.0.1) that serves the UI and a small JSON API, guarded by a per-session token |
 | `updater.py` | Cinder self-updater (GitHub releases) |
 | `version.py` | Current version and the repo updates come from |

@@ -72,13 +72,35 @@ function render() {
   else empty.innerHTML = `<strong>Nothing matches “${esc(L.q)}”</strong>Try a different search or filter.`;
 }
 
+let lastJSON = "";
+function setGames(games, json) {
+  if (json === lastJSON) return false;  // nothing changed: skip the re-render
+  lastJSON = json;
+  S.games = games;
+  if (C.route.tab === "library") render();
+  C.style && C.style.refreshArt();
+  return true;
+}
+
+/** Paint instantly from the last session's library, before Steam's files are read. */
+function paintCached() {
+  if (lastJSON) return;  // the live library already arrived
+  try {
+    const json = localStorage.getItem("cinder.library");
+    if (json) setGames(JSON.parse(json), json);
+  } catch { /* no cache */ }
+}
+
 async function load(quiet = false) {
   try {
-    const { games } = await C.api("/api/library");
-    S.games = games;
-    render();
-    C.style && C.style.refreshArt();
-    if (!quiet) C.toast(`${games.length} games`);
+    const res = await fetch("/api/library", { headers: { "X-Cinder-Token": window.CINDER_TOKEN } });
+    const json = await res.text();
+    const data = JSON.parse(json);
+    if (!res.ok || data.ok === false) throw new Error(data.error || res.statusText);
+    const games = JSON.stringify(data.games);
+    setGames(data.games, games);
+    try { localStorage.setItem("cinder.library", games); } catch { /* full or blocked */ }
+    if (!quiet) C.toast(`${data.games.length} games`);
   } catch (e) { C.toast(e.message, true); }
 }
 
@@ -152,7 +174,7 @@ function bind() {
   });
 }
 
-C.library = { load, render, openDetail, sorts: SORTS };
+C.library = { load, render, paintCached, openDetail, sorts: SORTS };
 C.views.library = {
   placeholder: "Search your library",
   show() { render(); },

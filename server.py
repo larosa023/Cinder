@@ -50,6 +50,7 @@ class Context:
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "Cinder"
+    protocol_version = "HTTP/1.1"  # keep-alive: images and API calls reuse connections
     ctx: Context  # set by make_server
 
     def log_message(self, *args):
@@ -117,7 +118,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404, b"", "text/css")
         m = re.fullmatch(r"/art/(\d+)/(\w+)", path)
         if m and m.group(2) in ART:
-            kind, val = c.steam.art(int(m.group(1)), m.group(2))
+            found = c.steam.art(int(m.group(1)), m.group(2))
+            if not found:
+                return self._send(404, b"", "text/plain", "max-age=3600")
+            kind, val = found
             if kind == "file":
                 return self._file(Path(val))
             return self._send(302, b"", "text/plain", "max-age=3600", {"Location": val})
@@ -168,6 +172,7 @@ class Handler(BaseHTTPRequestHandler):
                                       "size": 0, "lastupdated": 0, "installdir": "", "library": ""})
             except storeapi.SteamDataError:
                 pass  # keep the local library
+        c.steam.prefetch_art([g["appid"] for g in games])
         return games
 
     def _steam_data(self, path: str, q: dict):

@@ -31,6 +31,7 @@ body.bg-glow { background: radial-gradient(1200px 600px at 85% -10%, color-mix(i
 body.bg-art::before {
   content: ""; position: fixed; inset: -60px; z-index: -1; pointer-events: none;
   background: var(--bg-art) center / cover no-repeat; filter: blur(48px) saturate(1.2); opacity: .22;
+  transform: translateZ(0); will-change: transform;  /* own GPU layer: scrolling doesn't repaint the blur */
 }
 
 /* ---------- Title bar ---------- */
@@ -94,16 +95,30 @@ body.native:not(.win-max) .rz { display: block; }
 .rz-nw { top: 0; left: 0; cursor: nwse-resize; } .rz-se { bottom: 0; right: 0; cursor: nwse-resize; }
 
 /* ---------- Sidebar navigation ---------- */
-.sidebar { grid-area: side; display: none; width: var(--side-w); padding: 14px 10px; border-right: 1px solid var(--border); background: color-mix(in srgb, var(--bg-elev) 70%, transparent); }
-body.nav-side .sidebar { display: block; }
-.navside { display: flex; flex-direction: column; gap: 2px; }
-.navside button {
-  display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 12px; border-radius: 10px;
-  color: var(--text-dim); font-weight: 600; text-align: left; transition: background .15s, color .15s;
+.sidebar {
+  grid-area: side; display: none; flex-direction: column; width: var(--side-w); padding: 14px 10px 12px;
+  border-right: 1px solid var(--border); background: color-mix(in srgb, var(--bg-elev) 70%, transparent);
+  overflow: hidden; transition: width .22s cubic-bezier(.2, .8, .2, 1), padding .22s cubic-bezier(.2, .8, .2, 1);
 }
-.navside button:hover { background: var(--surface-hover); color: var(--text); }
+body.nav-side .sidebar { display: flex; }
+.navside { display: flex; flex-direction: column; gap: 2px; }
+.navside button, .side-toggle {
+  display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 12px; border-radius: 10px;
+  color: var(--text-dim); font-weight: 600; text-align: left; white-space: nowrap;
+  transition: background .15s, color .15s, padding .22s cubic-bezier(.2, .8, .2, 1);
+}
+.navside button span, .side-toggle span { transition: opacity .15s ease; }
+.navside button:hover, .side-toggle:hover { background: var(--surface-hover); color: var(--text); }
 .navside button.on { background: var(--surface); color: var(--text); box-shadow: inset 3px 0 0 var(--accent); }
 .navside button.on svg { color: var(--accent); }
+.side-toggle { margin-top: auto; font-weight: 500; font-size: 13px; }
+.side-toggle svg { transition: transform .22s cubic-bezier(.2, .8, .2, 1); }
+/* Collapsed: icons only */
+body.side-collapsed { --side-w: 60px; }
+body.side-collapsed .sidebar { padding-left: 8px; padding-right: 8px; }
+body.side-collapsed .navside button, body.side-collapsed .side-toggle { padding: 0 12px; }
+body.side-collapsed .navside button span, body.side-collapsed .side-toggle span { opacity: 0; pointer-events: none; }
+body.side-collapsed .side-toggle svg { transform: rotate(180deg); }
 
 /* ---------- Main ---------- */
 main { grid-area: main; overflow-y: auto; overflow-x: hidden; padding: calc(var(--pad) * .8) var(--pad) 48px; scroll-behavior: smooth; min-width: 0; }
@@ -165,7 +180,7 @@ select, .text {
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--card-w), 1fr)); gap: calc(22px * var(--gap)) calc(16px * var(--gap)); }
 .grid.wide { grid-template-columns: repeat(auto-fill, minmax(calc(var(--card-w) * 1.55), 1fr)); }
-.card { text-align: left; min-width: 0; outline: none; }
+.card { text-align: left; min-width: 0; outline: none; content-visibility: auto; contain-intrinsic-size: auto 320px; }
 .art {
   position: relative; aspect-ratio: 2 / 3; border-radius: var(--card-radius); overflow: hidden;
   background: var(--surface); box-shadow: 0 6px 18px var(--shadow);
@@ -176,6 +191,11 @@ select, .text {
 img:not([data-loaded]) { opacity: 0; }
 img[data-loaded] { opacity: 1; transition: opacity .3s; }
 .art.missing img { display: none; }
+.art.from-header::before {
+  content: ""; position: absolute; inset: -24px; background: var(--fb) center / cover;
+  filter: blur(18px) brightness(.55) saturate(1.2);
+}
+.art.from-header img { position: relative; object-fit: contain; }
 .art.missing::after {
   content: attr(data-name); position: absolute; inset: 0; display: grid; place-items: center;
   padding: 16px; text-align: center; font-weight: 650; font-size: 15px; color: var(--text-dim);

@@ -69,7 +69,7 @@ jobs:
 
       - name: Build Cinder.exe
         if: steps.ver.outputs.skip != 'true'
-        run: pyinstaller --noconfirm --clean --onefile --noconsole --name Cinder --add-data "ui;ui" --add-data "themes;themes" main.py
+        run: pyinstaller --noconfirm --clean --onefile --noconsole --optimize 1 --name Cinder --add-data "ui;ui" --add-data "themes;themes" --exclude-module tkinter --exclude-module pydoc_data --exclude-module test --exclude-module lib2to3 main.py
 
       - name: Publish release
         if: steps.ver.outputs.skip != 'true'

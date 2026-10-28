@@ -214,13 +214,19 @@ document.addEventListener("error", (e) => {
   if (img.dataset.fallback) {
     const fb = img.dataset.fallback;
     delete img.dataset.fallback;
+    // A tall cover falling back to wide header art: show it centered on a blurred copy.
+    const art = img.parentElement;
+    if (art && art.classList.contains("art") && !art.closest(".grid.wide")) {
+      art.classList.add("from-header");
+      art.style.setProperty("--fb", `url("${fb}")`);
+    }
     img.src = fb;
     return;
   }
   const fail = img.dataset.fail;
   if (fail === "hide") img.style.visibility = "hidden";
   else if (fail === "logo") img.closest(".d-title, .sp-title")?.classList.add("no-logo");
-  else if (img.parentElement?.classList.contains("art")) img.parentElement.classList.add("missing");
+  else if (img.parentElement?.classList.contains("art")) img.parentElement.classList.remove("from-header"), img.parentElement.classList.add("missing");
   else img.style.visibility = "hidden";
 }, true);
 })();

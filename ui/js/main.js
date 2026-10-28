@@ -30,6 +30,7 @@ function bindGlobal() {
     else if ((e.key === "/" && !typing) || (e.key.toLowerCase() === "f" && e.ctrlKey)) {
       e.preventDefault(); search.focus(); search.select();
     } else if (e.key === "," && e.ctrlKey) { e.preventDefault(); C.openSettings(); }
+    else if (e.ctrlKey && e.key.toLowerCase() === "b") { e.preventDefault(); C.style.toggleSidebar(); }
     else if (e.ctrlKey && /^[1-5]$/.test(e.key)) { e.preventDefault(); C.go(C.TABS[+e.key - 1].id); }
     else if (e.altKey && e.key === "ArrowLeft") { e.preventDefault(); history.back(); }
     else if (e.altKey && e.key === "ArrowRight") { e.preventDefault(); history.forward(); }
@@ -51,6 +52,7 @@ async function init() {
   Object.values(C.views).forEach((v) => v.init && v.init());
   C.settings.init();
   C.style.init();
+  const libraryLoad = C.library.load(true);  // start reading the library right away
   try {
     const st = await C.api("/api/state");
     Object.assign(S, { config: st.config, themes: st.themes, user: st.user, steam: st.steam, platform: st.platform });
@@ -72,8 +74,9 @@ async function init() {
     }, 100);
   }
 
-  await C.library.load(true);
+  C.library.paintCached();
   C.onRoute();
+  await libraryLoad;
   C.updates.poll();
   setTimeout(C.updates.poll, 5000);  // startup update checks finish in the background
 }

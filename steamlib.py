@@ -42,9 +42,41 @@ ART = {
     "logo": ("logo", "png"),
     "header": ("header", "jpg"),
 }
-CDN = "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{appid}/{stem}.{ext}"
 
 _NO_WINDOW = 0x08000000 if IS_WIN else 0
+
+
+# -------------------------------------------------------------------- processes
+
+def _process_running(exe_name: str) -> bool:
+    """Windows: check the process list directly (much faster than running tasklist)."""
+    import ctypes
+    from ctypes import wintypes
+
+    class PROCESSENTRY32W(ctypes.Structure):
+        _fields_ = [("dwSize", wintypes.DWORD), ("cntUsage", wintypes.DWORD), ("th32ProcessID", wintypes.DWORD),
+                    ("th32DefaultHeapID", ctypes.c_void_p), ("th32ModuleID", wintypes.DWORD),
+                    ("cntThreads", wintypes.DWORD), ("th32ParentProcessID", wintypes.DWORD),
+                    ("pcPriClassBase", ctypes.c_long), ("dwFlags", wintypes.DWORD),
+                    ("szExeFile", ctypes.c_wchar * 260)]
+
+    k32 = ctypes.windll.kernel32
+    k32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+    snap = k32.CreateToolhelp32Snapshot(0x2, 0)  # TH32CS_SNAPPROCESS
+    if not snap or snap == wintypes.HANDLE(-1).value:
+        return False
+    try:
+        e = PROCESSENTRY32W()
+        e.dwSize = ctypes.sizeof(PROCESSENTRY32W)
+        ok = k32.Process32FirstW(snap, ctypes.byref(e))
+        target = exe_name.lower()
+        while ok:
+            if e.szExeFile.lower() == target:
+                return True
+            ok = k32.Process32NextW(snap, ctypes.byref(e))
+        return False
+    finally:
+        k32.CloseHandle(snap)
 
 
 # --------------------------------------------------------------------------- VDF
@@ -110,11 +142,28 @@ def parse_vdf(text: str) -> dict:
     return root
 
 
+_vdf_cache: dict[str, tuple[float, int, dict]] = {}
+_vdf_lock = threading.Lock()
+
+
 def read_vdf(path: Path) -> dict:
+    """Parse a text VDF file, re-parsing only when it changes on disk."""
     try:
-        return parse_vdf(path.read_text(encoding="utf-8", errors="replace"))
+        st = path.stat()
     except OSError:
         return {}
+    key = str(path)
+    with _vdf_lock:
+        hit = _vdf_cache.get(key)
+        if hit and hit[0] == st.st_mtime and hit[1] == st.st_size:
+            return hit[2]
+    try:
+        data = parse_vdf(path.read_text(encoding="utf-8", errors="replace"))
+    except OSError:
+        return {}
+    with _vdf_lock:
+        _vdf_cache[key] = (st.st_mtime, st.st_size, data)
+    return data
 
 
 def _int(v, default=0) -> int:
@@ -161,7 +210,8 @@ def find_steam_path(override: str | None = None) -> Path | None:
 class Steam:
     def __init__(self, path_override: str | None = None):
         self.path = find_steam_path(path_override)
-        self._art_cache: dict[tuple[int, str], Path | None] = {}
+        self.arts = None  # steamart.ArtFinder, created on first use
+        self._running, self._running_at = False, -10.0
         self._lc: tuple[Path | None, float, dict] = (None, 0.0, {})
         self._lock = threading.Lock()
 
@@ -291,51 +341,42 @@ class Steam:
         return sorted(games.values(), key=lambda g: g["name"].lower())
 
     # -- art ----------------------------------------------------------------
-    def art(self, appid: int, kind: str) -> tuple[str, str]:
-        """Return ("file", path) for a local cached image, else ("url", cdn_url)."""
-        stem, ext = ART[kind]
-        key = (appid, kind)
-        if key not in self._art_cache:
-            self._art_cache[key] = self._find_local_art(appid, stem, ext)
-        local = self._art_cache[key]
-        if local:
-            return "file", str(local)
-        return "url", CDN.format(appid=appid, stem=stem, ext=ext)
+    def _art_finder(self):
+        if self.arts is None:
+            from steamart import ArtFinder
+            from config import data_dir
+            self.arts = ArtFinder(self.path, data_dir())
+        return self.arts
 
-    def _find_local_art(self, appid: int, stem: str, ext: str) -> Path | None:
-        if not self.path:
-            return None
-        base = self.path / "appcache" / "librarycache"
-        for p in (base / f"{appid}_{stem}.{ext}", base / str(appid) / f"{stem}.{ext}"):
-            if p.exists():
-                return p
-        d = base / str(appid)
-        if d.is_dir():
-            for name in (f"{stem}.{ext}", f"{stem}_2x.{ext}"):
-                for p in d.rglob(name):
-                    return p
-        return None
+    def art(self, appid: int, kind: str):
+        """("file", path) / ("url", url) for a game's art, or None. See steamart.py."""
+        return self._art_finder().find(appid, kind)
+
+    def prefetch_art(self, appids: list[int]) -> None:
+        self._art_finder().prefetch(appids)
 
     # -- process control ----------------------------------------------------
     def running(self) -> bool:
+        """Is steam.exe running? Cached for 2 seconds; no subprocess on Windows."""
+        now = time.monotonic()
+        if now - self._running_at < 2:
+            return self._running
         try:
-            if IS_WIN:
-                out = subprocess.run(
-                    ["tasklist", "/FI", "IMAGENAME eq steam.exe", "/NH"],
-                    capture_output=True, text=True, creationflags=_NO_WINDOW, timeout=5,
-                ).stdout
-                return "steam.exe" in out.lower()
-            out = subprocess.run(["pgrep", "-x", "steam"], capture_output=True, timeout=5)
-            return out.returncode == 0
+            self._running = _process_running("steam.exe") if IS_WIN else (
+                subprocess.run(["pgrep", "-x", "steam"], capture_output=True, timeout=5).returncode == 0)
         except Exception:
-            return False
+            self._running = False
+        self._running_at = now
+        return self._running
 
     def wait_stopped(self, timeout: float = 45) -> bool:
         end = time.time() + timeout
         while time.time() < end:
+            self._running_at = -10.0
             if not self.running():
                 return True
             time.sleep(1.5)
+        self._running_at = -10.0
         return not self.running()
 
     def start(self, silent: bool = True, extra: list[str] | None = None, freeze: bool = True) -> bool:
@@ -352,6 +393,7 @@ class Steam:
         else:
             kw["start_new_session"] = True
         subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **kw)
+        self._running_at = -10.0
         return True
 
     @staticmethod
@@ -379,6 +421,7 @@ class Steam:
     def shutdown(self) -> None:
         if self.running() and self.exe:
             subprocess.Popen([str(self.exe), "-shutdown"], creationflags=_NO_WINDOW)
+        self._running_at = -10.0
 
     # -- update freeze ------------------------------------------------------
     @property

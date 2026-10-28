@@ -5,7 +5,7 @@ const { $, $$ } = C;
 
 const DEFAULTS = {
   accent: "", nav: "top", covers: "portrait", radius: "soft", density: "cozy",
-  font: "segoe", bg: "solid", glow: true, blur: true, motion: true, recent: true, labels: true,
+  font: "segoe", bg: "solid", sideCollapsed: false, glow: true, blur: true, motion: true, recent: true, labels: true,
 };
 const ACCENTS = ["", "#5b8cff", "#3ea6ff", "#66c0f4", "#2dd4bf", "#3ddc97", "#a3e635",
   "#facc15", "#ff7a3d", "#ff5d6c", "#f472b6", "#a78bfa"];
@@ -35,6 +35,12 @@ function apply() {
   const s = style;
   const b = document.body;
   b.classList.toggle("nav-side", s.nav === "side");
+  b.classList.toggle("side-collapsed", !!s.sideCollapsed);
+  const tg = $("#side-toggle");
+  if (tg) {
+    tg.title = s.sideCollapsed ? "Expand sidebar (Ctrl+B)" : "Collapse sidebar (Ctrl+B)";
+    tg.querySelector("span").textContent = s.sideCollapsed ? "Expand" : "Collapse";
+  }
   b.classList.toggle("covers-wide", s.covers === "wide");
   b.classList.toggle("no-glow", !s.glow);
   b.classList.toggle("no-blur", !s.blur);
@@ -99,7 +105,13 @@ ${vals.map(([k, v]) => `  ${k}: ${v};`).join("\n")}
 `;
 }
 
+function toggleSidebar() {
+  if (style.nav !== "side") return;
+  set("sideCollapsed", !style.sideCollapsed);
+}
+
 function bind() {
+  $("#side-toggle").addEventListener("click", toggleSidebar);
   $("#st-accent").innerHTML = ACCENTS.map((c) =>
     `<button data-accent="${c}" title="${c || "Theme default"}" style="${c ? `background:${c}` : ""}" class="${c ? "" : "auto"}"></button>`).join("")
     + '<label class="custom" title="Custom color"><input type="color" id="st-accent-custom" value="#5b8cff"></label>';
@@ -140,6 +152,6 @@ function bind() {
 C.style = {
   get: () => style,
   load(saved) { style = { ...DEFAULTS, ...(saved || {}) }; apply(); },
-  apply, refreshArt, init: bind,
+  apply, refreshArt, toggleSidebar, init: bind,
 };
 })();

@@ -7,7 +7,8 @@ if not exist ".venv\Scripts\python.exe" (
 .venv\Scripts\python -m pip install --upgrade pip >nul
 .venv\Scripts\python -m pip install -r requirements.txt pyinstaller
 .venv\Scripts\pyinstaller --noconfirm --clean --onefile --noconsole ^
-  --name Cinder ^
+  --optimize 1 --name Cinder ^
+  --exclude-module tkinter --exclude-module pydoc_data --exclude-module test --exclude-module lib2to3 ^
   --add-data "ui;ui" ^
   --add-data "themes;themes" ^
   main.py
