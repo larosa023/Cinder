@@ -157,11 +157,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": True, **c.ach.hub()})
             return self._json({"ok": False, "error": "Not available"})
         if path == "/api/downloads":
-            items = [{"appid": g["appid"], "name": g["name"], **g["download"]}
-                     for g in c.steam.library() if g.get("download")]
-            order = {"downloading": 0, "installing": 1, "verifying": 2, "queued": 3, "paused": 4}
-            items.sort(key=lambda d: order.get(d["state"], 9))
-            return self._json({"ok": True, "items": items})
+            return self._json(self._downloads())
         if path == "/api/library":
             return self._json({"ok": True, "games": self._library()})
         try:
@@ -409,37 +405,108 @@ class Handler(BaseHTTPRequestHandler):
         path.write_text(css, encoding="utf-8")
         return self._json({"ok": True, "id": slug, "themes": list_themes(self.ctx.theme_dirs)})
 
+    # -- downloads -------------------------------------------------------------
+    def _bridge_state(self) -> str:
+        c, s = self.ctx, self.ctx.steam
+        if not s.found or not s.bridge:
+            return "unavailable"
+        if not c.config["steam_bridge"]:
+            return "off"
+        if not s.running():
+            return "steam_off"
+        return "on" if s.bridge.available() else "needs_restart"
+
+    def _downloads(self) -> dict:
+        """Downloads from Steam's files, upgraded with Steam's live queue when connected."""
+        import steambridge
+        s = self.ctx.steam
+        games = {g["appid"]: g for g in s.library()}
+        items = {a: {"appid": a, "name": g["name"], **g["download"]} for a, g in games.items() if g.get("download")}
+        bridge = self._bridge_state()
+        out = {"ok": True, "bridge": bridge, "live": False, "current": 0, "speed": 0, "peak": 0, "eta": 0}
+        snap = None
+        if bridge == "on":
+            try:
+                snap = s.bridge.snapshot()
+            except steambridge.BridgeError as e:
+                log.info("downloads: live queue unavailable (%s)", e)
+        if snap and snap.get("items") is not None:
+            out["live"] = True
+            ov = snap.get("overview") or {}
+            cur = int(ov.get("update_appid") or 0)
+            running = str(ov.get("update_state") or "").lower() not in ("", "none", "stopping") and not ov.get("paused")
+            out.update(current=cur if running else 0,
+                       speed=int(ov.get("update_network_bytes_per_second") or 0) if running else 0,
+                       peak=int(ov.get("update_peak_network_bytes_per_second") or 0),
+                       eta=int(ov.get("update_seconds_remaining") or 0) if running else 0)
+            for it in snap["items"] or []:
+                a = int(it.get("appid") or 0)
+                if not a:
+                    continue
+                d = items.get(a) or {"appid": a, "name": (games.get(a) or {}).get("name") or f"App {a}",
+                                     "state": "queued", "total": 0, "done": 0, "stage_total": 0, "stage_done": 0}
+                total, done = int(it.get("total_bytes") or 0), int(it.get("downloaded_bytes") or 0)
+                if total:
+                    d["total"], d["done"] = total, min(done, total)
+                d["queue"] = int(it.get("queue_index") if it.get("queue_index") is not None else 999)
+                if it.get("completed"):
+                    d["state"], d["completed_time"] = "done", int(it.get("completed_time") or 0)
+                elif it.get("paused"):
+                    d["state"] = "paused"
+                elif a == out["current"]:
+                    if d["state"] not in ("installing", "verifying"):
+                        d["state"] = "downloading"
+                elif d["state"] == "downloading":
+                    d["state"] = "queued"
+                if it.get("update_error"):
+                    d["error"] = str(it["update_error"])
+                items[a] = d
+        order = {"downloading": 0, "installing": 1, "verifying": 2, "queued": 3, "paused": 4, "done": 9}
+        lst = sorted(items.values(), key=lambda d: (order.get(d["state"], 5), d.get("queue", 999),
+                                                    -d.get("completed_time", 0)))
+        busy = {d["appid"] for d in lst if d["state"] != "done"}
+        out["items"] = lst
+        out["updates"] = [{"appid": a, "name": g["name"], "size": g.get("size", 0)} for a, g in games.items()
+                          if g.get("installed") and g.get("update_pending") and not g.get("shortcut") and a not in busy]
+        return out
+
     def _bridge_action(self, action: str, body: dict):
-        """Update games or pause/resume downloads without opening a Steam window."""
+        """Update games and control the download queue without opening a Steam window."""
         import threading
         import steambridge
         from steamlib import running_appid
         c, s = self.ctx, self.ctx.steam
         b = s.bridge
+        if not s.found or not b:
+            return self._json({"ok": False, "error": "Steam wasn't found"})
+        cmd = "update" if action == "game_update" else str(body.get("cmd", ""))
+        if action == "download_pause":  # older UI
+            cmd = "pause" if body.get("pause") else "resume"
+        if cmd not in ("update", "pause", "resume", "top", "remove", "pause_all", "resume_all", "connect"):
+            return self._json({"ok": False, "error": "unknown command"}, 400)
         raw = body.get("appids") or ([body["appid"]] if body.get("appid") is not None else [])
-        ids = [int(x) for x in raw if str(x).isdigit()]
-        games = {g["appid"]: g for g in s.library()}
-        ids = [a for a in ids if a in games and games[a].get("installed") and not games[a].get("shortcut")][:200]
-        if not ids:
+        ids = [int(x) for x in raw if str(x).isdigit()][:200]
+        if cmd == "update":
+            games = {g["appid"]: g for g in s.library()}
+            ids = [a for a in ids if a in games and games[a].get("installed") and not games[a].get("shortcut")]
+        if not ids and cmd not in ("pause_all", "resume_all", "connect"):
             return self._json({"ok": False, "error": "Nothing to update"})
-        pause = bool(body.get("pause"))
 
         def do():
             try:
-                r = b.update(ids) if action == "game_update" else b.pause(ids[0], pause)
+                r = b.update(ids) if cmd == "update" else b.command(cmd, ids) if cmd != "connect" else {"ok": True}
             except steambridge.BridgeError as e:
-                log.warning("bridge %s failed: %s", action, e)
+                log.warning("bridge %s %s failed: %s", cmd, ids, e)
                 return {"ok": False, "error": f"Steam didn't take the request ({e})"}
             if isinstance(r, dict) and r.get("ok"):
-                return {"ok": True, "state": "queued"}
-            log.warning("bridge %s: unexpected reply %r", action, r)
+                log.info("bridge %s %s", cmd, ids)
+                return {"ok": True, "state": "queued" if cmd == "update" else "done"}
+            log.warning("bridge %s: unexpected reply %r", cmd, r)
             return {"ok": False, "error": "This Steam build doesn't support that from Cinder. Use Manage in Steam."}
 
-        if not s.found or not b:
-            return self._json({"ok": False, "error": "Steam wasn't found"})
         if not c.config["steam_bridge"]:
-            # Fallback: Steam's own page for the game, which has the Update button.
-            s.steam_url(f"steam://nav/games/details/{ids[0]}")
+            # Fallback: Steam's own pages, which have the buttons.
+            s.steam_url(f"steam://nav/games/details/{ids[0]}" if cmd == "update" and ids else "steam://open/downloads")
             return self._json({"ok": True, "state": "steam"})
         if not s.running():
             def start_then():
@@ -535,7 +602,7 @@ class Handler(BaseHTTPRequestHandler):
             s.steam_url("steam://store")
         elif action == "steam_exit":
             s.shutdown()
-        elif action in ("game_update", "download_pause"):
+        elif action in ("game_update", "download_pause", "download_cmd"):
             return self._bridge_action(action, body)
         elif action == "cinder_check":
             return self._json({"ok": True, "cinder": c.updater.check()})

@@ -33,6 +33,10 @@ class BridgeError(Exception):
     pass
 
 
+class ConnError(BridgeError):
+    """Couldn't talk to Steam at all (as opposed to Steam reporting an error)."""
+
+
 # ----------------------------------------------------------------- websocket
 
 def _recv_exact(sock: socket.socket, n: int) -> bytes:
@@ -40,7 +44,7 @@ def _recv_exact(sock: socket.socket, n: int) -> bytes:
     while len(buf) < n:
         chunk = sock.recv(n - len(buf))
         if not chunk:
-            raise BridgeError("Steam closed the connection")
+            raise ConnError("Steam closed the connection")
         buf += chunk
     return buf
 
@@ -73,7 +77,7 @@ def _recv_message(sock: socket.socket) -> str:
         if mask:
             payload = bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
         if op == 8:
-            raise BridgeError("Steam closed the connection")
+            raise ConnError("Steam closed the connection")
         if op == 9:
             _send_frame(sock, payload, 10)
             continue
@@ -95,7 +99,7 @@ def _evaluate(ws_url: str, expression: str, timeout: float = 15) -> object:
         while b"\r\n\r\n" not in head:
             chunk = sock.recv(1024)
             if not chunk:
-                raise BridgeError("Steam refused the connection")
+                raise ConnError("Steam refused the connection")
             head += chunk
         if b" 101 " not in head.split(b"\r\n", 1)[0]:
             raise BridgeError("Steam refused the connection")
@@ -111,7 +115,7 @@ def _evaluate(ws_url: str, expression: str, timeout: float = 15) -> object:
                 d = res["exceptionDetails"]
                 raise BridgeError((d.get("exception") or {}).get("description") or d.get("text") or "Steam error")
             return (res.get("result") or {}).get("value")
-        raise BridgeError("Steam didn't answer")
+        raise ConnError("Steam didn't answer")
     finally:
         sock.close()
 
@@ -165,14 +169,12 @@ class SteamBridge:
         return None
 
     def available(self) -> bool:
+        """True when Steam is running and its interface answers."""
         if not self.steam.running():
+            self._target = None
             return False
         if self._target:
-            try:
-                if _evaluate(self._target, "typeof SteamClient", 3) == "object":
-                    return True
-            except (OSError, BridgeError):
-                pass
+            return True
         self._target = self._find_target()
         return bool(self._target)
 
@@ -185,14 +187,17 @@ class SteamBridge:
             time.sleep(2)
         return False
 
-    def run(self, js: str) -> object:
-        if not self.available():
-            raise BridgeError("not connected")
-        try:
-            return _evaluate(self._target, js)  # type: ignore[arg-type]
-        except OSError as e:
-            self._target = None
-            raise BridgeError(f"Couldn't reach Steam ({e})") from e
+    def run(self, js: str, timeout: float = 15) -> object:
+        for attempt in range(2):
+            if not self.available():
+                raise ConnError("not connected")
+            try:
+                return _evaluate(self._target, js, timeout)  # type: ignore[arg-type]
+            except (OSError, ConnError) as e:
+                self._target = None  # Steam reloaded its interface: find it again
+                if attempt:
+                    raise ConnError(f"Couldn't reach Steam ({e})") from e
+        raise ConnError("not connected")
 
     # -- actions -----------------------------------------------------------------
     def update(self, appids: list[int]) -> object:
@@ -211,15 +216,39 @@ class SteamBridge:
   return {{ok: true, done}};
 }})()""")
 
-    def pause(self, appid: int, pause: bool) -> object:
-        fn = "PauseAppUpdate" if pause else "ResumeAppUpdate"
+    def command(self, cmd: str, appids: list[int]) -> object:
+        """pause / resume / top / remove for given apps; pause_all / resume_all for the queue."""
+        ids = json.dumps([int(a) for a in appids])
         return self.run(f"""(async () => {{
-  const D = SteamClient.Downloads;
-  if (!D || !D.{fn}) return {{ok: false, missing: Object.keys(D || {{}})}};
-  if (!{str(pause).lower()}) {{ try {{ D.EnableAllDownloads && await D.EnableAllDownloads(true); }} catch (e) {{}} }}
-  await D.{fn}({int(appid)});
+  const D = SteamClient.Downloads, cmd = {json.dumps(cmd)};
+  let ids = {ids};
+  const need = {{pause: "PauseAppUpdate", resume: "ResumeAppUpdate", top: "SetQueueIndex",
+    remove: "RemoveFromDownloadList", pause_all: "PauseAppUpdate", resume_all: "ResumeAppUpdate"}}[cmd];
+  if (!D || !D[need]) return {{ok: false, missing: Object.keys(D || {{}})}};
+  const st = window.__cinderDl || {{}};
+  if (cmd === "pause_all" || cmd === "resume_all")
+    ids = (st.items || []).filter((i) => !i.completed).map((i) => i.appid);
+  if (cmd.startsWith("resume") || cmd === "top") {{ try {{ D.EnableAllDownloads && await D.EnableAllDownloads(true); }} catch (e) {{}} }}
+  for (const id of ids) {{
+    if (cmd === "top") {{ await D.SetQueueIndex(id, 0); try {{ await D.ResumeAppUpdate(id); }} catch (e) {{}} }}
+    else await D[need](id);
+  }}
   return {{ok: true}};
 }})()""")
+
+    def snapshot(self) -> dict | None:
+        """Steam's live download queue: {overview, items}. Listens once, then reads what Steam pushed."""
+        r = self.run("""(() => {
+  const D = SteamClient.Downloads;
+  let st = window.__cinderDl;
+  if (!st) {
+    st = window.__cinderDl = {};
+    try { D.RegisterForDownloadOverview((o) => { st.overview = o; st.at = Date.now(); }); } catch (e) { st.err = String(e); }
+    try { D.RegisterForDownloadItems((active, items) => { st.active = active; st.items = items; st.at = Date.now(); }); } catch (e) { st.err = String(e); }
+  }
+  return {overview: st.overview || null, items: st.items || null, active: !!st.active, err: st.err || null};
+})()""", 5)
+        return r if isinstance(r, dict) else None
 
 
 def restart_with_bridge(steam, bridge: SteamBridge, then=None) -> None:

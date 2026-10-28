@@ -20,8 +20,8 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 
 - A "Now playing" pill in the top bar with a session timer (click it for the game page)
 - Cinder minimizes or hides to the tray when a game starts and comes back when it closes (Settings → General)
-- Downloads panel: install and update progress, speed and time left, read from Steam's own files
-- **Update games without launching them**: an Update button on the cover badge, the game page, the right-click menu and the Downloads panel (with **Update all**). Downloads can be paused and resumed from the panel too. No Steam window opens: Cinder asks Steam's own interface to do it (Settings → Steam → Update games from Cinder). The first time, Steam restarts once in the background to switch on its local debugging connection (only reachable from your PC)
+- **Downloads tab**: what's downloading now (big progress bar, speed graph, peak speed, time left and when it'll finish), the queue (**Start now** moves a game to the front, pause, resume, remove), updates waiting (**Update all**) and what finished. When connected to Steam the numbers are live from Steam itself; otherwise they're read from Steam's files
+- **Update games without launching them**: an Update button on the cover badge, the game page, the right-click menu and the Downloads panel (with **Update all**). Downloads can be paused, resumed and reordered from the Downloads tab. No Steam window opens: Cinder asks Steam's own interface to do it (Settings → Steam → Update games from Cinder). The first time, Steam restarts once in the background to switch on its local debugging connection (only reachable from your PC)
 
 **Achievements, lists and your profile**
 
@@ -66,7 +66,7 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 - **Steam update freeze**: keeps the client on its current build; update it on demand from Settings
 - **Built-in Cinder updater**: new versions install from GitHub releases, so you don't re-download the exe
 
-Shortcuts: `Ctrl+B` collapses the sidebar to icons, `Ctrl+1`–`6` switch tabs, `Alt+←` / mouse back button goes back, `F5` refreshes, `Ctrl+,` opens Settings.
+Shortcuts: `Ctrl+B` collapses the sidebar to icons, `Ctrl+1`–`7` switch tabs, `Alt+←` / mouse back button goes back, `F5` refreshes, `Ctrl+,` opens Settings.
 
 ## Optional: Steam Web API key
 
