@@ -28,11 +28,14 @@ DEFAULTS = {
     "favorites": [],
     "hidden": [],
     "sale_alerts": True,
+    "lists": [],          # [{"id", "name", "appids"}] - your Cinder game lists
+    "profile_style": {},  # background appid, showcase appids, sections
 }
 EDITABLE = {"theme", "sort", "card_size", "freeze_updates", "autostart_steam", "frameless", "steam_path", "check_updates",
             "store_region", "api_key", "start_tab", "style", "show_steam_updates",
             "hide_steam_on_launch", "persona", "close_to_tray", "tray_hint_shown",
-            "when_playing", "restore_after_play", "favorites", "hidden", "sale_alerts"}
+            "when_playing", "restore_after_play", "favorites", "hidden", "sale_alerts",
+            "lists", "profile_style"}
 
 
 def data_dir() -> Path:

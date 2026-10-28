@@ -20,6 +20,8 @@ function visible() {
   let g = S.games;
   if (L.filter === "hidden") g = g.filter((x) => hid.has(x.appid));
   else g = g.filter((x) => !hid.has(x.appid));
+  const inList = C.lists && C.lists.activeSet();
+  if (inList) g = g.filter((x) => inList.has(x.appid));
   if (L.filter === "favorites") g = g.filter((x) => fav.has(x.appid));
   else if (L.filter === "installed") g = g.filter((x) => x.installed);
   else if (L.filter === "played") g = g.filter((x) => x.playtime > 0);
@@ -91,6 +93,9 @@ function render() {
   if (!S.steam.found) empty.innerHTML = "<strong>Steam wasn't found</strong>Set the Steam folder in config.json, or reinstall Steam.";
   else if (!S.games.length) empty.innerHTML = "<strong>No installed games yet</strong>Install something in Steam and press F5.";
   else if (L.filter === "favorites") empty.innerHTML = "<strong>No favorites yet</strong>Right-click a game and choose Favorite.";
+  else if (C.lists && C.lists.active()) empty.innerHTML = C.lists.active().dynamic
+    ? "<strong>This is an automatic Steam collection</strong>Its games are picked by filters that only Steam can apply. Open it in Steam to see them."
+    : "<strong>This list is empty</strong>Right-click any game and choose Add to list.";
   else empty.innerHTML = `<strong>Nothing matches “${esc(L.q)}”</strong>Try a different search or filter.`;
 }
 
@@ -210,6 +215,7 @@ function cardMenu(e, appid) {
     <button data-cm="play">${g.installed ? ICON.play + "Play" : ICON.down + "Install"}</button>
     <button data-cm="fav">${STAR}${fav ? "Remove from favorites" : "Favorite"}</button>
     <button data-cm="hide">${hid ? "Unhide" : "Hide from library"}</button>
+    <button data-cm="list">Add to list…</button>
     <hr>
     <button data-cm="details">Details</button>
     ${g.shortcut ? '<button data-cm="folder">Open folder</button>' : `<button data-cm="store">Store page</button>
@@ -236,6 +242,7 @@ function bind() {
     ({
       play: () => C.launch(id),
       fav: () => toggleList("favorites", id),
+      list: () => { const r = $("#card-menu").getBoundingClientRect(); C.lists.picker(id, r.left, r.top); },
       hide: () => toggleList("hidden", id),
       details: () => openDetail(id),
       store: () => C.go(`store/app/${id}`),
@@ -249,6 +256,10 @@ function bind() {
   $("#d-fav").addEventListener("click", () => toggleList("favorites", L.current.appid));
   $("#d-hide").addEventListener("click", () => toggleList("hidden", L.current.appid));
   $("#btn-random").addEventListener("click", pickRandom);
+  $("#d-lists").addEventListener("click", (e) => {
+    const r = e.target.getBoundingClientRect();
+    C.lists.picker(L.current.appid, r.left, r.bottom + 6);
+  });
 
   const onCard = (e) => {
     const play = e.target.closest("[data-play]");
@@ -283,7 +294,7 @@ function bind() {
   });
 }
 
-C.library = { load, render, paintCached, openDetail, sorts: SORTS };
+C.library = { load, render, paintCached, openDetail, sorts: SORTS, visible };
 C.views.library = {
   placeholder: "Search your library",
   show() { render(); },

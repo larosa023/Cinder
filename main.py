@@ -60,6 +60,13 @@ def clean_stale_temp() -> None:
             pass  # still in use (e.g. another copy of Cinder is running)
 
 
+def later(seconds: float, fn) -> None:
+    """Run fn after a delay without keeping Cinder from closing."""
+    t = threading.Timer(seconds, fn)
+    t.daemon = True
+    t.start()
+
+
 def activate_running_copy(ddir: Path, show: bool = True) -> bool:
     """If Cinder is already running, bring its window up (unless show=False) and return True."""
     import json
@@ -211,6 +218,10 @@ def main() -> None:
         window_api=window_api,
     )
     ctx.migrated_from = args.migrated_from
+    if steam.found:
+        from achievements import AchievementIndex
+        ctx.ach = AchievementIndex(steam, cfg, ddir)
+        later(30, ctx.ach.scan)  # fill the cache in the background
     ctx.playing = lambda: None
     ctx.activate = lambda: None
     ctx.notify = lambda title, text: None
@@ -285,6 +296,8 @@ def main() -> None:
         tucked["how"] = how
 
     def on_game_stop(appid, seconds):
+        if ctx.ach:
+            later(60, ctx.ach.scan)  # pick up what you just unlocked
         if tucked["how"] and cfg["restore_after_play"]:
             show_window()
         tucked["how"] = None

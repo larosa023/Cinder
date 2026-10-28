@@ -41,6 +41,7 @@ class Context:
                  updater, steam_updater, restart, window_api=None):
         self.token = token
         self.updater = updater
+        self.ach = None  # achievements.AchievementIndex, set by main
         self.steam_updater = steam_updater
         self.restart = restart
         self.steam = steam
@@ -142,6 +143,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": True, "steam": self._steam_status()})
         if path == "/api/updates":
             return self._json({"ok": True, "cinder": c.updater.snapshot(), "steam": c.steam_updater.snapshot()})
+        if path == "/api/collections":
+            return self._json({"ok": True, "steam": c.steam.collections()})
+        if path == "/api/achievements":
+            if c.ach:
+                c.ach.scan()  # refreshes anything stale, in the background
+                return self._json({"ok": True, **c.ach.hub()})
+            return self._json({"ok": False, "error": "Not available"})
         if path == "/api/downloads":
             items = [{"appid": g["appid"], "name": g["name"], **g["download"]}
                      for g in c.steam.library() if g.get("download")]
@@ -210,7 +218,10 @@ class Handler(BaseHTTPRequestHandler):
             me = self._me()
             if not me:
                 raise storeapi.SteamDataError("Sign in to Steam once so Cinder knows your account")
-            return self._json({"ok": True, **storeapi.achievements(me, appid, key)})
+            res = storeapi.achievements(me, appid, key)
+            if c.ach:
+                c.ach.record(appid, res)
+            return self._json({"ok": True, **res})
         me = self._me()
         if path == "/api/wishlist":
             if not me:
@@ -292,6 +303,9 @@ class Handler(BaseHTTPRequestHandler):
                 if body.get("show", True):
                     threading.Thread(target=self.ctx.activate, daemon=True).start()
                 return self._json({"ok": True})
+            if path == "/api/achievements/scan":
+                started = self.ctx.ach.scan(force=True) if self.ctx.ach else False
+                return self._json({"ok": True, "started": started})
             if path == "/api/log":
                 from cinderlog import log
                 log.info("page: %s", str(body.get("msg", ""))[:500])
@@ -317,6 +331,25 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": False, "error": "bad style"}, 400)
         if "api_key" in body:
             body["api_key"] = re.sub(r"[^0-9A-Fa-f]", "", str(body["api_key"]))[:64]
+        if "lists" in body:
+            lists = []
+            for l in body["lists"] if isinstance(body["lists"], list) else []:
+                if not isinstance(l, dict) or not str(l.get("name", "")).strip():
+                    continue
+                lists.append({"id": re.sub(r"[^\w-]", "", str(l.get("id") or ""))[:40] or secrets_id(),
+                              "name": str(l["name"]).strip()[:60],
+                              "appids": [int(x) for x in l.get("appids") or [] if str(x).isdigit()][:5000]})
+            body["lists"] = lists[:100]
+        if "profile_style" in body:
+            ps = body["profile_style"] if isinstance(body["profile_style"], dict) else {}
+            bg = ps.get("background")
+            body["profile_style"] = {
+                "background": int(bg) if str(bg).isdigit() else None,
+                "showcase": [int(x) for x in ps.get("showcase") or [] if str(x).isdigit()][:4],
+                "sections": {k: bool(v) for k, v in (ps.get("sections") or {}).items()
+                             if k in ("showcase", "achievements", "stats", "about", "recent", "most")},
+                "banner": "compact" if ps.get("banner") == "compact" else "large",
+            }
         for k in ("favorites", "hidden"):
             if k in body:
                 if not isinstance(body[k], list):
@@ -432,6 +465,12 @@ class Handler(BaseHTTPRequestHandler):
                 webbrowser.open(url)  # other news sites open in your browser
             else:
                 return self._json({"ok": False, "error": "link not allowed"}, 400)
+        elif action == "steam_profile_edit":
+            sec = str(body.get("section", ""))
+            me = self._me()
+            if sec not in ("info", "avatar", "background", "miniprofile", "theme", "showcases", "settings") or not me:
+                return self._json({"ok": False, "error": "unknown section"}, 400)
+            s.steam_url(f"steam://openurl/https://steamcommunity.com/profiles/{me}/edit/{sec}")
         elif action == "store_in_steam":
             s.steam_url("steam://store")
         elif action == "steam_exit":
@@ -455,6 +494,11 @@ class Handler(BaseHTTPRequestHandler):
         else:
             return self._json({"ok": False, "error": "unknown action"}, 400)
         return self._json({"ok": True})
+
+
+def secrets_id() -> str:
+    import secrets
+    return "l-" + secrets.token_hex(4)
 
 
 def _open_path(p: str):

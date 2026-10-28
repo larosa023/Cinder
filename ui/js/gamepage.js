@@ -86,5 +86,5 @@ function bind() {
   });
 }
 
-C.gamepage = { open, init: bind };
+C.gamepage = { open, init: bind, show: (tab) => { if (!$("#d-tabs").hidden) setTab(tab); } };
 })();

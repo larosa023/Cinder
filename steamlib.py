@@ -263,6 +263,7 @@ class Steam:
         self.arts = None  # steamart.ArtFinder, created on first use
         self.quiet = None  # steamquiet.SteamQuiet, set by main
         self._sc_cache: tuple[float | None, list] = (None, [])
+        self._col_cache: tuple = (None, [])
         self._running, self._running_at = False, -10.0
         self._lc: tuple[Path | None, float, dict] = (None, 0.0, {})
         self._lock = threading.Lock()
@@ -405,6 +406,45 @@ class Steam:
                 return {_int(d.get("dlcappid")) for d in depots.values()
                         if isinstance(d, dict) and _int(d.get("dlcappid"))}
         return set()
+
+    def collections(self) -> list[dict]:
+        """Your Steam library collections (userdata/<id>/config/cloudstorage).
+
+        Static collections list their games; dynamic ones (built from filters) can't be
+        reproduced outside Steam, so they're listed without games.
+        """
+        ud = self._userdata()
+        if not ud:
+            return []
+        p = ud / "config" / "cloudstorage" / "cloud-storage-namespace-1.json"
+        try:
+            st = p.stat()
+        except OSError:
+            return []
+        if self._col_cache[0] == (st.st_mtime, st.st_size):
+            return self._col_cache[1]
+        out = []
+        try:
+            import json
+            for key, entry in json.loads(p.read_text(encoding="utf-8")):
+                if not key.startswith("user-collections.") or not isinstance(entry, dict):
+                    continue
+                if entry.get("is_deleted") or not entry.get("value"):
+                    continue
+                val = json.loads(entry["value"])
+                cid = val.get("id") or key.split(".", 1)[1]
+                removed = {int(x) for x in val.get("removed") or []}
+                apps = [int(x) for x in val.get("added") or [] if int(x) not in removed]
+                dynamic = bool(val.get("filterSpec"))
+                if cid in ("favorite", "hidden") and not apps:
+                    continue  # Steam's built-in ones, only shown if you use them
+                out.append({"id": f"steam:{cid}", "name": val.get("name") or cid, "appids": apps, "dynamic": dynamic})
+        except Exception as ex:
+            from cinderlog import log
+            log.warning("couldn't read Steam collections: %r", ex)
+        out.sort(key=lambda c: c["name"].lower())
+        self._col_cache = ((st.st_mtime, st.st_size), out)
+        return out
 
     # -- non-Steam games -----------------------------------------------------
     def _userdata(self) -> Path | None:

@@ -22,6 +22,12 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 - Cinder minimizes or hides to the tray when a game starts and comes back when it closes (Settings → General)
 - Downloads panel: install and update progress, speed and time left, read from Steam's own files
 
+**Achievements, lists and your profile**
+
+- Achievements tab: everything you've unlocked across your games, recent and rarest unlocks, games closest to 100%, and per-game progress (gathered in the background and cached)
+- Game lists: your Steam collections appear automatically (read from Steam's files), plus Cinder lists you make. Pick a list from **Lists** in the library; right-click a game to add it to a list
+- Customize your Cinder profile: background from any game's art, a showcase of up to 4 games, which sections show, banner size. **Edit on Steam** jumps to each part of Steam's own profile editor
+
 **Game pages**
 
 - Tabs for Achievements (unlock dates and how rare each one is), News and patch notes, and DLC (with what you have installed)
@@ -57,7 +63,7 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 - **Steam update freeze**: keeps the client on its current build; update it on demand from Settings
 - **Built-in Cinder updater**: new versions install from GitHub releases, so you don't re-download the exe
 
-Shortcuts: `Ctrl+B` collapses the sidebar to icons, `Ctrl+1`–`5` switch tabs, `Alt+←` / mouse back button goes back, `F5` refreshes, `Ctrl+,` opens Settings.
+Shortcuts: `Ctrl+B` collapses the sidebar to icons, `Ctrl+1`–`6` switch tabs, `Alt+←` / mouse back button goes back, `F5` refreshes, `Ctrl+,` opens Settings.
 
 ## Optional: Steam Web API key
 
@@ -181,6 +187,7 @@ The `@swatch` colors are what the theme picker shows. A user theme with the same
 | `install.py` | Install location, shortcuts, start with Windows, swapping in updates after exit |
 | `tray.py` | Tray icon, its menu, and Windows notifications |
 | `playing.py` | Notices when a game starts and stops (Steam's RunningAppID) |
+| `achievements.py` | Gathers your achievements across games in the background for the Achievements tab |
 | `sales.py` | Checks your wishlist every few hours for new sales |
 | `main.py` | Starts everything and opens the window |
 | `.github/workflows/release.yml` | Builds and publishes `Cinder.exe` when a `v*` tag is pushed |

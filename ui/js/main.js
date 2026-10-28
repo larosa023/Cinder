@@ -24,13 +24,13 @@ function bindGlobal() {
 
   document.addEventListener("keydown", (e) => {
     const typing = e.target.matches("input, select, textarea");
-    if (e.key === "Escape") { C.closeOverlays(); C.toggleStatusMenu(false); C.activity.toggleDownloads(false); $("#card-menu").hidden = true; }
+    if (e.key === "Escape") { C.closeOverlays(); C.toggleStatusMenu(false); C.activity.toggleDownloads(false); $("#card-menu").hidden = true; $("#list-picker").hidden = true; $("#lists-menu").hidden = true; }
     else if (e.key === "F5") { e.preventDefault(); C.views[C.route.tab].refresh?.(); }
     else if ((e.key === "/" && !typing) || (e.key.toLowerCase() === "f" && e.ctrlKey)) {
       e.preventDefault(); search.focus(); search.select();
     } else if (e.key === "," && e.ctrlKey) { e.preventDefault(); C.openSettings(); }
     else if (e.ctrlKey && e.key.toLowerCase() === "b") { e.preventDefault(); C.style.toggleSidebar(); }
-    else if (e.ctrlKey && /^[1-5]$/.test(e.key)) { e.preventDefault(); C.go(C.TABS[+e.key - 1].id); }
+    else if (e.ctrlKey && /^[1-6]$/.test(e.key)) { e.preventDefault(); C.go(C.TABS[+e.key - 1].id); }
     else if (e.altKey && e.key === "ArrowLeft") { e.preventDefault(); history.back(); }
     else if (e.altKey && e.key === "ArrowRight") { e.preventDefault(); history.forward(); }
   });
@@ -57,6 +57,7 @@ async function init() {
   C.style.init();
   C.activity.init();
   C.gamepage.init();
+  C.lists.init();
   const libraryLoad = C.library.load(true);  // start reading the library right away
   try {
     const st = await C.api("/api/state");
@@ -79,6 +80,7 @@ async function init() {
     }, 100);
   }
 
+  C.lists.loadSteam().then(() => { C.lists.renderChip(); });
   C.library.paintCached();
   C.onRoute();
   await libraryLoad;

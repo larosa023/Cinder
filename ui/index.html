@@ -69,6 +69,8 @@
     <section class="library">
       <div class="lib-head">
         <h2>Library <span class="count" id="count"></span></h2>
+        <span class="list-chip" id="list-chip" hidden><span id="list-chip-name"></span>
+          <button id="list-chip-x" title="Show all games"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></span>
         <div class="chips" id="filters">
           <button data-filter="all" class="on">All</button>
           <button data-filter="favorites" id="chip-favorites" hidden>Favorites</button>
@@ -79,6 +81,7 @@
           <button data-filter="hidden" id="chip-hidden" hidden>Hidden</button>
         </div>
         <div class="spacer"></div>
+        <button class="btn sm" id="btn-lists" title="Your lists and Steam collections"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>Lists</button>
         <button class="btn sm" id="btn-random" title="Pick a random installed game"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2" class="fill"/><circle cx="15" cy="15" r="1.2" class="fill"/><circle cx="15" cy="9" r="1.2" class="fill"/><circle cx="9" cy="15" r="1.2" class="fill"/></svg>Pick for me</button>
         <select id="sort" title="Sort">
           <option value="recent">Recently played</option>
@@ -96,6 +99,7 @@
   <section class="view" id="view-store" hidden></section>
   <section class="view" id="view-wishlist" hidden></section>
   <section class="view" id="view-friends" hidden></section>
+  <section class="view" id="view-achievements" hidden></section>
   <section class="view" id="view-profile" hidden></section>
 </main>
 
@@ -116,6 +120,7 @@
         <button class="btn" id="d-store" title="Store page">Store page</button>
         <button class="btn" id="d-fav" title="Keep it at the top of your library"></button>
         <button class="btn" id="d-hide" title="Hide it from your library"></button>
+        <button class="btn" id="d-lists" title="Add to one of your lists">Add to list</button>
         <button class="btn danger" id="d-uninstall">Uninstall</button>
       </div>
       <nav class="d-tabs" id="d-tabs">
@@ -208,7 +213,7 @@
         <div class="row"><div><strong>Open Cinder to</strong></div>
           <select id="set-start">
             <option value="library">Library</option><option value="store">Store</option>
-            <option value="wishlist">Wishlist</option><option value="friends">Friends</option><option value="profile">Profile</option>
+            <option value="wishlist">Wishlist</option><option value="friends">Friends</option><option value="achievements">Achievements</option><option value="profile">Profile</option>
           </select></div>
         <div class="row"><div><strong>Start Cinder when Windows starts</strong><small id="startup-note">Opens quietly in the tray, ready when you are.</small></div>
           <label class="switch"><input type="checkbox" id="set-startup"><span></span></label></div>
@@ -229,7 +234,7 @@
         <h3>Shortcuts</h3>
         <dl class="keys">
           <div><dt><kbd>/</kbd></dt><dd>Search</dd></div>
-          <div><dt><kbd>Ctrl</kbd> <kbd>1</kbd>–<kbd>5</kbd></dt><dd>Switch tabs</dd></div>
+          <div><dt><kbd>Ctrl</kbd> <kbd>1</kbd>–<kbd>6</kbd></dt><dd>Switch tabs</dd></div>
           <div><dt><kbd>Alt</kbd> <kbd>←</kbd></dt><dd>Back</dd></div>
           <div><dt><kbd>F5</kbd></dt><dd>Refresh</dd></div>
           <div><dt><kbd>Ctrl</kbd> <kbd>B</kbd></dt><dd>Collapse / expand the sidebar</dd></div>
@@ -307,6 +312,22 @@
   <div id="dl-list"></div>
 </div>
 
+<!-- Profile: Edit on Steam menu + customize panel -->
+<div class="menu lists" id="steam-edit-menu" hidden></div>
+<div class="overlay" id="profile-edit" hidden>
+  <div class="panel pe">
+    <div class="panel-head"><h2>Customize your profile</h2>
+      <button class="icon-btn" data-pe-cancel title="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <p class="hint">This changes how your profile looks in Cinder. To change what friends see on Steam, use Edit on Steam.</p>
+    <div id="pe-body"></div>
+    <div class="pe-foot"><button class="btn" data-pe-cancel>Cancel</button><button class="btn primary" id="pe-save">Save</button></div>
+  </div>
+</div>
+
+<!-- Lists -->
+<div class="menu lists" id="lists-menu" hidden></div>
+<div class="menu lists" id="list-picker" hidden></div>
+
 <!-- Right-click menu on games -->
 <div class="menu ctx" id="card-menu" hidden></div>
 
@@ -325,9 +346,11 @@
 <script src="/ui/js/core.js"></script>
 <script src="/ui/js/style.js"></script>
 <script src="/ui/js/library.js"></script>
+<script src="/ui/js/lists.js"></script>
 <script src="/ui/js/store.js"></script>
 <script src="/ui/js/wishlist.js"></script>
 <script src="/ui/js/friends.js"></script>
+<script src="/ui/js/achhub.js"></script>
 <script src="/ui/js/profile.js"></script>
 <script src="/ui/js/settings.js"></script>
 <script src="/ui/js/activity.js"></script>
