@@ -1,9 +1,14 @@
 name: Release
 
-# Push a tag like v0.2.1 (matching version.py) and this builds Cinder.exe
-# and publishes it as a GitHub release. Cinder's built-in updater picks it up.
+# Publishes Cinder.exe as a GitHub release, which Cinder's built-in updater picks up.
+#
+# Runs automatically whenever version.py changes on main: if there's no release
+# for that version yet, it builds the exe and publishes release v<VERSION>.
+# Publishing a release by hand on GitHub (or pushing a v* tag) also works.
 on:
   push:
+    branches: [main]
+    paths: [version.py]
     tags: ["v*"]
   release:
     types: [published]
@@ -12,11 +17,9 @@ on:
 permissions:
   contents: write
 
-# Publishing a release from the website can fire both the tag and release
-# events; run one build per tag.
 concurrency:
   group: release-${{ github.event.release.tag_name || github.ref_name }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -28,28 +31,53 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Check tag matches version.py
-        if: startsWith(github.ref, 'refs/tags/')
-        env:
-          TAG: ${{ github.event.release.tag_name || github.ref_name }}
+      - name: Work out the version
+        id: ver
         shell: python
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          import os, sys
+          import json, os, subprocess, sys, urllib.request
           sys.path.insert(0, ".")
           from version import VERSION
-          tag = os.environ["TAG"].lstrip("vV")
-          if tag != VERSION:
+          tag = os.environ["RELEASE_TAG"] or (os.environ["REF_NAME"] if os.environ["REF_TYPE"] == "tag" else f"v{VERSION}")
+          if tag.lstrip("vV") != VERSION:
               sys.exit(f"Tag {tag} does not match version.py ({VERSION}); bump version.py first")
+          # On a plain push to main, skip if this version was already released.
+          skip = "false"
+          if os.environ["EVENT"] in ("push", "workflow_dispatch") and os.environ["REF_TYPE"] == "branch":
+              req = urllib.request.Request(
+                  f"https://api.github.com/repos/${{ github.repository }}/releases/tags/{tag}",
+                  headers={"Authorization": f"Bearer {os.environ['GH_TOKEN']}", "Accept": "application/vnd.github+json"})
+              try:
+                  urllib.request.urlopen(req)
+                  skip = "true"
+                  print(f"{tag} is already released; nothing to do.")
+              except urllib.error.HTTPError as e:
+                  if e.code != 404:
+                      raise
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"tag={tag}\nskip={skip}\n")
 
       - name: Install
+        if: steps.ver.outputs.skip != 'true'
         run: pip install -r requirements.txt pyinstaller
 
       - name: Build Cinder.exe
+        if: steps.ver.outputs.skip != 'true'
         run: pyinstaller --noconfirm --clean --onefile --noconsole --name Cinder --add-data "ui;ui" --add-data "themes;themes" main.py
 
       - name: Publish release
+        if: steps.ver.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.release.tag_name || github.ref_name }}
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: Cinder ${{ steps.ver.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           files: dist/Cinder.exe
           generate_release_notes: true
+          make_latest: true

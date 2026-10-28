@@ -100,13 +100,7 @@ Cinder checks this repo's latest GitHub release. When a newer version is out, a 
 | `run.bat` from a `git clone` | `git pull --ff-only`, then refreshes dependencies |
 | `run.bat` from a downloaded zip | Unpacks the release's source over the folder (your `.venv` is left alone) |
 
-**Publishing a new version** (for the repo owner):
-
-1. Bump `VERSION` in `version.py`, e.g. `0.2.1`.
-2. Commit and push.
-3. On GitHub, go to **Releases → Draft a new release**, type the tag `v0.2.1` (choose "create new tag on publish"), and click **Publish release**. Pushing a `v0.2.1` tag from git works too.
-
-The **Release** GitHub Action builds `Cinder.exe` on Windows and attaches it to the release, usually within a few minutes. Every copy of Cinder will then offer the update.
+**Publishing a new version** (for the repo owner): bump `VERSION` in `version.py` (e.g. `0.3.1`) and push to `main`. The **Release** GitHub Action builds `Cinder.exe` on Windows and publishes release `v0.3.1`, usually within a few minutes. Every copy of Cinder will then offer the update. Publishing a release by hand on GitHub still works too.
 
 ### Steam
 
