@@ -1,8 +1,11 @@
-"""Cinder self-updater, backed by GitHub releases.
+r"""Cinder self-updater, backed by GitHub releases.
 
-Three install styles are handled:
-  exe     - running as Cinder.exe (PyInstaller). Downloads the new exe from the
-            latest release and swaps it in (Windows lets you rename a running exe).
+Install styles:
+  dir     - the installed folder build (%LOCALAPPDATA%\Programs\Cinder). Downloads
+            Cinder-win64.zip, unpacks it next to the app, and swaps it in after
+            Cinder exits (a running program can't replace its own files).
+  single  - an old single-file Cinder.exe. "Updating" installs the folder build
+            (much faster to start) with Start menu and Desktop shortcuts.
   git     - running from a git clone. Runs `git pull --ff-only`.
   source  - running from an unzipped copy. Downloads the release source zip and
             unpacks it over the app folder.
@@ -11,7 +14,6 @@ Three install styles are handled:
 from __future__ import annotations
 
 import hashlib
-import io
 import json
 import os
 import re
@@ -26,10 +28,13 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
+import install
+from cinderlog import log
 from version import REPO, VERSION
 
 API_LATEST = f"https://api.github.com/repos/{REPO}/releases/latest"
 EXE_ASSET = "Cinder.exe"
+ZIP_ASSET = "Cinder-win64.zip"
 _NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
 
 
@@ -65,7 +70,7 @@ class Updater:
         self.frozen = bool(getattr(sys, "frozen", False))
         self.exe = Path(sys.executable).resolve() if self.frozen else None
         if self.frozen:
-            self.mode = "exe"
+            self.mode = "dir" if install.is_folder_build() else "single"
         elif (app_dir / ".git").exists() and shutil.which("git"):
             self.mode = "git"
         else:
@@ -85,20 +90,23 @@ class Updater:
             "progress": None,
             "error": None,
             "ready": False,  # update applied, restart needed
+            "migrate": False,  # single-file exe: offering the faster installed version
         }
+        self._staged: Path | None = None
 
     # -- housekeeping -------------------------------------------------------
-    def _old_exe_path(self) -> Path:
-        """Where the previous exe is parked during an update (out of sight, same drive if possible)."""
-        tmp = Path(tempfile.gettempdir())
-        if self.exe and tmp.drive.lower() == self.exe.drive.lower():
-            return tmp / f"Cinder-previous-{os.getpid()}.exe"
-        return self.exe.with_name(self.exe.name + ".old")
-
     def cleanup(self) -> None:
-        """Remove previous exes left behind by updates (they can't be deleted while running)."""
+        """Remove leftovers from earlier updates (old exes, unused staged folders)."""
         if not self.exe:
             return
+        if self.mode == "dir" and not self._staged and not self.state["busy"]:
+            app = self.exe.parent
+            for leftover in (app.parent / "Cinder.update", app.parent / "Cinder.install", app / "_internal.old"):
+                shutil.rmtree(leftover, ignore_errors=True)
+            try:
+                (app / "Cinder.exe.old").unlink(missing_ok=True)
+            except OSError:
+                pass
         olds = [self.exe.with_name(self.exe.name + ".old"), *Path(tempfile.gettempdir()).glob("Cinder-previous-*.exe")]
         for old in olds:
             try:
@@ -129,12 +137,17 @@ class Updater:
         self._release = rel
         latest = (rel.get("tag_name") or "").lstrip("vV")
         available = parse_version(latest) > parse_version(VERSION)
-        if available and self.mode == "exe" and not self._exe_asset():
+        migrate = False
+        if self.mode == "single" and self._zip_asset():
+            # The single-file exe always offers to switch to the faster installed version.
+            available = migrate = True
+        elif available and self.mode in ("dir", "single") and not self._zip_asset():
             available = False
-            self._set(error=f"Release {latest} has no {EXE_ASSET} yet (it may still be building)")
+            self._set(error=f"Release {latest} has no {ZIP_ASSET} yet (it may still be building)")
         self._set(
             latest=latest,
             available=available,
+            migrate=migrate,
             notes=(rel.get("body") or "")[:4000],
             url=rel.get("html_url") or self.state["url"],
             checked_at=time.time(),
@@ -144,11 +157,14 @@ class Updater:
     def check_async(self) -> None:
         threading.Thread(target=self.check, daemon=True).start()
 
-    def _exe_asset(self) -> dict | None:
+    def _asset(self, name: str) -> dict | None:
         for a in (self._release or {}).get("assets", []):
-            if a.get("name", "").lower() == EXE_ASSET.lower():
+            if a.get("name", "").lower() == name.lower():
                 return a
         return None
+
+    def _zip_asset(self) -> dict | None:
+        return self._asset(ZIP_ASSET)
 
     # -- apply --------------------------------------------------------------
     def apply_async(self) -> bool:
@@ -161,47 +177,90 @@ class Updater:
 
     def _apply(self):
         try:
-            {"exe": self._apply_exe, "git": self._apply_git, "source": self._apply_source}[self.mode]()
+            {"dir": self._apply_dir, "single": self._apply_single,
+             "git": self._apply_git, "source": self._apply_source}[self.mode]()
             self._set(ready=True, available=False, phase="Restart Cinder to finish", progress=None)
         except Exception as e:
             self._set(error=str(e) or e.__class__.__name__, phase="", progress=None)
         finally:
             self._set(busy=False)
 
-    def _apply_exe(self):
-        asset = self._exe_asset()
+    def _download_zip(self, dest: Path) -> None:
+        asset = self._zip_asset()
         if not asset:
-            raise RuntimeError("Release has no Cinder.exe")
-        new = self.exe.with_name(self.exe.name + ".new")
-        old = self._old_exe_path()
+            raise RuntimeError(f"Release has no {ZIP_ASSET}")
         self._set(phase="Downloading")
-        _download(asset["browser_download_url"], new, lambda p: self._set(progress=p))
-
+        _download(asset["browser_download_url"], dest, lambda p: self._set(progress=p))
         digest = (asset.get("digest") or "").lower()
         if digest.startswith("sha256:"):
-            self._set(phase="Verifying")
-            h = hashlib.sha256(new.read_bytes()).hexdigest()
-            if h != digest.split(":", 1)[1]:
-                new.unlink(missing_ok=True)
+            self._set(phase="Verifying", progress=None)
+            h = hashlib.sha256()
+            with open(dest, "rb") as f:
+                for chunk in iter(lambda: f.read(1 << 20), b""):
+                    h.update(chunk)
+            if h.hexdigest() != digest.split(":", 1)[1]:
+                dest.unlink(missing_ok=True)
                 raise RuntimeError("Download failed verification; nothing was changed")
-        if new.stat().st_size < 1_000_000:
-            new.unlink(missing_ok=True)
-            raise RuntimeError("Downloaded file looks incomplete; nothing was changed")
 
-        self._set(phase="Installing")
-        old.unlink(missing_ok=True)
-        try:
-            os.replace(self.exe, old)  # moving the running exe is allowed on Windows (same drive)
-        except OSError:
-            old = self.exe.with_name(self.exe.name + ".old")
-            old.unlink(missing_ok=True)
-            os.replace(self.exe, old)
-            _hide(old)
-        try:
-            os.replace(new, self.exe)
-        except OSError:
-            os.replace(old, self.exe)  # roll back
-            raise
+    @staticmethod
+    def _extract(zpath: Path, target: Path) -> None:
+        """Unpack the release zip (Cinder.exe + _internal/) into target, safely."""
+        if target.exists():
+            shutil.rmtree(target, ignore_errors=True)
+        target.mkdir(parents=True)
+        root = target.resolve()
+        with zipfile.ZipFile(zpath) as zf:
+            names = zf.namelist()
+            # Accept both "Cinder.exe" at the root and "Cinder/Cinder.exe".
+            prefix = "" if "Cinder.exe" in names else next(
+                (n[: -len("Cinder.exe")] for n in names if n.endswith("/Cinder.exe")), None)
+            if prefix is None:
+                raise RuntimeError("Release zip doesn't contain Cinder.exe")
+            for info in zf.infolist():
+                if not info.filename.startswith(prefix) or info.is_dir():
+                    continue
+                rel = info.filename[len(prefix):]
+                dest = (target / rel).resolve()
+                if root not in dest.parents:
+                    continue  # never write outside the target folder
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                with zf.open(info) as src, open(dest, "wb") as dst:
+                    shutil.copyfileobj(src, dst)
+        if not (target / "Cinder.exe").is_file() or not (target / "_internal").is_dir():
+            raise RuntimeError("Release zip is incomplete")
+
+    def _apply_dir(self):
+        """Folder build: stage the new version next to the app; swapped in after exit."""
+        app = Path(sys.executable).resolve().parent
+        staged = app.parent / "Cinder.update"
+        with tempfile.TemporaryDirectory() as td:
+            z = Path(td) / ZIP_ASSET
+            self._download_zip(z)
+            self._set(phase="Unpacking", progress=None)
+            self._extract(z, staged)
+        (staged / "version.txt").write_text(self.state["latest"] or "", encoding="utf-8")
+        self._staged = staged
+
+    def _apply_single(self):
+        """Single-file exe: install the folder build and create shortcuts."""
+        target = install.install_dir()
+        staged = target.parent / "Cinder.install"
+        with tempfile.TemporaryDirectory() as td:
+            z = Path(td) / ZIP_ASSET
+            self._download_zip(z)
+            self._set(phase="Installing", progress=None)
+            self._extract(z, staged)
+        (staged / "version.txt").write_text(self.state["latest"] or VERSION, encoding="utf-8")
+        if target.exists():
+            try:
+                shutil.rmtree(target)
+            except OSError as e:
+                shutil.rmtree(staged, ignore_errors=True)
+                raise RuntimeError("Close any other open Cinder windows and try again") from e
+        os.replace(staged, target)
+        self._set(phase="Creating shortcuts")
+        install.create_shortcuts(target / "Cinder.exe")
+        log.info("installed folder build to %s", target)
 
     def _apply_git(self):
         self._set(phase="Pulling from GitHub")
@@ -246,6 +305,8 @@ class Updater:
 
     # -- restart ------------------------------------------------------------
     def restart_command(self) -> list[str]:
+        if self.mode == "single":
+            return [str(install.installed_exe()), "--migrated-from", str(self.exe)]
         if self.frozen:
             return [str(self.exe)]
         return [sys.executable, str(self.app_dir / "main.py"), *sys.argv[1:]]
@@ -253,6 +314,9 @@ class Updater:
     def spawn_new(self) -> None:
         """Start the new Cinder. Call as the last thing before this process exits."""
         env = clean_env()
+        if self.mode == "dir" and self._staged and self._staged.exists():
+            install.schedule_swap(self._staged, Path(sys.executable).resolve().parent, os.getpid(), env)
+            return
         kw = {"cwd": str(self.app_dir), "env": env}
         if sys.platform != "win32":
             kw["start_new_session"] = True
@@ -287,12 +351,3 @@ def clean_env() -> dict:
             env.pop(k)
     env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
     return env
-
-
-def _hide(path: Path) -> None:
-    if sys.platform == "win32":
-        try:
-            import ctypes
-            ctypes.windll.kernel32.SetFileAttributesW(str(path), 0x2)  # FILE_ATTRIBUTE_HIDDEN
-        except Exception:
-            pass

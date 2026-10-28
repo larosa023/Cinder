@@ -17,6 +17,13 @@ from steamquiet import SteamQuiet
 from updater import Updater
 from cinderlog import log, setup as setup_log
 from winsnap import IS_WIN, WinSnap
+import install
+from version import VERSION
+
+# Leaner WebView2: no background networking, sync, crash reporting or component updates.
+WEBVIEW2_ARGS = ("--disable-features=ElasticOverscroll,msSmartScreenProtection,msWebOOUI,msPdfOOUI "
+                 "--disable-background-networking --disable-component-update --disable-sync "
+                 "--disable-domain-reliability --disable-breakpad --no-first-run")
 
 
 def resource_dir() -> Path:
@@ -51,6 +58,35 @@ def clean_stale_temp() -> None:
             log.info("removed leftover temp folder %s", d.name)
         except OSError:
             pass  # still in use (e.g. another copy of Cinder is running)
+
+
+def activate_running_copy(ddir: Path, show: bool = True) -> bool:
+    """If Cinder is already running, bring its window up (unless show=False) and return True."""
+    import json
+    import urllib.request
+    try:
+        info = json.loads((ddir / "instance.json").read_text(encoding="utf-8"))
+        body = json.dumps({"show": show}).encode()
+        req = urllib.request.Request(f"http://127.0.0.1:{int(info['port'])}/api/activate", data=body,
+                                     headers={"X-Cinder-Token": info["token"], "Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=2) as r:
+            return r.status == 200
+    except Exception:
+        return False
+
+
+def launch_installed_instead() -> bool:
+    """The old single-file Cinder.exe: if the faster installed version is there, open that instead."""
+    if not install.is_frozen() or install.is_folder_build():
+        return False
+    from updater import clean_env, parse_version
+    exe, ver = install.installed_exe(), install.installed_version()
+    if not exe.is_file() or not ver or parse_version(ver) < parse_version(VERSION):
+        return False
+    import subprocess
+    subprocess.Popen([str(exe), *sys.argv[1:]], cwd=str(exe.parent), env=clean_env(),
+                     creationflags=0x00000008 | 0x00000200)
+    return True
 
 
 class WindowApi:
@@ -92,7 +128,7 @@ class WindowApi:
         return self._snap.state
 
     def close(self):
-        self._window.destroy()
+        self._window.destroy()  # the closing handler decides: hide to tray, or quit
 
 
 def main() -> None:
@@ -100,10 +136,21 @@ def main() -> None:
     ap.add_argument("--browser", action="store_true", help="open in your web browser instead of a window")
     ap.add_argument("--port", type=int, default=0, help="fixed port (default: random)")
     ap.add_argument("--no-steam", action="store_true", help="don't start Steam automatically")
+    ap.add_argument("--tray", action="store_true", help="start hidden in the tray")
+    ap.add_argument("--migrated-from", default="", help=argparse.SUPPRESS)
     args = ap.parse_args()
 
     ddir = data_dir()
     setup_log(ddir)
+    if not args.browser and activate_running_copy(ddir, show=not args.tray):
+        log.info("already running; brought the existing window up")
+        return
+    if launch_installed_instead():
+        log.info("opened the installed version instead of this single-file copy")
+        return
+    if install.is_folder_build():
+        install.write_version_marker(VERSION)
+    os.environ.setdefault("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", WEBVIEW2_ARGS)
     log.info("Cinder %s starting (%s, frozen=%s)", __import__("version").VERSION, sys.platform, getattr(sys, "frozen", False))
     clean_stale_temp()
     cfg = Config(ddir / "config.json")
@@ -163,6 +210,9 @@ def main() -> None:
         restart=restart,
         window_api=window_api,
     )
+    ctx.migrated_from = args.migrated_from
+    ctx.activate = lambda: None
+    ctx.notify = lambda title, text: None
     srv = make_server(ctx, args.port)
     url = f"http://127.0.0.1:{srv.server_address[1]}/"
 
@@ -178,8 +228,10 @@ def main() -> None:
         return
 
     threading.Thread(target=srv.serve_forever, daemon=True).start()
+    _write_instance(ddir, srv.server_address[1], ctx.token)
     import webview  # pywebview
 
+    quitting = threading.Event()
     window = webview.create_window(
         "Cinder",
         url,
@@ -190,12 +242,66 @@ def main() -> None:
         easy_drag=False,
         background_color="#0b0d12",
         js_api=window_api,
+        hidden=args.tray,
     )
     window_api._attach(window)
+
+    def show_window():
+        try:
+            window.show()
+            window.restore()
+            if IS_WIN and window_api._snap.hwnd():
+                import ctypes
+                ctypes.windll.user32.SetForegroundWindow(window_api._snap.hwnd())
+        except Exception:
+            log.exception("couldn't show the window")
+
+    def quit_app():
+        quitting.set()
+        window.destroy()
+
+    tray = None
+    if IS_WIN:
+        from tray import Tray
+        icon = res / "assets" / "cinder.ico"
+        tray = Tray(str(icon), on_open=show_window, on_quit=quit_app)
+        tray.start()
+        ctx.notify = tray.notify
+    ctx.activate = show_window
+
+    def on_closing():
+        # Closing keeps Cinder in the tray (like Steam), unless you quit or it's restarting.
+        if quitting.is_set() or restart_requested.is_set() or not tray or not cfg["close_to_tray"]:
+            return True
+        threading.Thread(target=window.hide, daemon=True).start()
+        if not cfg["tray_hint_shown"]:
+            cfg.update({"tray_hint_shown": True})
+            tray.notify("Cinder is still running", "It's in the tray by the clock. Right-click the icon to quit.")
+        return False
+    window.events.closing += on_closing
+
     webview.start(private_mode=False, storage_path=str(ddir / "webview"))
+    if tray:
+        tray.stop()
     srv.shutdown()
+    _clear_instance(ddir)
     if restart_requested.is_set():
         updater.spawn_new()
+
+
+def _write_instance(ddir: Path, port: int, token: str) -> None:
+    import json
+    try:
+        (ddir / "instance.json").write_text(json.dumps({"port": port, "token": token, "pid": os.getpid()}), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _clear_instance(ddir: Path) -> None:
+    try:
+        (ddir / "instance.json").unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 if __name__ == "__main__":

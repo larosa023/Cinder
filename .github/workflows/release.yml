@@ -67,9 +67,26 @@ jobs:
         if: steps.ver.outputs.skip != 'true'
         run: pip install -r requirements.txt pyinstaller
 
-      - name: Build Cinder.exe
+      - name: Build (installed folder version)
         if: steps.ver.outputs.skip != 'true'
-        run: pyinstaller --noconfirm --clean --onefile --noconsole --optimize 1 --name Cinder --add-data "ui;ui" --add-data "themes;themes" --exclude-module tkinter --exclude-module pydoc_data --exclude-module test --exclude-module lib2to3 main.py
+        run: >
+          pyinstaller --noconfirm --clean --onedir --noconsole --optimize 1 --name Cinder
+          --icon assets\cinder.ico --add-data "ui;ui" --add-data "themes;themes" --add-data "assets;assets"
+          --exclude-module tkinter --exclude-module pydoc_data --exclude-module test --exclude-module lib2to3
+          --distpath dist-dir --workpath build-dir main.py
+
+      - name: Zip the folder version
+        if: steps.ver.outputs.skip != 'true'
+        shell: pwsh
+        run: Compress-Archive -Path dist-dir\Cinder\* -DestinationPath Cinder-win64.zip -CompressionLevel Optimal
+
+      - name: Build Cinder.exe (single file, for first downloads and older copies)
+        if: steps.ver.outputs.skip != 'true'
+        run: >
+          pyinstaller --noconfirm --clean --onefile --noconsole --optimize 1 --name Cinder
+          --icon assets\cinder.ico --add-data "ui;ui" --add-data "themes;themes" --add-data "assets;assets"
+          --exclude-module tkinter --exclude-module pydoc_data --exclude-module test --exclude-module lib2to3
+          --distpath dist-one --workpath build-one main.py
 
       - name: Publish release
         if: steps.ver.outputs.skip != 'true'
@@ -78,6 +95,8 @@ jobs:
           tag_name: ${{ steps.ver.outputs.tag }}
           name: Cinder ${{ steps.ver.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          files: dist/Cinder.exe
+          files: |
+            dist-one/Cinder.exe
+            Cinder-win64.zip
           generate_release_notes: true
           make_latest: true

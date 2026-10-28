@@ -11,6 +11,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+import threading
+
+import install
 import storeapi
 from steamlib import ART, IS_WIN
 from version import VERSION
@@ -237,6 +240,13 @@ class Handler(BaseHTTPRequestHandler):
             "user": c.steam.user(),
             "steam": self._steam_status(),
             "native": c.window_api is not None,
+            "install": {
+                "folder_build": install.is_folder_build(),
+                "frozen": install.is_frozen(),
+                "startup": install.startup_enabled(),
+                "migrated_from": getattr(c, "migrated_from", "") or "",
+                "path": str(install.install_dir()),
+            },
         }
 
     # -- POST -----------------------------------------------------------------
@@ -252,6 +262,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._action(body)
             if path == "/api/theme":
                 return self._save_theme(body)
+            if path == "/api/activate":
+                if body.get("show", True):
+                    threading.Thread(target=self.ctx.activate, daemon=True).start()
+                return self._json({"ok": True})
             if path == "/api/log":
                 from cinderlog import log
                 log.info("page: %s", str(body.get("msg", ""))[:500])
@@ -267,6 +281,12 @@ class Handler(BaseHTTPRequestHandler):
             ok, msg = c.steam.set_freeze(bool(body["freeze_updates"]))
             if not ok:
                 return self._json({"ok": False, "error": msg})
+        if "start_with_windows" in body:
+            if not install.is_frozen():
+                return self._json({"ok": False, "error": "Only available in the installed Cinder"})
+            if not install.set_startup(bool(body.pop("start_with_windows"))):
+                return self._json({"ok": False, "error": "Windows didn't allow changing the startup setting"})
+            msg = "Cinder will start with Windows" if install.startup_enabled() else "Cinder won't start with Windows"
         if "style" in body and not isinstance(body["style"], dict):
             return self._json({"ok": False, "error": "bad style"}, 400)
         if "api_key" in body:
@@ -275,6 +295,29 @@ class Handler(BaseHTTPRequestHandler):
             body["store_region"] = re.sub(r"[^A-Za-z]", "", str(body["store_region"]))[:2].upper() or "US"
         c.config.update(body)
         return self._json({"ok": True, "config": c.config.public(), "message": msg, "steam": self._steam_status()})
+
+    def _delete_old_exe(self):
+        """After switching to the installed version, remove the old single-file Cinder.exe."""
+        import time
+        old = Path(getattr(self.ctx, "migrated_from", "") or "")
+        if not old.name.lower() == "cinder.exe" or not old.is_file():
+            return self._json({"ok": False, "error": "Old copy not found"})
+        if old.resolve() == Path(sys.executable).resolve():
+            return self._json({"ok": False, "error": "That's the copy that's running"})
+        for _ in range(10):  # it may still be closing
+            try:
+                old.unlink()
+                break
+            except OSError:
+                time.sleep(0.5)
+        else:
+            return self._json({"ok": False, "error": "Couldn't delete it yet; try again in a moment"})
+        try:
+            old.with_name("Cinder.exe.old").unlink(missing_ok=True)
+        except OSError:
+            pass
+        self.ctx.migrated_from = ""
+        return self._json({"ok": True})
 
     def _save_theme(self, body: dict):
         name = str(body.get("name", "")).strip()[:40]
@@ -363,6 +406,8 @@ class Handler(BaseHTTPRequestHandler):
         elif action == "steam_update":
             if not c.steam_updater.update_async():
                 return self._json({"ok": False, "error": "A Steam update is already running"})
+        elif action == "delete_old_exe":
+            return self._delete_old_exe()
         elif action == "themes_folder":
             _open_path(str(c.data_dir / "themes"))
         else:

@@ -171,6 +171,7 @@ function renderUpdates() {
     if (c.busy) txt = c.phase + (c.progress != null ? ` · ${Math.round(c.progress * 100)}%` : "…");
     else if (c.ready) txt = "Update installed. Restart to finish.";
     else if (c.error) txt = c.error;
+    else if (c.migrate && c.available) txt = "A faster installed version is available (starts instantly)";
     else if (c.available) txt = `Version ${c.latest} is available`;
     else if (c.checked_at) txt = `You're up to date${c.latest ? ` (latest is ${c.latest})` : ""}`;
     else txt = "Not checked yet";
@@ -182,7 +183,7 @@ function renderUpdates() {
     const go = $("#u-go");
     go.hidden = !(c.available || c.ready);
     go.disabled = c.busy;
-    go.textContent = c.ready ? "Restart" : `Update to ${c.latest}`;
+    go.textContent = c.ready ? "Restart" : c.migrate ? "Install" : `Update to ${c.latest}`;
     $("#u-check").disabled = c.busy;
   }
   if (st) {
@@ -200,6 +201,25 @@ function renderUpdates() {
     $("#s-check").disabled = st.busy;
   }
   const banner = $("#banner");
+  const inst = S.install || {};
+  if (inst.migrated_from) {
+    Object.assign(banner.dataset, { key: "migrated", kind: "migrated" });
+    banner.hidden = false;
+    $("#banner-text").textContent = "Cinder is now installed and starts instantly. Use the new Cinder shortcut on your Desktop or Start menu. Delete the old Cinder.exe?";
+    $("#banner-go").textContent = "Delete old copy";
+    $("#banner-go").hidden = false;
+    return;
+  }
+  if (c && c.migrate && (c.available || c.busy || c.ready)) {
+    Object.assign(banner.dataset, { key: "migrate", kind: "cinder" });
+    banner.hidden = !c.busy && !c.ready && dismissed("migrate");
+    $("#banner-text").textContent = c.busy ? `Installing faster Cinder: ${c.phase.toLowerCase()}…`
+      : c.ready ? "Faster Cinder is installed. Restart to switch over."
+      : "Cinder can now start instantly. Install it properly (adds Start menu and Desktop shortcuts)?";
+    $("#banner-go").textContent = c.ready ? "Restart" : "Install";
+    $("#banner-go").hidden = c.busy;
+    return;
+  }
   if (c && (c.ready || c.available || c.busy)) {
     const key = `cinder:${c.latest}`;
     banner.hidden = !c.busy && !c.ready && dismissed(key);
@@ -234,7 +254,7 @@ async function poll() {
     }
     const busy = r.cinder.busy || r.steam.busy;
     clearTimeout(U.timer);
-    if (busy || !$("#settings").hidden) U.timer = setTimeout(poll, busy ? 1200 : 4000);
+    if (busy || (!$("#settings").hidden && !document.hidden)) U.timer = setTimeout(poll, busy ? 1200 : 4000);
   } catch { /* offline */ }
 }
 
@@ -328,11 +348,23 @@ function bind() {
     renderUpdates();
   });
   $("#set-checkupd").addEventListener("change", (e) => C.saveConfig({ check_updates: e.target.checked }));
-  $("#banner-x").addEventListener("click", () => dismiss($("#banner").dataset.key));
-  $("#banner-go").addEventListener("click", () => {
-    if ($("#banner").dataset.kind === "cinder") cinderUpdate();
+  $("#banner-x").addEventListener("click", () => {
+    if ($("#banner").dataset.kind === "migrated") { S.install.migrated_from = ""; $("#banner").hidden = true; return; }
+    dismiss($("#banner").dataset.key);
+  });
+  $("#banner-go").addEventListener("click", async () => {
+    const kind = $("#banner").dataset.kind;
+    if (kind === "migrated") {
+      if (await C.act("delete_old_exe")) { C.toast("Old Cinder.exe deleted"); S.install.migrated_from = ""; $("#banner").hidden = true; }
+      return;
+    }
+    if (kind === "cinder") cinderUpdate();
     else C.openSettings("updates");
   });
+  $("#set-startup").addEventListener("change", async (e) => {
+    if (!(await C.saveConfig({ start_with_windows: e.target.checked }))) e.target.checked = !e.target.checked;
+  });
+  $("#set-tray").addEventListener("change", (e) => C.saveConfig({ close_to_tray: e.target.checked }));
 }
 
 function renderSteamUpdToggle() {
@@ -349,6 +381,11 @@ function fill() {
   $("#set-frameless").checked = !!c.frameless;
   $("#set-checkupd").checked = !!c.check_updates;
   $("#set-quiet").checked = c.hide_steam_on_launch !== false;
+  $("#set-tray").checked = c.close_to_tray !== false;
+  const inst = S.install || {};
+  $("#set-startup").checked = !!inst.startup;
+  $("#set-startup").disabled = !inst.frozen;
+  if (!inst.frozen) $("#startup-note").textContent = "Available in the installed Cinder.";
   $("#set-start").value = c.start_tab || "library";
   $("#sort").value = c.sort;
   $("#theme-css").href = `/themes/${encodeURIComponent(c.theme)}.css`;

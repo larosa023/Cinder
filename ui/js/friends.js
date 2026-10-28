@@ -83,7 +83,7 @@ C.views.friends = {
   show() {
     load();
     clearInterval(F.timer);
-    F.timer = setInterval(() => { if (C.route.tab === "friends" && F.data && F.data.live) load(true); }, 60000);
+    F.timer = setInterval(() => { if (!document.hidden && C.route.tab === "friends" && F.data && F.data.live) load(true); }, 60000);
   },
   search(q) { F.q = q.trim(); if (F.data) render(); },
   refresh() { return load(true); },

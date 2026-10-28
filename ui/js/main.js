@@ -43,7 +43,11 @@ function bindGlobal() {
 
   window.addEventListener("hashchange", C.onRoute);
   window.addEventListener("focus", () => { C.library.load(true); C.refreshStatus(); });
-  setInterval(C.refreshStatus, 15000);
+  // Nothing polls while Cinder is hidden or minimized; it catches up when shown.
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) { C.library.load(true); C.refreshStatus(); }
+  });
+  setInterval(() => { if (!document.hidden) C.refreshStatus(); }, 15000);
 }
 
 async function init() {
@@ -55,7 +59,7 @@ async function init() {
   const libraryLoad = C.library.load(true);  // start reading the library right away
   try {
     const st = await C.api("/api/state");
-    Object.assign(S, { config: st.config, themes: st.themes, user: st.user, steam: st.steam, platform: st.platform });
+    Object.assign(S, { config: st.config, themes: st.themes, user: st.user, steam: st.steam, platform: st.platform, install: st.install });
     $("#version").textContent = `v${st.version}`;
     C.settings.fill();
     C.style.load(st.config.style);

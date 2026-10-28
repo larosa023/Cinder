@@ -48,9 +48,15 @@ Everything works without one. Adding a key (Settings → **Account**) unlocks li
 
 For the Wishlist and Profile tabs, Steam needs your profile and game details set to **Public** (Steam → Profile → Edit Profile → Privacy Settings).
 
-## Run it
+## Install
 
-Needs Windows 10/11, Steam installed and signed in once, and Python 3.10+ from python.org.
+Download **Cinder.exe** from the [latest release](https://github.com/larosa023/Cinder/releases/latest) and run it once. It offers to install the faster version: Cinder then lives in `%LOCALAPPDATA%\Programs\Cinder`, opens instantly from its Start menu and Desktop shortcuts, and keeps itself up to date. You can delete the downloaded `Cinder.exe` afterwards (Cinder offers to).
+
+Needs Windows 10/11 and Steam installed and signed in once.
+
+Cinder lives in the tray: closing the window keeps it running (Settings → General), and it can start with Windows.
+
+### Run from source
 
 ```bat
 git clone https://github.com/larosa023/Cinder
@@ -58,23 +64,7 @@ cd Cinder
 run.bat
 ```
 
-The first run creates a `.venv` and installs `pywebview`. After that, `run.bat` just opens Cinder.
-
-### Build a single .exe
-
-```bat
-build.bat
-```
-
-The result is `dist\Cinder.exe`. Pin that to your taskbar and use it instead of Steam's shortcut.
-
-### Other options
-
-```
-python main.py --browser     open the UI in your web browser instead of a window
-python main.py --no-steam    don't start Steam automatically
-python main.py --port 8765   use a fixed local port
-```
+`build.bat` builds both versions locally (`dist\Cinder\` and `dist\Cinder.exe`).
 
 ## Steam update freeze
 
@@ -171,6 +161,8 @@ The `@swatch` colors are what the theme picker shows. A user theme with the same
 | `server.py` | Local-only HTTP server (127.0.0.1) that serves the UI and a small JSON API, guarded by a per-session token |
 | `updater.py` | Cinder self-updater (GitHub releases) |
 | `version.py` | Current version and the repo updates come from |
+| `install.py` | Install location, shortcuts, start with Windows, swapping in updates after exit |
+| `tray.py` | Tray icon, its menu, and Windows notifications |
 | `main.py` | Starts everything and opens the window |
 | `.github/workflows/release.yml` | Builds and publishes `Cinder.exe` when a `v*` tag is pushed |
 | `ui/` | The interface (plain HTML/CSS/JS, no frameworks), one script per tab in `ui/js/` |
