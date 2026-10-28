@@ -1,0 +1,20 @@
+/*
+  @name   OLED Black
+  @author Cinder
+  @swatch #000000 #111111 #3ea6ff
+*/
+:root {
+  --bg: #000000;
+  --bg-elev: #060606;
+  --surface: #111111;
+  --surface-hover: #1b1b1b;
+  --border: #1f1f1f;
+  --text: #f2f2f2;
+  --text-dim: #8a8a8a;
+  --accent: #3ea6ff;
+  --accent-text: #000000;
+  --shadow: rgba(0,0,0,.8);
+}
+
+/* Flat look: no glow behind cards. */
+.art, .tile { box-shadow: none; }

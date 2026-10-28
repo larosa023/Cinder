@@ -1,0 +1,17 @@
+/*
+  @name   Midnight
+  @author Cinder
+  @swatch #0b0d12 #181c25 #5b8cff
+*/
+:root {
+  --bg: #0b0d12;
+  --bg-elev: #12151c;
+  --surface: #181c25;
+  --surface-hover: #212634;
+  --border: #262b38;
+  --text: #e8ebf2;
+  --text-dim: #8b93a7;
+  --accent: #5b8cff;
+  --accent-text: #ffffff;
+  --shadow: rgba(0,0,0,.45);
+}

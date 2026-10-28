@@ -1,0 +1,17 @@
+/*
+  @name   Harbor
+  @author Cinder
+  @swatch #171d25 #1f2a37 #66c0f4
+*/
+:root {
+  --bg: #171d25;
+  --bg-elev: #1b2430;
+  --surface: #223042;
+  --surface-hover: #2a3b51;
+  --border: #2b3a4d;
+  --text: #e6eef6;
+  --text-dim: #8fa2b6;
+  --accent: #66c0f4;
+  --accent-text: #0d1720;
+  --shadow: rgba(0,0,0,.45);
+}

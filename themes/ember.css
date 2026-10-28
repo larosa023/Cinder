@@ -1,0 +1,17 @@
+/*
+  @name   Ember
+  @author Cinder
+  @swatch #120d0b #231915 #ff7a3d
+*/
+:root {
+  --bg: #120d0b;
+  --bg-elev: #181210;
+  --surface: #231915;
+  --surface-hover: #2e211b;
+  --border: #33251f;
+  --text: #f5ebe6;
+  --text-dim: #a8948a;
+  --accent: #ff7a3d;
+  --accent-text: #1a0f0a;
+  --shadow: rgba(0,0,0,.5);
+}
