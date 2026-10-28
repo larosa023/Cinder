@@ -14,6 +14,7 @@ from config import Config, data_dir
 from server import Context, make_server
 from steamlib import Steam, SteamUpdater
 from updater import Updater
+from cinderlog import log, setup as setup_log
 from winsnap import IS_WIN, WinSnap
 
 
@@ -26,6 +27,29 @@ def app_dir() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent
+
+
+def clean_stale_temp() -> None:
+    """Remove Cinder's own leftover PyInstaller _MEI folders from earlier runs.
+
+    Only folders that contain Cinder's UI are touched, and only after Windows lets
+    the folder be renamed, which fails while anything inside is still in use.
+    """
+    if not getattr(sys, "frozen", False):
+        return
+    import shutil
+    import tempfile
+    mine = Path(getattr(sys, "_MEIPASS", "")).resolve()
+    for d in Path(tempfile.gettempdir()).glob("_MEI*"):
+        try:
+            if not d.is_dir() or d.resolve() == mine or not (d / "ui" / "js" / "core.js").exists():
+                continue
+            trash = d.with_name(d.name + "_old")
+            os.rename(d, trash)
+            shutil.rmtree(trash, ignore_errors=True)
+            log.info("removed leftover temp folder %s", d.name)
+        except OSError:
+            pass  # still in use (e.g. another copy of Cinder is running)
 
 
 class WindowApi:
@@ -55,15 +79,33 @@ class WindowApi:
         self._window.toggle_fullscreen()
         return "max"
 
+    def log(self, msg):
+        """Lets the page write to cinder.log."""
+        log.info("page: %s", str(msg)[:500])
+
     # Called by the page's pointer events on the title bar and window edges.
     def drag_begin(self):
-        return self._snap.begin_drag()
+        try:
+            ok = self._snap.begin_drag()
+            if not ok:
+                log.warning("drag_begin: no window handle")
+            return ok
+        except Exception:
+            log.exception("drag_begin failed")
+            return False
 
     def drag_move(self):
-        self._snap.drag_move()
+        try:
+            self._snap.drag_move()
+        except Exception:
+            log.exception("drag_move failed")
 
     def drag_end(self):
-        return self._snap.end_drag()
+        try:
+            return self._snap.end_drag()
+        except Exception:
+            log.exception("drag_end failed")
+            return self._snap.state
 
     def resize_begin(self, edge):
         if isinstance(edge, str) and edge in {"n", "s", "e", "w", "ne", "nw", "se", "sw"}:
@@ -91,6 +133,9 @@ def main() -> None:
     args = ap.parse_args()
 
     ddir = data_dir()
+    setup_log(ddir)
+    log.info("Cinder %s starting (%s, frozen=%s)", __import__("version").VERSION, sys.platform, getattr(sys, "frozen", False))
+    clean_stale_temp()
     cfg = Config(ddir / "config.json")
     steam = Steam(cfg["steam_path"] or None)
 

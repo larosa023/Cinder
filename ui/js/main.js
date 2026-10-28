@@ -66,7 +66,10 @@ async function init() {
   if (!tryBind()) {
     window.addEventListener("pywebviewready", tryBind);
     let tries = 0;
-    const t = setInterval(() => { if (tryBind() || ++tries > 100) clearInterval(t); }, 100);
+    const t = setInterval(() => {
+      if (tryBind()) clearInterval(t);
+      else if (++tries > 100) { clearInterval(t); C.log("pywebview bridge never became ready: " + JSON.stringify(Object.keys((window.pywebview || {}).api || {}))); }
+    }, 100);
   }
 
   await C.library.load(true);

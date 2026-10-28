@@ -140,8 +140,11 @@ C.winState = (state) => {
 };
 window.cinderWinState = C.winState;
 
+C.log = (msg) => { C.api("/api/log", { msg: String(msg) }).catch(() => {}); };
+
 C.bindWindow = () => {
   const w = window.pywebview.api;
+  C.log(`window controls: platform=${C.S.platform} frameless=${C.S.config.frameless} api=${Object.keys(w).join(",")}`);
   const frameless = C.S.platform === "win32" && C.S.config.frameless;
   document.body.classList.toggle("native", !!frameless);
   if (!frameless || C.boundWindow) return;
@@ -165,31 +168,41 @@ C.bindWindow = () => {
   const dragMove = pump(() => w.drag_move());
   const resizeMove = pump(() => w.resize_move());
 
-  // Title bar: drag anywhere that isn't a control. Double-click toggles maximize.
+  // Title bar. Normal moves are done by pywebview's built-in drag on the
+  // .pywebview-drag-region elements. Cinder adds: snapping when you let go
+  // (top = maximize, left/right edge = half screen), and dragging a maximized
+  // window back out at its normal size, which pywebview's drag can't do.
   const bar = $("#titlebar");
-  let dragging = false, dragTimer = null;
+  const isControl = (t) => t.closest("button, input, select, a, label, .navtabs");
+  let dragging = false, unsnapping = false, dragTimer = null;
+  // While maximized/snapped, keep pywebview's drag out of it; Cinder moves the window itself.
+  bar.addEventListener("mousedown", (e) => {
+    if (document.body.classList.contains("win-max") && !isControl(e.target)) e.stopPropagation();
+  }, true);
   bar.addEventListener("pointerdown", async (e) => {
-    if (e.button !== 0 || e.target.closest("button, input, select, a, label, .navtabs")) return;
-    bar.setPointerCapture(e.pointerId);
+    if (e.button !== 0 || isControl(e.target)) return;
     dragging = true;
-    await w.drag_begin();
-    // Keep following the cursor even if the browser skips move events while the window moves.
+    unsnapping = document.body.classList.contains("win-max");
+    if (unsnapping) bar.setPointerCapture(e.pointerId);
+    try {
+      if (!(await w.drag_begin())) C.log("drag_begin returned false");
+    } catch (err) { C.log("drag_begin error: " + err); }
     clearInterval(dragTimer);
-    dragTimer = setInterval(() => { if (dragging) dragMove(); }, 16);
+    if (unsnapping) dragTimer = setInterval(() => { if (dragging) dragMove(); }, 16);
   });
-  bar.addEventListener("pointermove", () => { if (dragging) dragMove(); });
+  bar.addEventListener("pointermove", () => { if (dragging && unsnapping) dragMove(); });
   const endDrag = async (e) => {
     if (!dragging) return;
     dragging = false;
     clearInterval(dragTimer);
     try { bar.releasePointerCapture(e.pointerId); } catch {}
-    C.winState(await w.drag_end());
+    try { C.winState(await w.drag_end()); } catch (err) { C.log("drag_end error: " + err); }
   };
-  bar.addEventListener("pointerup", endDrag);
+  window.addEventListener("pointerup", endDrag);
+  window.addEventListener("mouseup", endDrag);
   bar.addEventListener("pointercancel", endDrag);
-  bar.addEventListener("lostpointercapture", endDrag);
   bar.addEventListener("dblclick", async (e) => {
-    if (e.target.closest("button, input, select, a, label, .navtabs")) return;
+    if (isControl(e.target)) return;
     C.winState(await w.toggle_maximize());
   });
 

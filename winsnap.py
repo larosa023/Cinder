@@ -17,6 +17,8 @@ from __future__ import annotations
 import os
 import sys
 
+from cinderlog import log
+
 IS_WIN = sys.platform == "win32"
 
 if IS_WIN:
@@ -63,10 +65,12 @@ class WinSnap:
         if self._hwnd or not IS_WIN:
             return self._hwnd
         try:
-            self._hwnd = int(self.window.native.Handle.ToInt64())
+            h = self.window.native.Handle
+            self._hwnd = int(h.ToInt64()) if hasattr(h, "ToInt64") else int(h)
+            log.info("window handle from form: %s", self._hwnd)
             return self._hwnd
-        except Exception:
-            pass
+        except Exception as e:
+            log.warning("form handle unavailable (%r); searching by title", e)
         pid, found = os.getpid(), []
 
         def cb(h, _):
@@ -82,6 +86,7 @@ class WinSnap:
 
         user32.EnumWindows(EnumProc(cb), 0)
         self._hwnd = found[0] if found else None
+        log.info("window handle by title: %s", self._hwnd)
         return self._hwnd
 
     @staticmethod
@@ -106,7 +111,26 @@ class WinSnap:
 
     def _place(self, x, y, w=None, h=None):
         flags = SWP_NOZORDER | SWP_NOACTIVATE | (SWP_NOSIZE if w is None else 0)
-        user32.SetWindowPos(self.hwnd(), None, int(x), int(y), int(w or 0), int(h or 0), flags)
+        hwnd = self.hwnd()
+
+        def do():
+            if not user32.SetWindowPos(hwnd, None, int(x), int(y), int(w or 0), int(h or 0), flags):
+                log.warning("SetWindowPos failed: error %s", ctypes.GetLastError())
+        self._on_ui(do)
+
+    def _on_ui(self, fn):
+        """Run fn on the window's own thread (WinForms), falling back to calling it directly."""
+        try:
+            form = self.window.native
+            if form.InvokeRequired:
+                from System import Action  # pythonnet, present with pywebview on Windows
+                form.Invoke(Action(fn))
+                return
+        except Exception as e:
+            if not getattr(self, "_warned_ui", False):
+                self._warned_ui = True
+                log.warning("couldn't marshal to the UI thread (%r); calling directly", e)
+        fn()
 
     @staticmethod
     def _button_down() -> bool:
@@ -202,7 +226,10 @@ class WinSnap:
 
     def end_drag(self):
         d, self._drag = self._drag, None
-        if not d or not d["moved"]:
+        if not d:
+            return self.state
+        # The window may have been moved by pywebview's own drag rather than drag_move.
+        if not d["moved"] and self._rect()[:2] == d["rect"][:2]:
             return self.state
         pt = self._cursor()
         mon, _ = self._monitor(pt=pt)

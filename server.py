@@ -243,6 +243,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._action(body)
             if path == "/api/theme":
                 return self._save_theme(body)
+            if path == "/api/log":
+                from cinderlog import log
+                log.info("page: %s", str(body.get("msg", ""))[:500])
+                return self._json({"ok": True})
         except Exception as e:  # keep the UI alive on unexpected errors
             return self._json({"ok": False, "error": str(e)}, 500)
         return self._json({"ok": False, "error": "unknown endpoint"}, 404)
