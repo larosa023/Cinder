@@ -25,6 +25,7 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 **Achievements, lists and your profile**
 
 - Achievements tab: everything you've unlocked across your games, recent and rarest unlocks, games closest to 100%, and per-game progress (gathered in the background and cached)
+- Achievement progress on covers: a trophy badge and progress bar (gold at 100%) on each game while you're viewing a list, or always (Settings → Appearance → Game cards)
 - Game lists: your Steam collections appear automatically (read from Steam's files), plus Cinder lists you make. Pick a list from **Lists** in the library; right-click a game to add it to a list
 - Customize your Cinder profile: background from any game's art, a showcase of up to 4 games, which sections show, banner size. **Edit on Steam** jumps to each part of Steam's own profile editor
 
@@ -48,6 +49,7 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 
 - 5 built-in themes plus drop-in CSS themes
 - **Quick style**, layered on any theme: accent color, top bar or sidebar navigation, tall or wide covers, corners, density, font, background (solid, glow, or blurred art from your last played game), shadows, blur, animations, cover size
+- **Game cards**: choose what shows under each cover (play time, last played, both, achievements, size or nothing), how play time reads (733 hrs, 733h 20m, 30d 13h, 733.3 h), how dates read (2 days ago, Oct 26, 2026, numeric, 2026-10-26), names on one or two lines, and hiding ™/®/© in names
 - **Save as theme** turns your current look into a theme file
 
 **Window**

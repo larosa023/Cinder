@@ -74,6 +74,7 @@ function select(id) {
   toggleMenu(false);
   renderChip();
   C.library.render();
+  C.library.ensureAch();
 }
 
 function renderChip() {

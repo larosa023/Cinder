@@ -39,20 +39,75 @@ function visible() {
 
 const wide = () => C.style && C.style.get().covers === "wide";
 
+const TROPHY = '<svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3"/></svg>';
+
+// Achievement progress per game ({appid: [unlocked, total]}), loaded only when cards show it.
+let achTimer = 0;
+const achFor = (g) => (L.ach || {})[g.appid];
+function achWanted() {
+  const st = C.style ? C.style.get() : {};
+  return st.cardSub === "ach" || st.achBadge === "always" || (st.achBadge === "lists" && !!(C.lists && C.lists.active()));
+}
+const badgeOn = () => {
+  const b = C.style ? C.style.get().achBadge : "lists";
+  return b === "always" || (b === "lists" && !!(C.lists && C.lists.active()));
+};
+async function ensureAch() {
+  if (!achWanted()) return;
+  clearTimeout(achTimer);
+  try {
+    const r = await C.api("/api/achievements/summary");
+    const changed = JSON.stringify(r.games) !== JSON.stringify(L.ach || {});
+    L.ach = r.games || {};
+    if (changed) render();
+    if (r.scanning) achTimer = setTimeout(ensureAch, 4000);
+  } catch { /* offline: cards just skip the badge */ }
+}
+
+function subText(g) {
+  if (g.shortcut) return "Non-Steam game";
+  const st = C.style ? C.style.get() : {};
+  const play = g.playtime ? C.fmtPlay(g.playtime) + " played" : "Not played yet";
+  switch (st.cardSub) {
+    case "none": return "";
+    case "last": return g.lastplayed ? C.fmtAgo(g.lastplayed) : "Never played";
+    case "both": return g.playtime ? `${C.fmtPlay(g.playtime)} · ${g.lastplayed ? C.fmtAgo(g.lastplayed) : "—"}` : "Not played yet";
+    case "size": return g.size ? C.fmtSize(g.size) : (g.installed ? "" : "Not installed");
+    case "ach": {
+      const a = achFor(g);
+      return a ? `${a[0]} of ${a[1]} achievements` : (L.ach ? "No achievements" : "…");
+    }
+    default: return play;
+  }
+}
+
+function achHTML(g) {
+  if (g.shortcut || !badgeOn()) return "";
+  const a = achFor(g);
+  if (!a) return "";
+  const pct = Math.round((100 * a[0]) / a[1]);
+  const perfect = a[0] >= a[1] ? " perfect" : "";
+  return `<span class="ach-badge${perfect}" title="${a[0]} of ${a[1]} achievements (${pct}%)">${TROPHY}${a[0]}/${a[1]}</span>
+      <span class="ach-line${perfect}"><i style="width:${pct}%"></i></span>`;
+}
+
 function cardHTML(g) {
   const art = wide()
     ? `<img loading="lazy" decoding="async" alt="" src="/art/${g.appid}/header">`
     : `<img loading="lazy" decoding="async" alt="" src="/art/${g.appid}/portrait" data-fallback="/art/${g.appid}/header">`;
   const fav = favs().has(g.appid);
+  const name = esc(C.gname(g.name));
+  const sub = subText(g);
   return `<button class="card${g.installed ? "" : " not-installed"}${fav ? " fav" : ""}" data-appid="${g.appid}" title="${esc(g.name)}">
-    <div class="art" data-name="${esc(g.name)}">${art}
+    <div class="art" data-name="${name}">${art}
       ${fav ? `<span class="star" title="Favorite">${STAR}</span>` : ""}
       ${g.update_pending ? '<span class="badge">Update</span>' : ""}
       ${g.installed ? "" : '<span class="badge muted">Not installed</span>'}
+      ${achHTML(g)}
       <span class="play" data-play="${g.appid}" title="${g.installed ? "Play" : "Install"}">${g.installed ? ICON.play : ICON.down}</span>
     </div>
-    <div class="meta"><span class="name">${esc(g.name)}</span>
-      <span class="sub">${g.shortcut ? "Non-Steam game" : g.playtime ? C.fmtPlay(g.playtime) + " played" : "Not played yet"}</span></div>
+    <div class="meta"><span class="name">${name}</span>${sub ? `
+      <span class="sub">${esc(sub)}</span>` : ""}</div>
   </button>`;
 }
 
@@ -62,7 +117,7 @@ function tileHTML(g) {
   return `<button class="tile" data-appid="${g.appid}" title="${esc(g.name)}">
     <img loading="lazy" alt="" src="/art/${g.appid}/header" data-fail="hide">
     <span class="shade"></span>
-    <span class="t-meta"><span class="t-name">${esc(g.name)}</span>
+    <span class="t-meta"><span class="t-name">${esc(C.gname(g.name))}</span>
       <span class="t-sub">${C.fmtAgo(g.lastplayed)} · ${C.fmtPlay(g.playtime)}</span></span>
   </button>`;
 }
@@ -155,7 +210,7 @@ function openDetail(appid) {
   $(".d-title").classList.remove("no-logo");
   $("#d-logo").style.visibility = "";
   $("#d-logo").src = `/art/${g.appid}/logo`;
-  $("#d-name").textContent = g.name;
+  $("#d-name").textContent = C.gname(g.name);
   $("#d-playtime").textContent = C.fmtPlay(g.playtime);
   $("#d-last").textContent = C.fmtAgo(g.lastplayed);
   $("#d-size").textContent = C.fmtSize(g.size);
@@ -294,7 +349,7 @@ function bind() {
   });
 }
 
-C.library = { load, render, paintCached, openDetail, sorts: SORTS, visible };
+C.library = { load, render, paintCached, openDetail, sorts: SORTS, visible, ensureAch };
 C.views.library = {
   placeholder: "Search your library",
   show() { render(); },

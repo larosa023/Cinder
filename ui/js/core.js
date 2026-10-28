@@ -30,18 +30,44 @@ C.act = async (action, extra = {}) => {
 };
 
 // ---------- formatting ----------
-C.fmtPlay = (m) => !m ? "Never" : m < 60 ? `${m} min` : `${(m / 60).toFixed(m < 600 ? 1 : 0)} hrs`;
-C.fmtAgo = (ts) => {
-  if (!ts) return "Never";
+// Play time and dates follow Settings → Appearance → Game cards.
+const fmtOpt = (k, d) => (C.style && C.style.get()[k]) || d;
+C.fmtPlay = (m) => {
+  if (!m) return "Never";
+  const f = fmtOpt("playFmt", "hours");
+  const h = Math.floor(m / 60), mm = m % 60;
+  if (f === "hm") return h ? `${h.toLocaleString()}h ${mm}m` : `${mm}m`;
+  if (f === "days") {
+    if (m < 60) return `${m}m`;
+    const d = Math.floor(h / 24);
+    return d ? `${d}d ${h % 24}h` : `${h}h ${mm}m`;
+  }
+  if (f === "decimal") return `${(m / 60).toLocaleString(undefined, { maximumFractionDigits: 1, minimumFractionDigits: 1 })} h`;
+  return m < 60 ? `${m} min` : `${(m / 60).toLocaleString(undefined, { maximumFractionDigits: m < 600 ? 1 : 0 })} hrs`;
+};
+const relAgo = (ts) => {
   const s = Date.now() / 1000 - ts;
   if (s < 90) return "Just now";
   if (s < 3600) return `${Math.round(s / 60)} min ago`;
   if (s < 86400) return `${Math.round(s / 3600)} hr ago`;
   if (s < 86400 * 2) return "Yesterday";
   if (s < 86400 * 30) return `${Math.round(s / 86400)} days ago`;
+  return null;
+};
+C.fmtDate = (ts) => {
+  const d = new Date(ts * 1000);
+  const f = fmtOpt("dateFmt", "relative");
+  if (f === "numeric") return d.toLocaleDateString();
+  if (f === "iso") return d.toISOString().slice(0, 10);
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+};
+C.fmtAgo = (ts) => {
+  if (!ts) return "Never";
+  if (fmtOpt("dateFmt", "relative") === "relative") return relAgo(ts) || C.fmtDate(ts);
   return C.fmtDate(ts);
 };
-C.fmtDate = (ts) => new Date(ts * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+/** Display name, optionally without ™ ® © symbols. */
+C.gname = (n) => (C.style && C.style.get().cleanNames ? String(n || "").replace(/[™®©]/g, "").replace(/\s{2,}/g, " ").trim() : n);
 C.fmtSize = (b) => {
   if (!b) return "—";
   const u = ["B", "KB", "MB", "GB", "TB"];

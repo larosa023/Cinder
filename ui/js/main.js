@@ -84,6 +84,7 @@ async function init() {
   C.library.paintCached();
   C.onRoute();
   await libraryLoad;
+  C.library.ensureAch();
   C.updates.poll();
   setTimeout(C.updates.poll, 5000);  // startup update checks finish in the background
 }

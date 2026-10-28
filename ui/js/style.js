@@ -6,7 +6,10 @@ const { $, $$ } = C;
 const DEFAULTS = {
   accent: "", nav: "top", covers: "portrait", radius: "soft", density: "cozy",
   font: "segoe", bg: "solid", sideCollapsed: false, glow: true, blur: true, motion: true, recent: true, labels: true,
+  // Game cards
+  cardSub: "playtime", playFmt: "hours", dateFmt: "relative", achBadge: "lists", nameLines: "1", cleanNames: false,
 };
+const CARD_KEYS = ["cardSub", "playFmt", "dateFmt", "achBadge", "nameLines", "cleanNames"];
 const ACCENTS = ["", "#5b8cff", "#3ea6ff", "#66c0f4", "#2dd4bf", "#3ddc97", "#a3e635",
   "#facc15", "#ff7a3d", "#ff5d6c", "#f472b6", "#a78bfa"];
 const RADIUS = { sharp: [4, 3, 6], soft: [12, 10, 16], round: [18, 16, 24] };  // radius, card, panel
@@ -47,6 +50,7 @@ function apply() {
   b.classList.toggle("no-motion", !s.motion);
   b.classList.toggle("hide-recent", !s.recent);
   b.classList.toggle("hide-labels", !s.labels);
+  b.classList.toggle("names-2", s.nameLines === "2");
   ["solid", "glow", "art"].forEach((k) => b.classList.toggle(`bg-${k}`, s.bg === k));
   const [r, cr, pr] = RADIUS[s.radius] || RADIUS.soft;
   const [gap, pad] = DENSITY[s.density] || DENSITY.cozy;
@@ -71,6 +75,10 @@ function syncControls() {
     $$("button", seg).forEach((btn) => btn.classList.toggle("on", btn.dataset.v === style[seg.dataset.style]));
   });
   $$("[data-style-bool]").forEach((cb) => (cb.checked = !!style[cb.dataset.styleBool]));
+  $$("[data-style-select]").forEach((sel) => (sel.value = style[sel.dataset.styleSelect]));
+  const ex = (id, txt) => { const e = $(id); if (e) e.textContent = txt; };
+  ex("#fmt-play-ex", `Example: ${C.fmtPlay(44000)}`);
+  ex("#fmt-date-ex", `Example: ${C.fmtAgo(Date.now() / 1000 - 2 * 86400)}`);
   $$("#st-accent [data-accent]").forEach((btn) => btn.classList.toggle("on", btn.dataset.accent === (style.accent || "")));
   const custom = $("#st-accent-custom");
   if (custom && style.accent && !ACCENTS.includes(style.accent)) custom.value = style.accent;
@@ -79,7 +87,10 @@ function syncControls() {
 function set(key, value) {
   style[key] = value;
   apply();
-  if (key === "covers") C.library.render();
+  if (key === "covers" || CARD_KEYS.includes(key)) {
+    C.library.render();
+    if (CARD_KEYS.includes(key)) C.library.ensureAch && C.library.ensureAch();
+  }
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => C.saveConfig({ style }), 400);
 }
@@ -125,6 +136,7 @@ function bind() {
     if (b) set(seg.dataset.style, b.dataset.v);
   }));
   $$("[data-style-bool]").forEach((cb) => cb.addEventListener("change", () => set(cb.dataset.styleBool, cb.checked)));
+  $$("[data-style-select]").forEach((sel) => sel.addEventListener("change", () => set(sel.dataset.styleSelect, sel.value)));
   $("#style-reset").addEventListener("click", () => {
     style = { ...DEFAULTS };
     apply();

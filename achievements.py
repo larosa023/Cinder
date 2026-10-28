@@ -125,6 +125,12 @@ class AchievementIndex:
             self.scanning = False
             log.info("achievement scan: %d games checked", self.done)
 
+    def summary(self) -> dict:
+        """{appid: [unlocked, total]} for every game with achievements we've checked."""
+        with self._lock:
+            return {sid: [e["unlocked"], e["total"]] for sid, e in self.games.items()
+                    if not e.get("none") and e.get("total")}
+
     # -- hub -------------------------------------------------------------------
     def hub(self) -> dict:
         names = {g["appid"]: g for g in self.steam.library()}

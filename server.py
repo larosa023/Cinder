@@ -145,6 +145,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": True, "cinder": c.updater.snapshot(), "steam": c.steam_updater.snapshot()})
         if path == "/api/collections":
             return self._json({"ok": True, "steam": c.steam.collections()})
+        if path == "/api/achievements/summary":
+            if not c.ach:
+                return self._json({"ok": True, "games": {}, "scanning": False})
+            c.ach.scan()
+            return self._json({"ok": True, "games": c.ach.summary(), "scanning": c.ach.scanning})
         if path == "/api/achievements":
             if c.ach:
                 c.ach.scan()  # refreshes anything stale, in the background
