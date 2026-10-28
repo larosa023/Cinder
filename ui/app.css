@@ -21,9 +21,13 @@ button { cursor: pointer; background: none; border: 0; padding: 0; }
 svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 svg.fill { fill: currentColor; stroke: none; }
 [hidden] { display: none !important; }
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
-::-webkit-scrollbar-track { background: transparent; }
+/* Scrollbars follow the theme: a thin accent-tinted thumb on a clear track. */
+:root { color-scheme: dark; --scroll-thumb: color-mix(in srgb, var(--text-dim) 35%, transparent); }
+* { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+*:hover { --scroll-thumb: color-mix(in srgb, var(--text-dim) 55%, transparent); }
+/* Horizontal rows scroll with their arrows, so their bar only shows while you hover the row. */
+.srow-items, .recent-row, .sp-thumbs { scrollbar-color: transparent transparent; }
+.srow-items:hover, .recent-row:hover, .sp-thumbs:hover { scrollbar-color: color-mix(in srgb, var(--accent) 60%, transparent) transparent; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Background styles */

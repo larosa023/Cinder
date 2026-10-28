@@ -39,7 +39,7 @@
 .srow-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .srow-items {
   display: grid; grid-auto-flow: column; grid-auto-columns: minmax(230px, 270px); gap: calc(14px * var(--gap));
-  overflow-x: auto; scroll-snap-type: x proximity; padding: 4px 2px 10px; scrollbar-width: thin;
+  overflow-x: auto; scroll-snap-type: x proximity; padding: 4px 2px 10px;
 }
 .scard { text-align: left; scroll-snap-align: start; min-width: 0; }
 .scard-art {

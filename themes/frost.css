@@ -4,6 +4,7 @@
   @swatch #f4f6fa #ffffff #3b6cf6
 */
 :root {
+  color-scheme: light;
   --bg: #f4f6fa;
   --bg-elev: #ffffff;
   --surface: #ffffff;
