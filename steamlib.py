@@ -429,7 +429,7 @@ class Steam:
             self.start(silent=True, extra=["-applaunch", str(appid)])
         if self.quiet:
             # A cold Steam start takes a while before it would show its window.
-            self.quiet.watch(before, seconds=15 if was_running else 45)
+            self.quiet.watch(before, seconds=20 if was_running else 45, popups=True)
 
     def set_status(self, status: str) -> None:
         """Online / away / invisible / offline (Steam's friends status)."""

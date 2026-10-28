@@ -28,6 +28,8 @@ if IS_WIN:
     user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
     user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
     user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+    user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+    user32.IsWindow.argtypes = [wintypes.HWND]
     EnumProc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
 
     class PROCESSENTRY32W(ctypes.Structure):
@@ -61,9 +63,9 @@ def steam_pids() -> set[int]:
     return pids
 
 
-def _windows(pids: set[int], titles: tuple[str, ...]) -> set[int]:
-    """Visible, full-size top-level Steam windows with one of these exact titles."""
-    found: set[int] = set()
+def steam_windows(pids: set[int]) -> dict[int, tuple[str, str, int, int]]:
+    """Visible top-level windows owned by Steam: hwnd -> (title, class, width, height)."""
+    found: dict[int, tuple[str, str, int, int]] = {}
     if not pids:
         return found
 
@@ -74,30 +76,47 @@ def _windows(pids: set[int], titles: tuple[str, ...]) -> set[int]:
         user32.GetWindowThreadProcessId(h, ctypes.byref(p))
         if p.value not in pids:
             return True
-        buf = ctypes.create_unicode_buffer(256)
-        user32.GetWindowTextW(h, buf, 256)
-        if buf.value not in titles:
-            return True
         r = wintypes.RECT()
         user32.GetWindowRect(h, ctypes.byref(r))
-        # Steam's main window and friends list are big; its prompts are small dialogs.
-        if (r.right - r.left) >= 600 and (r.bottom - r.top) >= 400:
-            found.add(h)
+        w, hh = r.right - r.left, r.bottom - r.top
+        if w < 120 or hh < 80:
+            return True  # tooltips, menus, hidden helpers
+        title = ctypes.create_unicode_buffer(256)
+        user32.GetWindowTextW(h, title, 256)
+        cls = ctypes.create_unicode_buffer(128)
+        user32.GetClassNameW(h, cls, 128)
+        found[h] = (title.value, cls.value, w, hh)
         return True
 
     user32.EnumWindows(EnumProc(cb), 0)
     return found
 
 
+def _is_big(info, titles) -> bool:
+    """Steam's main window / friends list: known title and full size."""
+    title, _cls, w, h = info
+    return title in titles and w >= 600 and h >= 400
+
+
 class SteamQuiet:
+    """See the module docstring.
+
+    Big windows (main library, friends list) are sent back to the tray.
+    During a game launch, new *small* Steam popups (like "Starting game") are hidden
+    too. That popup closes by itself once the game starts; anything still around
+    after RESHOW_AFTER seconds probably needs you (cloud conflict, launch options,
+    shader processing), so it is shown again and left alone.
+    """
     MAIN = ("Steam",)
     FRIENDS = ("Friends List",)
+    RESHOW_AFTER = 10.0
 
     def __init__(self, enabled=lambda: True):
         self.enabled = enabled
         self._until = 0.0
         self._titles: set[str] = set()
         self._before: set[int] = set()
+        self._popups = False
         self._lock = threading.Lock()
         self._thread = None
 
@@ -105,15 +124,16 @@ class SteamQuiet:
         """Call right before triggering Steam: remembers windows that are already open."""
         if not IS_WIN or not self.enabled():
             return set()
-        return _windows(steam_pids(), tuple(titles))
+        return set(steam_windows(steam_pids()))
 
-    def watch(self, before: set[int], seconds: float = 25, titles=MAIN) -> None:
+    def watch(self, before: set[int], seconds: float = 25, titles=MAIN, popups: bool = False) -> None:
         if not IS_WIN or not self.enabled():
             return
         with self._lock:
             self._until = max(self._until, time.monotonic() + seconds)
             self._titles |= set(titles)
             self._before |= before
+            self._popups = self._popups or popups
             if self._thread and self._thread.is_alive():
                 return
             self._thread = threading.Thread(target=self._run, daemon=True)
@@ -125,26 +145,55 @@ class SteamQuiet:
             self._until = 0.0
 
     def _run(self):
-        closed = 0
-        sent: dict[int, float] = {}  # window -> when we last asked it to close
+        sent: dict[int, float] = {}    # big window -> when we last asked it to close
+        hidden: dict[int, float] = {}  # popup -> when we hid it
+        released: set[int] = set()     # popups we gave back; never touch again
+        seen: set[int] = set()
         while True:
+            now = time.monotonic()
             with self._lock:
-                if time.monotonic() > self._until:
-                    self._titles.clear()
-                    self._before.clear()
-                    break
-                titles, before = tuple(self._titles), set(self._before)
+                active = now <= self._until
+                titles, before, popups = tuple(self._titles), set(self._before), self._popups
+            if not active and not hidden:
+                break
             try:
-                now = time.monotonic()
-                for h in _windows(steam_pids(), titles) - before:
-                    if now - sent.get(h, -10) < 1.0:
-                        continue  # asked recently; give Steam a moment
-                    user32.PostMessageW(h, WM_CLOSE, 0, 0)  # Steam hides to the tray on close
-                    sent[h] = now
-                    closed += 1
+                wins = steam_windows(steam_pids())
+                # Hidden popups: gone means it was the launch popup; still there means it needs you.
+                for h, t0 in list(hidden.items()):
+                    if not user32.IsWindow(h):
+                        log.info("steam popup %s closed by itself", h)
+                        del hidden[h]
+                    elif now - t0 >= self.RESHOW_AFTER or not active:
+                        user32.ShowWindow(h, 5)  # SW_SHOW
+                        log.info("steam popup %s still open after %.0fs; showing it", h, now - t0)
+                        released.add(h)
+                        del hidden[h]
+                if active:
+                    for h, info in wins.items():
+                        if h in before or h in released or h in hidden:
+                            continue
+                        if h not in seen:
+                            seen.add(h)
+                            log.info("steam window appeared: title=%r class=%r size=%dx%d", *info)
+                        if _is_big(info, titles):
+                            if now - sent.get(h, -10) >= 1.0:
+                                user32.PostMessageW(h, WM_CLOSE, 0, 0)  # Steam hides to the tray on close
+                                sent[h] = now
+                                log.info("sent Steam window %r back to the tray", info[0])
+                        elif popups:
+                            user32.ShowWindow(h, 0)  # SW_HIDE
+                            hidden[h] = now
+                            log.info("hid steam popup %r (%dx%d)", info[0], info[2], info[3])
             except Exception:
                 log.exception("steam window watch failed")
+                for h in hidden:
+                    try:
+                        user32.ShowWindow(h, 5)
+                    except Exception:
+                        pass
                 break
-            time.sleep(0.15)
-        if closed:
-            log.info("sent %d Steam window(s) back to the tray", closed)
+            time.sleep(0.1)
+        with self._lock:
+            self._titles.clear()
+            self._before.clear()
+            self._popups = False
