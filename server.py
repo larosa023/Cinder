@@ -201,6 +201,41 @@ class Handler(BaseHTTPRequestHandler):
         return games
 
     # -- workshop ----------------------------------------------------------------
+    _ws_support: dict | None = None
+
+    def _workshop_support(self, appid: int, cc: str) -> dict:
+        """Does this game have a Steam Workshop? Your files first, then its store page (remembered)."""
+        import workshop
+        cls = type(self)
+        path = self.ctx.data_dir / "workshop_support.json"
+        if cls._ws_support is None:
+            try:
+                cls._ws_support = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                cls._ws_support = {}
+        local = workshop.installed(self.ctx.steam).get(appid)
+        count = len(local["items"]) if local else 0
+        key = str(appid)
+        if local:
+            supported = True
+        elif key in cls._ws_support:
+            supported = bool(cls._ws_support[key])
+        elif appid >= 0x80000000:
+            supported = False
+        else:
+            try:
+                supported = bool(storeapi.app_details(appid, cc).get("workshop"))
+            except storeapi.SteamDataError:
+                return {"supported": False, "count": 0, "unknown": True}  # try again next time
+        if cls._ws_support.get(key) != supported:
+            cls._ws_support[key] = supported
+            try:
+                path.write_text(json.dumps(cls._ws_support), encoding="utf-8")
+            except OSError:
+                pass
+        updates = sum(i["needs_update"] for i in local["items"]) if local else 0
+        return {"supported": supported, "count": count, "updates": updates}
+
     def _workshop(self, path: str, q: dict, key: str):
         import workshop
         c = self.ctx
@@ -269,6 +304,9 @@ class Handler(BaseHTTPRequestHandler):
             local = next((g for g in c.steam.library() if g["appid"] == app["appid"]), None)
             app["installed"] = bool(local and local["installed"])
             return self._json({"ok": True, "app": app})
+        m = re.fullmatch(r"/api/game/(\d+)/workshop_support", path)
+        if m:
+            return self._json({"ok": True, **self._workshop_support(int(m.group(1)), cc)})
         m = re.fullmatch(r"/api/game/(\d+)/(news|achievements|dlc)", path)
         if m:
             appid, what = int(m.group(1)), m.group(2)

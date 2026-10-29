@@ -2,7 +2,29 @@
 (() => {
 "use strict";
 const { $, $$, esc } = C;
-const G = { appid: 0, tab: "overview", cache: {} };
+const G = { appid: 0, tab: "overview", cache: {}, ws: {} };
+const WS_ICON = '<svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg>';
+
+// Only games with a Steam Workshop get the Workshop button and tab.
+function paintWorkshop(appid, s) {
+  if (G.appid !== appid) return;
+  const on = !!(s && s.supported);
+  $("#d-tab-workshop").hidden = !on;
+  const b = $("#d-workshop");
+  b.hidden = !on;
+  if (on) b.innerHTML = `${WS_ICON}Workshop${s.count ? ` <span class="count-pill">${s.count}</span>` : ""}${s.updates ? ' <span class="count-pill hot">update</span>' : ""}`;
+  if (!on && G.tab === "workshop") setTab("overview");
+}
+
+async function checkWorkshop(appid) {
+  paintWorkshop(appid, G.ws[appid]);
+  if (G.ws[appid] && !G.ws[appid].unknown && Date.now() - G.ws[appid].at < 60000) return;
+  try {
+    const s = await C.api(`/api/game/${appid}/workshop_support`);
+    G.ws[appid] = { ...s, at: Date.now() };
+    paintWorkshop(appid, s);
+  } catch { /* offline: leave it hidden */ }
+}
 
 function setTab(tab) {
   G.tab = tab;
@@ -84,9 +106,11 @@ function open(g) {
   $("#d-store").hidden = nonSteam;
   if (nonSteam) { $("#d-props").hidden = true; $("#d-uninstall").hidden = true; }
   setTab("overview");
+  if (nonSteam) paintWorkshop(g.appid, null); else checkWorkshop(g.appid);
 }
 
 function bind() {
+  $("#d-workshop").addEventListener("click", () => setTab("workshop"));
   $("#d-tabs").addEventListener("click", (e) => {
     const b = e.target.closest("[data-dtab]");
     if (b) setTab(b.dataset.dtab);

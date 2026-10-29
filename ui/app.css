@@ -514,3 +514,6 @@ body.no-motion .dlp-bar i { animation: none; }
 .shelf h3 .count { color: var(--text-dim); font-size: 13px; font-weight: 600; }
 .shelf-row { display: grid; grid-auto-flow: column; grid-auto-columns: var(--card-w); gap: calc(16px * var(--gap)); overflow-x: auto; padding: 6px 2px 8px; }
 .shelf-row .card { content-visibility: visible; }
+.count-pill { display: inline-grid; place-items: center; min-width: 20px; height: 18px; padding: 0 6px; margin-left: 2px; border-radius: 99px;
+  background: var(--surface-hover); color: var(--text-dim); font-size: 11px; font-weight: 700; }
+.count-pill.hot { background: var(--accent); color: var(--accent-text); }

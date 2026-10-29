@@ -1,6 +1,7 @@
 /* Store tab: featured home, search, and app pages. Purchases open in the Steam client. */
 (() => {
 "use strict";
+const WS_ICON = '<svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg>';
 const { $, esc, S, ICON } = C;
 const el = () => $("#view-store");
 const T = { home: null, shots: [], shotIndex: 0, searchTimer: null, lastQuery: "" };
@@ -131,6 +132,7 @@ async function showApp(appid) {
         ${a.installed || owned ? "" : C.priceHTML(a.price, "lg")}
         ${buy}
         <button class="btn" data-buy="${a.appid}" title="Add to your wishlist in Steam">${ICON.heart}Wishlist</button>
+        ${a.workshop ? `<button class="btn" data-ws-app="${a.appid}" title="Mods, maps and more for this game">${WS_ICON}Workshop</button>` : ""}
       </div>
       ${a.about ? `<section class="sp-about"><h2>About this game</h2><div class="prose">${esc(a.about).replace(/\n/g, "<br>")}</div></section>` : ""}
       ${a.categories.length ? `<section class="sp-about"><h2>Features</h2><div class="tags">${a.categories.map((c) => `<span>${esc(c)}</span>`).join("")}</div></section>` : ""}
@@ -169,6 +171,8 @@ function bind() {
     if (thumb) return setShot(+thumb.dataset.shot);
     const shot = t.closest(".sp-shot[data-shot]");
     if (shot) return openLightbox(+shot.dataset.shot);
+    const ws = t.closest("[data-ws-app]");
+    if (ws) return C.go(`workshop/${ws.dataset.wsApp}/browse`);
     const buy = t.closest("[data-buy]");
     if (buy) { C.act("store", { appid: +buy.dataset.buy }).then((ok) => ok && C.toast("Opened in Steam")); return; }
     const launch = t.closest("[data-launch]");

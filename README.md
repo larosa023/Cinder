@@ -36,7 +36,7 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 - Workshop tab: every game you have workshop items for, with item counts, size on disk and updates waiting (read from Steam's own files)
 - Each game's workshop: **Your items** (subscribed mods, plus items the game installed itself) and **Browse** (Trending, Most popular, Top rated, Newest, Recently updated, or search with Enter)
 - Item pages with preview, subscribers, favorites, size, tags and description. **Subscribe in Steam** opens the item in Steam to subscribe or unsubscribe, the same way buying works. **Open folder** goes to its files. **Update now** asks Steam for the newest version when you're connected
-- Also on each game page (Workshop tab) and in the right-click menu
+- Games with a Steam Workshop get a **Workshop** button and tab on their game page (with your item count and pending updates), and store pages get a Workshop button. Detected from your files or the game's store page, and remembered
 
 **Game pages**
 

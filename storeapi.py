@@ -206,6 +206,7 @@ def app_details(appid: int, cc: str) -> dict:
         "dlc_count": len(d.get("dlc") or []),
         "dlc": [int(x) for x in (d.get("dlc") or [])][:120],
         "website": d.get("website") or "",
+        "workshop": any(_int(c.get("id")) == 30 for c in d.get("categories") or []),  # Steam Workshop
     }
 
 
