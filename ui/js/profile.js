@@ -231,7 +231,13 @@ function bind() {
     const tab = t.closest("[data-pe-tab]");
     if (tab) { P.editTab = tab.dataset.peTab; return renderEditor(); }
     const bg = t.closest("[data-pick-background]");
-    if (bg) { pe.background = +bg.dataset.pickBackground; return renderEditor(); }
+    if (bg) {
+      pe.background = +bg.dataset.pickBackground;
+      const q = $("#pe-q") ? $("#pe-q").value : "";
+      renderEditor();
+      if (q && $("#pe-q")) { $("#pe-q").value = q; $("#pe-grid").innerHTML = pickGrid("background"); }
+      return;
+    }
     if (t.closest("[data-pe-auto]")) { pe.background = null; return renderEditor(); }
     const sc = t.closest("[data-pick-showcase]");
     if (sc) {
@@ -268,8 +274,8 @@ C.views.profile = {
   search(q, enter) {
     // Searching from the profile jumps to the library.
     if (!q.trim()) return;
+    C.views.library.search(q, enter);  // the library keeps the text, so nothing typed is lost
     C.go("library");
-    setTimeout(() => { $("#search").value = q; C.views.library.search(q, enter); }, 30);
   },
   refresh() { P.ach = null; return load(C.route.params[0], true); },
   init: bind,

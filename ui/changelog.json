@@ -1,86 +1,195 @@
 [
-  {"version": "0.15.0", "date": "2026-10-29", "title": "What's new", "items": [
-    "New What's new button in the top bar: every Cinder update in one place, with a dot when there's something you haven't seen"
-  ]},
-  {"version": "0.14.1", "date": "2026-10-29", "title": "Download speed in Mbps", "items": [
-    "Show download speed in MB/s, Mbps or both: click the speed on the Downloads tab, or pick in Settings → Appearance",
-    "Speeds show one decimal place"
-  ]},
-  {"version": "0.14.0", "date": "2026-10-29", "title": "Only run Steam when needed", "items": [
-    "New setting (Settings → Steam): Steam stays closed while you browse in Cinder and starts in the background when you play, update or change status",
-    "Closes Steam after a few idle minutes: no game running, nothing downloading, no Steam window open",
-    "Steam status shows whether it's closed, running, or about to close"
-  ]},
-  {"version": "0.13.1", "date": "2026-10-29", "title": "Workshop on game pages", "items": [
-    "Games with a Steam Workshop get a Workshop button and tab on their game page, with your item count and updates",
-    "Store pages get a Workshop button for games that have one"
-  ]},
-  {"version": "0.13.0", "date": "2026-10-29", "title": "Library layouts", "items": [
-    "Switch the library between Covers, Banners, Tiles, List and Shelves",
-    "Cover-size slider right in the library header",
-    "List view with sortable columns: play time, last played, achievements, size",
-    "New sort: Achievements"
-  ]},
-  {"version": "0.12.0", "date": "2026-10-28", "title": "Steam Workshop", "items": [
-    "Workshop tab: your mods per game, size on disk and updates waiting",
-    "Browse any game's workshop: trending, popular, top rated, newest, search",
-    "Item pages with preview, stats and description; subscribe in Steam, open folder, update"
-  ]},
-  {"version": "0.11.3", "date": "2026-10-28", "title": "Updates that start", "items": [
-    "Update buttons now call Steam the same way Steam's own Update button does",
-    "Cinder checks Steam's download log to confirm an update really started"
-  ]},
-  {"version": "0.11.0", "date": "2026-10-28", "title": "Downloads tab", "items": [
-    "Full Downloads tab: live progress, speed graph, time left, queue, finished list",
-    "Start now, pause, resume, remove, Pause all / Resume all",
-    "Updates available list with Update all"
-  ]},
-  {"version": "0.10.0", "date": "2026-10-28", "title": "Update without launching", "items": [
-    "Update button on covers, game pages, the right-click menu and Downloads",
-    "Downloads badge counts updates waiting"
-  ]},
-  {"version": "0.9.1", "date": "2026-10-28", "title": "Achievements on covers", "items": [
-    "Trophy badge and progress bar on covers while viewing a list (gold at 100%)",
-    "Game card options: what shows under covers, play time and date formats, two-line names, hide ™/®"
-  ]},
-  {"version": "0.9.0", "date": "2026-10-28", "title": "Achievements, lists and profile", "items": [
-    "Achievements tab across all your games: recent, rarest, almost done",
-    "Game lists: your Steam collections plus Cinder lists",
-    "Customize your Cinder profile, with Edit on Steam shortcuts"
-  ]},
-  {"version": "0.8.0", "date": "2026-10-28", "title": "Game pages and alerts", "items": [
-    "Game page tabs for achievements, news and DLC",
-    "Non-Steam games show up and launch",
-    "Wishlist sale alerts"
-  ]},
-  {"version": "0.7.0", "date": "2026-10-28", "title": "While you play", "items": [
-    "Now playing pill with a session timer; Cinder tucks away while you play",
-    "Downloads panel, favorites, hidden games and Pick for me"
-  ]},
-  {"version": "0.6.0", "date": "2026-10-28", "title": "Instant start", "items": [
-    "Installed version that opens instantly, with Start menu and Desktop shortcuts",
-    "Lives in the tray and can start with Windows"
-  ]},
-  {"version": "0.5.0", "date": "2026-10-28", "title": "Status and quiet launching", "items": [
-    "Set your status: Online, Away, Invisible, Offline (checked against what friends see)",
-    "Games launch without Steam's window or its Starting game popup"
-  ]},
-  {"version": "0.4.0", "date": "2026-10-28", "title": "Faster, with art for every game", "items": [
-    "Art for every game from Steam's newer image cache",
-    "Collapsible icon-only sidebar",
-    "Scrollbars match your theme; click and drag to scroll rows"
-  ]},
-  {"version": "0.3.0", "date": "2026-10-28", "title": "Tabs like Steam", "items": [
-    "Store, Wishlist, Friends and Profile tabs",
-    "Quick style options on top of any theme",
-    "Drag the window to the top of the screen to maximize; snap to the sides"
-  ]},
-  {"version": "0.2.0", "date": "2026-10-28", "title": "Built-in updaters", "items": [
-    "Cinder updates itself from GitHub releases",
-    "Update Steam on demand while it otherwise stays frozen"
-  ]},
-  {"version": "0.1.0", "date": "2026-10-28", "title": "Cinder", "items": [
-    "A fast, themeable front end for your Steam library",
-    "Keeps Steam on its current build so Steamidra keeps working"
-  ]}
+ {
+  "version": "0.16.0",
+  "date": "2026-10-29",
+  "title": "Smoother and lighter",
+  "items": [
+   "Library redraws about 3–4× faster on big libraries; searching, filtering and favoriting no longer rebuild every cover",
+   "Covers don't fade in again when the library refreshes, and the page doesn't jump while scrolling",
+   "Coming back to Cinder no longer reloads everything twice; Downloads and achievement checks pause while Cinder is hidden",
+   "Steam's large settings file is re-read in the background instead of holding things up",
+   "Cover art never stalls the app while art lookups run",
+   "Fixes: workshop browse could get stuck loading, store pages could show stale results, friends list no longer flashes, settings saved quickly in a row no longer undo each other",
+   "Security: Cinder only answers requests made to your own PC"
+  ]
+ },
+ {
+  "version": "0.15.0",
+  "date": "2026-10-29",
+  "title": "What's new",
+  "items": [
+   "New What's new button in the top bar: every Cinder update in one place, with a dot when there's something you haven't seen"
+  ]
+ },
+ {
+  "version": "0.14.1",
+  "date": "2026-10-29",
+  "title": "Download speed in Mbps",
+  "items": [
+   "Show download speed in MB/s, Mbps or both: click the speed on the Downloads tab, or pick in Settings → Appearance",
+   "Speeds show one decimal place"
+  ]
+ },
+ {
+  "version": "0.14.0",
+  "date": "2026-10-29",
+  "title": "Only run Steam when needed",
+  "items": [
+   "New setting (Settings → Steam): Steam stays closed while you browse in Cinder and starts in the background when you play, update or change status",
+   "Closes Steam after a few idle minutes: no game running, nothing downloading, no Steam window open",
+   "Steam status shows whether it's closed, running, or about to close"
+  ]
+ },
+ {
+  "version": "0.13.1",
+  "date": "2026-10-29",
+  "title": "Workshop on game pages",
+  "items": [
+   "Games with a Steam Workshop get a Workshop button and tab on their game page, with your item count and updates",
+   "Store pages get a Workshop button for games that have one"
+  ]
+ },
+ {
+  "version": "0.13.0",
+  "date": "2026-10-29",
+  "title": "Library layouts",
+  "items": [
+   "Switch the library between Covers, Banners, Tiles, List and Shelves",
+   "Cover-size slider right in the library header",
+   "List view with sortable columns: play time, last played, achievements, size",
+   "New sort: Achievements"
+  ]
+ },
+ {
+  "version": "0.12.0",
+  "date": "2026-10-28",
+  "title": "Steam Workshop",
+  "items": [
+   "Workshop tab: your mods per game, size on disk and updates waiting",
+   "Browse any game's workshop: trending, popular, top rated, newest, search",
+   "Item pages with preview, stats and description; subscribe in Steam, open folder, update"
+  ]
+ },
+ {
+  "version": "0.11.3",
+  "date": "2026-10-28",
+  "title": "Updates that start",
+  "items": [
+   "Update buttons now call Steam the same way Steam's own Update button does",
+   "Cinder checks Steam's download log to confirm an update really started"
+  ]
+ },
+ {
+  "version": "0.11.0",
+  "date": "2026-10-28",
+  "title": "Downloads tab",
+  "items": [
+   "Full Downloads tab: live progress, speed graph, time left, queue, finished list",
+   "Start now, pause, resume, remove, Pause all / Resume all",
+   "Updates available list with Update all"
+  ]
+ },
+ {
+  "version": "0.10.0",
+  "date": "2026-10-28",
+  "title": "Update without launching",
+  "items": [
+   "Update button on covers, game pages, the right-click menu and Downloads",
+   "Downloads badge counts updates waiting"
+  ]
+ },
+ {
+  "version": "0.9.1",
+  "date": "2026-10-28",
+  "title": "Achievements on covers",
+  "items": [
+   "Trophy badge and progress bar on covers while viewing a list (gold at 100%)",
+   "Game card options: what shows under covers, play time and date formats, two-line names, hide ™/®"
+  ]
+ },
+ {
+  "version": "0.9.0",
+  "date": "2026-10-28",
+  "title": "Achievements, lists and profile",
+  "items": [
+   "Achievements tab across all your games: recent, rarest, almost done",
+   "Game lists: your Steam collections plus Cinder lists",
+   "Customize your Cinder profile, with Edit on Steam shortcuts"
+  ]
+ },
+ {
+  "version": "0.8.0",
+  "date": "2026-10-28",
+  "title": "Game pages and alerts",
+  "items": [
+   "Game page tabs for achievements, news and DLC",
+   "Non-Steam games show up and launch",
+   "Wishlist sale alerts"
+  ]
+ },
+ {
+  "version": "0.7.0",
+  "date": "2026-10-28",
+  "title": "While you play",
+  "items": [
+   "Now playing pill with a session timer; Cinder tucks away while you play",
+   "Downloads panel, favorites, hidden games and Pick for me"
+  ]
+ },
+ {
+  "version": "0.6.0",
+  "date": "2026-10-28",
+  "title": "Instant start",
+  "items": [
+   "Installed version that opens instantly, with Start menu and Desktop shortcuts",
+   "Lives in the tray and can start with Windows"
+  ]
+ },
+ {
+  "version": "0.5.0",
+  "date": "2026-10-28",
+  "title": "Status and quiet launching",
+  "items": [
+   "Set your status: Online, Away, Invisible, Offline (checked against what friends see)",
+   "Games launch without Steam's window or its Starting game popup"
+  ]
+ },
+ {
+  "version": "0.4.0",
+  "date": "2026-10-28",
+  "title": "Faster, with art for every game",
+  "items": [
+   "Art for every game from Steam's newer image cache",
+   "Collapsible icon-only sidebar",
+   "Scrollbars match your theme; click and drag to scroll rows"
+  ]
+ },
+ {
+  "version": "0.3.0",
+  "date": "2026-10-28",
+  "title": "Tabs like Steam",
+  "items": [
+   "Store, Wishlist, Friends and Profile tabs",
+   "Quick style options on top of any theme",
+   "Drag the window to the top of the screen to maximize; snap to the sides"
+  ]
+ },
+ {
+  "version": "0.2.0",
+  "date": "2026-10-28",
+  "title": "Built-in updaters",
+  "items": [
+   "Cinder updates itself from GitHub releases",
+   "Update Steam on demand while it otherwise stays frozen"
+  ]
+ },
+ {
+  "version": "0.1.0",
+  "date": "2026-10-28",
+  "title": "Cinder",
+  "items": [
+   "A fast, themeable front end for your Steam library",
+   "Keeps Steam on its current build so Steamidra keeps working"
+  ]
+ }
 ]

@@ -269,7 +269,8 @@ class Steam:
         self._running, self._running_at = False, -10.0
         self._lc: tuple[Path | None, float, dict] = (None, 0.0, {})
         self._lock = threading.Lock()
-        self._lib_lock = threading.Lock()
+        self._lib_lock = threading.RLock()  # re-entered when the first localconfig read invalidates
+        self._lc_busy = False
         self._lib_cache: tuple[float, list] | None = None
 
     # -- basics -------------------------------------------------------------
@@ -351,9 +352,25 @@ class Steam:
             cp, cm, data = self._lc
             if cp == p and cm == mtime:
                 return data
-        data = read_vdf(p).get("userlocalconfigstore", {})
+            if cp == p and data:
+                # Steam rewrote it (it does this often, and it can be several MB). Keep answering
+                # with what we have and re-read it in the background.
+                if not self._lc_busy:
+                    self._lc_busy = True
+                    threading.Thread(target=self._reload_localconfig, args=(p, mtime), daemon=True).start()
+                return data
+        return self._reload_localconfig(p, mtime)
+
+    def _reload_localconfig(self, p: Path, mtime: float) -> dict:
+        try:
+            text = p.read_text(encoding="utf-8", errors="replace")
+            data = parse_vdf(text).get("userlocalconfigstore", {})
+        except OSError:
+            data = {}
         with self._lock:
             self._lc = (p, mtime, data)
+            self._lc_busy = False
+        self.invalidate_library()  # play times / last played may have changed
         return data
 
     def _localconfig_apps(self) -> dict:

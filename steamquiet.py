@@ -149,15 +149,24 @@ class SteamQuiet:
         hidden: dict[int, float] = {}  # popup -> when we hid it
         released: set[int] = set()     # popups we gave back; never touch again
         seen: set[int] = set()
+        pids: set[int] = set()
+        pids_at = -10.0
         while True:
             now = time.monotonic()
             with self._lock:
                 active = now <= self._until
                 titles, before, popups = tuple(self._titles), set(self._before), self._popups
-            if not active and not hidden:
-                break
+                if not active and not hidden:
+                    # Decide to stop and reset in one step, so a watch() arriving now starts a new thread.
+                    self._titles.clear()
+                    self._before.clear()
+                    self._popups = False
+                    self._thread = None
+                    return
             try:
-                wins = steam_windows(steam_pids())
+                if now - pids_at >= 1.0:  # Steam's process list barely changes; check it once a second
+                    pids, pids_at = steam_pids(), now
+                wins = steam_windows(pids)
                 # Hidden popups: gone means it was the launch popup; still there means it needs you.
                 for h, t0 in list(hidden.items()):
                     if not user32.IsWindow(h):
@@ -191,9 +200,10 @@ class SteamQuiet:
                         user32.ShowWindow(h, 5)
                     except Exception:
                         pass
-                break
+                with self._lock:
+                    self._titles.clear()
+                    self._before.clear()
+                    self._popups = False
+                    self._thread = None
+                return
             time.sleep(0.1)
-        with self._lock:
-            self._titles.clear()
-            self._before.clear()
-            self._popups = False

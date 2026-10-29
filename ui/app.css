@@ -215,7 +215,10 @@ select, .text {
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--card-w), 1fr)); gap: calc(22px * var(--gap)) calc(16px * var(--gap)); }
 .grid.wide { grid-template-columns: repeat(auto-fill, minmax(calc(var(--card-w) * 1.55), 1fr)); }
-.card { text-align: left; min-width: 0; outline: none; content-visibility: auto; contain-intrinsic-size: auto 320px; }
+.card { text-align: left; min-width: 0; outline: none; content-visibility: auto;
+  contain-intrinsic-size: auto calc(var(--card-w) * 1.5 + 48px); }  /* close to the real height: no jumps while scrolling */
+.grid.wide .card { contain-intrinsic-size: auto calc(var(--card-w) * 0.73 + 48px); }
+.grid.tiles .card { contain-intrinsic-size: auto calc(var(--card-w) * 0.75); }
 .art {
   position: relative; aspect-ratio: 2 / 3; border-radius: var(--card-radius); overflow: hidden;
   background: var(--surface); box-shadow: 0 6px 18px var(--shadow);
@@ -265,7 +268,7 @@ body.names-2 .card .name { white-space: normal; display: -webkit-box; -webkit-li
 .ach-badge {
   position: absolute; left: 8px; bottom: 10px; display: inline-flex; align-items: center; gap: 4px;
   padding: 2px 8px 2px 6px; border-radius: 99px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
-  background: rgba(0,0,0,.62); color: #fff; backdrop-filter: blur(4px); pointer-events: none;
+  background: rgba(0,0,0,.7); color: #fff; pointer-events: none;
 }
 .ach-badge svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .ach-badge.perfect { background: linear-gradient(135deg, #f6c453, #d99a1e); color: #2a1a00; }
@@ -380,7 +383,7 @@ body.no-motion *, body.no-motion *::before { animation: none !important; transit
 /* ---------- Favorites ---------- */
 .star {
   position: absolute; right: 8px; top: 8px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
-  background: rgba(0,0,0,.55); color: #ffd25e; backdrop-filter: blur(4px);
+  background: rgba(0,0,0,.62); color: #ffd25e;
 }
 .star svg { width: 15px; height: 15px; }
 .btn.on { border-color: color-mix(in srgb, #ffd25e 60%, transparent); color: #ffd25e; }

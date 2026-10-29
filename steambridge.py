@@ -189,10 +189,11 @@ class SteamBridge:
 
     def run(self, js: str, timeout: float = 15) -> object:
         for attempt in range(2):
-            if not self.available():
+            target = self._target if self.available() else None  # read once: other threads may reset it
+            if not target:
                 raise ConnError("not connected")
             try:
-                return _evaluate(self._target, js, timeout)  # type: ignore[arg-type]
+                return _evaluate(target, js, timeout)
             except (OSError, ConnError) as e:
                 self._target = None  # Steam reloaded its interface: find it again
                 if attempt:

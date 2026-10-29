@@ -9,8 +9,10 @@ const REGIONS = [["US", "United States"], ["CA", "Canada"], ["GB", "United Kingd
 
 C.saveConfig = async (changes) => {
   try {
+    Object.assign(S.config, changes);  // optimistic: later saves build on this one
     const r = await C.api("/api/config", changes);
-    S.config = r.config;
+    for (const k of Object.keys(changes)) if (k in r.config) S.config[k] = r.config[k];
+    for (const k of Object.keys(r.config)) if (!(k in S.config)) S.config[k] = r.config[k];
     if (r.steam) { S.steam = r.steam; renderSteam(); }
     if (r.message) C.toast(r.message);
     renderAccount();
@@ -271,7 +273,11 @@ async function poll() {
     const busy = r.cinder.busy || r.steam.busy;
     clearTimeout(U.timer);
     if (busy || (!$("#settings").hidden && !document.hidden)) U.timer = setTimeout(poll, busy ? 1200 : 4000);
-  } catch { /* offline */ }
+  } catch {
+    // A blip mid-update (Cinder restarting its server, say) shouldn't freeze the progress bar.
+    clearTimeout(U.timer);
+    if ((U.cinder && U.cinder.busy) || (U.steam && U.steam.busy)) U.timer = setTimeout(poll, 3000);
+  }
 }
 
 async function cinderUpdate() {

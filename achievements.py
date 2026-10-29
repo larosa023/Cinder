@@ -36,6 +36,8 @@ class AchievementIndex:
         self.private_hits = 0
         self.last_error = None
         self._dirty = 0
+        self._retry_after = 0.0  # after a scan that couldn't reach Steam, wait before trying again
+        self._thread_started = False
 
     # -- storage ---------------------------------------------------------------
     def _save(self):
@@ -76,8 +78,18 @@ class AchievementIndex:
         return age > (RECENT_TTL if recent else OLD_TTL) or g.get("lastplayed", 0) > e.get("checked", 0)
 
     def scan(self, force: bool = False) -> bool:
-        if self.scanning:
-            return False
+        with self._lock:
+            if self.scanning or (not force and time.time() < self._retry_after):
+                return False
+            self.scanning = True  # claimed: a second request can't start another scan
+        try:
+            return self._start(force)
+        finally:
+            if not self._thread_started:
+                self.scanning = False
+
+    def _start(self, force: bool) -> bool:
+        self._thread_started = False
         u = self.steam.user()
         if not u:
             self.last_error = "Sign in to Steam once so Cinder knows your account"
@@ -87,9 +99,10 @@ class AchievementIndex:
         todo = [g for g in played if force or self._stale(g)]
         if not todo:
             return False
-        self.scanning, self.done, self.total = True, 0, len(todo)
+        self.done, self.total = 0, len(todo)
         self.private_hits, self.last_error = 0, None
         threading.Thread(target=self._scan, args=(u["steamid"], todo), daemon=True).start()
+        self._thread_started = True
         return True
 
     def _scan(self, steamid: str, todo: list[dict]):
@@ -122,6 +135,8 @@ class AchievementIndex:
                 list(ex.map(one, todo))
         finally:
             self._save()
+            if self.last_error:
+                self._retry_after = time.time() + 600
             self.scanning = False
             log.info("achievement scan: %d games checked", self.done)
 

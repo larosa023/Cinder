@@ -3,7 +3,7 @@
 "use strict";
 const { $, $$, esc, S, ICON } = C;
 const el = () => $("#view-downloads");
-const DL = { q: "", data: null, timer: 0, hist: [], prev: {}, rate: {}, seen: {}, finished: [], busy: false };
+const DL = { q: "", now: { speed: 0, eta: 0 }, data: null, timer: 0, hist: [], prev: {}, rate: {}, seen: {}, finished: [], busy: false };
 
 const PAUSE = '<svg viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></svg>';
 const X = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>';
@@ -43,11 +43,13 @@ async function load(first = false) {
     }
     DL.seen = Object.fromEntries(d.items.filter((x) => x.state !== "done").map((x) => [x.appid, x]));
     DL.data = d;
+    sample(d);
     if (C.route.tab === "downloads") render();
   } catch (e) {
     if (!DL.data) el().innerHTML = C.failed(e.message);
   }
-  if (C.route.tab === "downloads") DL.timer = setTimeout(load, document.hidden ? 5000 : 1500);
+  // Only polls while you're looking at it; coming back to the window picks it up again.
+  if (C.route.tab === "downloads" && !document.hidden) DL.timer = setTimeout(load, 2000);
 }
 
 function spark() {
@@ -128,18 +130,28 @@ function banner(state) {
 const put = (node, html) => { if (node && node._html !== html) { node.innerHTML = html; node._html = html; } };
 const match = (x) => !DL.q || name(x).toLowerCase().includes(DL.q);
 
-function render() {
-  const d = DL.data;
-  const all = d.items;
-  const cur = all.find((x) => x.appid === d.current) || all.find((x) => ACTIVE.has(x.state)) || all.find((x) => x.state !== "done");
+const current = (d) => d.items.find((x) => x.appid === d.current) || d.items.find((x) => ACTIVE.has(x.state))
+  || d.items.find((x) => x.state !== "done");
+
+// Speed is sampled once per poll (not on every redraw, e.g. while typing in search).
+function sample(d) {
+  const cur = current(d);
   let speed = 0, eta = 0;
   if (cur) {
     speed = d.live ? d.speed : cur.state === "downloading" ? rate(cur.appid, cur.done) : 0;
     const p = progress(cur);
     eta = d.live && d.eta ? d.eta : speed > 1024 && p.total ? Math.round((p.total - p.done) / speed) : 0;
   }
+  DL.now = { speed, eta };
   DL.hist.push(speed);
   if (DL.hist.length > 90) DL.hist.shift();
+}
+
+function render() {
+  const d = DL.data;
+  const all = d.items;
+  const cur = current(d);
+  const { speed, eta } = DL.now;
   const queue = all.filter((x) => x !== cur && x.state !== "done").filter(match);
   const updates = d.updates.filter(match);
   const done = [...all.filter((x) => x.state === "done"), ...DL.finished.filter((f) => !all.some((x) => x.appid === f.appid))].filter(match);

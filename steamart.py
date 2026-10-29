@@ -79,6 +79,7 @@ class ArtFinder:
         self._resolved: dict[tuple[int, str], tuple[str, str] | None] = {}
         self._store: dict[str, dict] = {}
         self._offline_until = 0.0
+        self._tmp = threading.local()
         self._prefetch_done = threading.Event()
         self._prefetch_done.set()
         try:
@@ -118,9 +119,11 @@ class ArtFinder:
         with self._lock:
             if key in self._resolved:
                 return self._resolved[key]
+        self._tmp.provisional = False
         result = self._find(appid, kind, idx)
-        with self._lock:
-            self._resolved[key] = result
+        if not self._tmp.provisional:  # a guess made while the store lookup runs isn't kept
+            with self._lock:
+                self._resolved[key] = result
         return result
 
     def _find(self, appid: int, kind: str, idx: dict):
@@ -155,9 +158,11 @@ class ArtFinder:
         import time
         if info is None and time.monotonic() < self._offline_until:
             info = {}
-        if info is None:
-            self._prefetch_done.wait(10)  # a library-wide lookup may already be fetching it
-            info = self._store.get(str(appid))
+        if info is None and not self._prefetch_done.is_set():
+            # A library-wide lookup is running: don't hold up this image (and the browser's
+            # few connections) waiting for it. Use the classic address now, the real one next time.
+            self._tmp.provisional = True
+            return "url", f"{CDN}steam/apps/{appid}/{classic}"
         if info is None:
             info = self._fetch_store([appid]).get(str(appid))
         if info:
@@ -212,8 +217,10 @@ class ArtFinder:
 
     def _save(self):
         try:
+            with self._lock:
+                data = json.dumps(self._store)
             tmp = self.store_file.with_suffix(".tmp")
-            tmp.write_text(json.dumps(self._store), encoding="utf-8")
+            tmp.write_text(data, encoding="utf-8")
             tmp.replace(self.store_file)
         except OSError:
             pass

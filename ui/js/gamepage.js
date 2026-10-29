@@ -66,7 +66,7 @@ function renderAch(d) {
 function renderNews(d) {
   if (!d.items.length) return '<div class="state">No news for this game.</div>';
   return `<div class="news-list">${d.items.map((n) => `
-    <a class="news" href="${esc(n.url)}" data-url="${esc(n.url)}">
+    <a class="news" href="${/^https?:\/\//.test(n.url || "") ? esc(n.url) : "#"}" data-url="${esc(n.url)}">
       <div class="news-top">${n.patch ? '<span class="pill ingame">Patch notes</span>' : n.official ? '<span class="pill">Announcement</span>' : `<span class="pill">${esc(n.source)}</span>`}
         <small>${C.fmtDate(n.date)}</small></div>
       <strong>${esc(n.title)}</strong>

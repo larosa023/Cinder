@@ -123,6 +123,14 @@ def _text(raw: str) -> str:
     return "\n".join(out).strip()
 
 
+def _trim() -> None:
+    """Keep the item cache bounded (descriptions can be a few KB each)."""
+    with _lock:
+        if len(_details_cache) > 2000:
+            for k in sorted(_details_cache, key=lambda k: _details_cache[k][0])[:400]:
+                _details_cache.pop(k, None)
+
+
 def _clean(d: dict) -> dict:
     tags = [t.get("tag") for t in d.get("tags") or [] if isinstance(t, dict) and t.get("tag")]
     return {
@@ -167,6 +175,7 @@ def details(ids: list[str]) -> dict[str, dict]:
             with _lock:
                 _details_cache[c["id"]] = (now, c)
             out[c["id"]] = c
+    _trim()
     return out
 
 

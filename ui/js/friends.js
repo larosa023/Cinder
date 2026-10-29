@@ -9,12 +9,13 @@ const ORDER = { ingame: 0, online: 1, offline: 2 };
 
 async function load(force = false) {
   if (F.data && !force) return render();
-  el().innerHTML = C.loading("Loading friends…");
+  if (!F.data) el().innerHTML = C.loading("Loading friends…");  // refreshes keep the list on screen
   try {
     F.data = await C.api("/api/friends");
-    render();
+    if (C.route.tab === "friends") render();
   } catch (e) {
-    el().innerHTML = C.failed(e.message);
+    if (!F.data) el().innerHTML = C.failed(e.message);
+    else if (!force) C.toast(e.message, true);
   }
 }
 

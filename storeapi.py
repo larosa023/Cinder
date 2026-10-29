@@ -61,7 +61,12 @@ def _fetch(url: str, ttl: float = 600, as_json: bool = True, timeout: float = 12
         raise SteamDataError(f"Steam returned {e.code}") from e
     except Exception as e:
         raise SteamDataError("Couldn't reach Steam") from e
-    data = json.loads(raw) if as_json else raw.decode("utf-8", "replace")
+    try:
+        data = json.loads(raw) if as_json else raw.decode("utf-8", "replace")
+    except ValueError as e:
+        raise SteamDataError("Steam sent something unexpected. Try again in a minute") from e
+    if as_json and not isinstance(data, (dict, list)):
+        raise SteamDataError("Steam sent something unexpected. Try again in a minute")
     with _cache_lock:
         _cache[url] = (now, data)
         if len(_cache) > 800:  # keep memory small
@@ -243,18 +248,24 @@ def _names(appids: list[int], cc: str) -> dict[int, str]:
                     names[_int(it.get("appid"))] = it["name"]
         except SteamDataError:
             pass
-    missing = [a for a in appids if a not in names][:80]
+    now = time.time()
+    missing = [a for a in appids if a not in names and _no_name.get(a, 0) < now][:20]
     if missing:
         def one(a):
             try:
                 return a, app_details(a, cc)["name"]
             except Exception:
                 return a, None
-        with ThreadPoolExecutor(8) as ex:
+        with ThreadPoolExecutor(4) as ex:
             for a, n in ex.map(one, missing):
                 if n:
                     names[a] = n
+                else:
+                    _no_name[a] = now + 86400  # delisted or hidden: don't ask again today
     return names
+
+
+_no_name: dict[int, float] = {}
 
 
 # --------------------------------------------------------------------- wishlist

@@ -103,7 +103,27 @@ class Handler(BaseHTTPRequestHandler):
             return {}
 
     # -- GET ------------------------------------------------------------------
+    def _host_ok(self) -> bool:
+        """Only answer requests addressed to this PC (blocks DNS-rebinding pages from reading the token)."""
+        host = (self.headers.get("Host") or "").lower()
+        port = self.server.server_address[1]
+        return host in (f"127.0.0.1:{port}", f"localhost:{port}")
+
     def do_GET(self):
+        if not self._host_ok():
+            return self._send(403, b"forbidden", "text/plain")
+        try:
+            return self._get()
+        except (ConnectionError, BrokenPipeError):
+            pass
+        except Exception as e:
+            log.exception("GET %s failed", self.path)
+            try:
+                return self._json({"ok": False, "error": f"Something went wrong ({type(e).__name__})"}, 500)
+            except OSError:
+                pass
+
+    def _get(self):
         parts = urlsplit(self.path)
         path = parts.path
         query = {k: v[0] for k, v in parse_qs(parts.query).items()}
@@ -166,7 +186,8 @@ class Handler(BaseHTTPRequestHandler):
                     log.exception("recording Steam's download calls failed")
             return self._json(self._downloads())
         if path == "/api/library":
-            c.steam.invalidate_library()  # an explicit reload always reads Steam's files fresh
+            if not query.get("soft"):
+                c.steam.invalidate_library()  # an explicit reload always reads Steam's files fresh
             return self._json({"ok": True, "games": self._library()})
         try:
             return self._steam_data(path, query)
@@ -204,6 +225,7 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- workshop ----------------------------------------------------------------
     _ws_support: dict | None = None
+    _ws_lock = threading.Lock()
 
     def _workshop_support(self, appid: int, cc: str) -> dict:
         """Does this game have a Steam Workshop? Your files first, then its store page (remembered)."""
@@ -229,12 +251,13 @@ class Handler(BaseHTTPRequestHandler):
                 supported = bool(storeapi.app_details(appid, cc).get("workshop"))
             except storeapi.SteamDataError:
                 return {"supported": False, "count": 0, "unknown": True}  # try again next time
-        if cls._ws_support.get(key) != supported:
-            cls._ws_support[key] = supported
-            try:
-                path.write_text(json.dumps(cls._ws_support), encoding="utf-8")
-            except OSError:
-                pass
+        with cls._ws_lock:
+            if cls._ws_support.get(key) != supported:
+                cls._ws_support[key] = supported
+                try:
+                    path.write_text(json.dumps(cls._ws_support), encoding="utf-8")
+                except OSError:
+                    pass
         updates = sum(i["needs_update"] for i in local["items"]) if local else 0
         return {"supported": supported, "count": count, "updates": updates}
 
@@ -392,6 +415,8 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- POST -----------------------------------------------------------------
     def do_POST(self):
+        if not self._host_ok():
+            return self._send(403, b"forbidden", "text/plain")
         path = urlsplit(self.path).path
         if not self._authed():
             return self._json({"ok": False, "error": "forbidden"}, 403)

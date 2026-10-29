@@ -269,8 +269,19 @@ C.bindWindow = () => {
 };
 
 // ---------- images: fade-in + graceful fallbacks ----------
+// Images that already loaded once show instantly when their card is rebuilt (no fade again).
+C.loadedSrc = new Set();
+C.markLoaded = (root) => {
+  if (!root || !C.loadedSrc.size) return;
+  const imgs = root.tagName === "IMG" ? [root] : root.querySelectorAll("img:not([data-loaded])");
+  for (const img of imgs) if (C.loadedSrc.has(img.getAttribute("src"))) img.dataset.loaded = "1";
+};
 document.addEventListener("load", (e) => {
-  if (e.target.tagName === "IMG") e.target.dataset.loaded = "1";
+  if (e.target.tagName === "IMG") {
+    e.target.dataset.loaded = "1";
+    const src = e.target.getAttribute("src");
+    if (src && src.startsWith("/art/") && C.loadedSrc.size < 20000) C.loadedSrc.add(src);
+  }
 }, true);
 document.addEventListener("error", (e) => {
   const img = e.target;

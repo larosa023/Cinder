@@ -1,6 +1,8 @@
 /* Store tab: featured home, search, and app pages. Purchases open in the Steam client. */
 (() => {
 "use strict";
+// Only plain https image addresses go into CSS (no quotes or parentheses that could break out).
+const safeUrl = (u) => (/^https:\/\/[^\s'"()\\]+$/.test(u || "") ? u : "");
 const WS_ICON = '<svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg>';
 const { $, esc, S, ICON } = C;
 const el = () => $("#view-store");
@@ -44,11 +46,12 @@ async function showHome(force = false) {
   const v = el();
   if (T.home && !force) return renderHome();
   v.innerHTML = C.loading("Loading the store…");
+  const onHome = () => C.route.tab === "store" && !C.route.params.length;
   try {
     T.home = await C.api("/api/store/home");
-    renderHome();
+    if (onHome()) renderHome();
   } catch (e) {
-    v.innerHTML = C.failed(e.message);
+    if (onHome()) v.innerHTML = C.failed(e.message);
   }
 }
 
@@ -73,7 +76,7 @@ async function showSearch(q) {
       ${r.items.length ? `<div class="sgrid">${r.items.map(scard).join("")}</div>`
         : '<div class="state"><strong>No games found</strong>Try another name.</div>'}`;
   } catch (e) {
-    v.innerHTML = C.failed(e.message);
+    if (T.lastQuery === q && C.route.tab === "store") v.innerHTML = C.failed(e.message);
   }
 }
 
@@ -85,7 +88,7 @@ async function showApp(appid) {
   try {
     a = (await C.api(`/api/store/app/${appid}`)).app;
   } catch (e) {
-    v.innerHTML = C.failed(e.message);
+    if (C.route.tab === "store" && C.route.params[1] === String(appid)) v.innerHTML = C.failed(e.message);
     return;
   }
   if (C.route.tab !== "store" || C.route.params[1] !== String(appid)) return;
@@ -104,7 +107,7 @@ async function showApp(appid) {
     a.recommendations && ["Reviews", `${Number(a.recommendations).toLocaleString()} recommendations`],
   ].filter(Boolean);
   v.innerHTML = `
-    <div class="sp-bg" style="--sp-bg:url('${esc(a.background || a.header)}')"></div>
+    <div class="sp-bg" style="--sp-bg:url('${esc(safeUrl(a.background || a.header))}')"></div>
     <div class="sp">
       <div class="sp-title">
         <img alt="" src="/art/${a.appid}/logo" data-fail="logo">
@@ -203,7 +206,12 @@ C.views.store = {
     clearTimeout(T.searchTimer);
     const term = q.trim();
     if (!term) { if (C.route.params.length) C.go("store"); return; }
-    T.searchTimer = setTimeout(() => C.go(`store/search/${encodeURIComponent(term)}`), enter ? 0 : 450);
+    T.searchTimer = setTimeout(() => {
+      const h = `#/store/search/${encodeURIComponent(term)}`;
+      // Typing refines the same search: replace it in history so Back skips the partial queries.
+      if (C.route.tab === "store" && C.route.params[0] === "search") { history.replaceState(null, "", h); C.onRoute(); }
+      else C.go(`store/search/${encodeURIComponent(term)}`);
+    }, enter ? 0 : 450);
   },
   refresh() {
     T.home = null;

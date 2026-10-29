@@ -14,7 +14,8 @@ const SORTS = {
 };
 const achPct = (g) => { const a = (L.ach || {})[g.appid]; return a ? a[0] / a[1] : -1; };
 
-const favs = () => new Set(S.config.favorites || []);
+let favMemo = null;  // one Set per render instead of one per card
+const favs = () => favMemo || new Set(S.config.favorites || []);
 const hiddenSet = () => new Set(S.config.hidden || []);
 
 function visible() {
@@ -60,10 +61,12 @@ async function ensureAch() {
   clearTimeout(achTimer);
   try {
     const r = await C.api("/api/achievements/summary");
-    const changed = JSON.stringify(r.games) !== JSON.stringify(L.ach || {});
+    const sig = JSON.stringify(r.games || {});
+    const changed = sig !== L.achSig;
+    L.achSig = sig;
     L.ach = r.games || {};
-    if (changed) render();
-    if (r.scanning) achTimer = setTimeout(ensureAch, 4000);
+    if (changed && C.route.tab === "library") render();
+    if (r.scanning) achTimer = setTimeout(ensureAch, document.hidden || C.route.tab !== "library" ? 15000 : 5000);
   } catch { /* offline: cards just skip the badge */ }
 }
 
@@ -131,13 +134,13 @@ function tileHTML(g) {
 const V = (d) => `<svg viewBox="0 0 24 24">${d}</svg>`;
 const LAYOUTS = {
   grid: { label: "Covers", icon: V('<rect x="4" y="4" width="6" height="9" rx="1"/><rect x="14" y="4" width="6" height="9" rx="1"/><path d="M4 17h6M14 17h6M4 20h4M14 20h4"/>'),
-    cls: "grid", render: (list) => list.map((g) => cardHTML(g)).join("") },
+    cls: "grid", item: (g) => cardHTML(g) },
   wide: { label: "Banners", icon: V('<rect x="3" y="5" width="8" height="5" rx="1"/><rect x="13" y="5" width="8" height="5" rx="1"/><rect x="3" y="14" width="8" height="5" rx="1"/><rect x="13" y="14" width="8" height="5" rx="1"/>'),
-    cls: "grid wide", render: (list) => list.map((g) => cardHTML(g)).join("") },
+    cls: "grid wide", item: (g) => cardHTML(g) },
   tiles: { label: "Tiles", icon: V('<rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/>'),
-    cls: "grid tiles", render: (list) => list.map(tileCardHTML).join("") },
+    cls: "grid tiles", item: tileCardHTML },
   list: { label: "List", icon: V('<path d="M9 6h11M9 12h11M9 18h11"/><rect x="3" y="4.5" width="3" height="3" rx=".5"/><rect x="3" y="10.5" width="3" height="3" rx=".5"/><rect x="3" y="16.5" width="3" height="3" rx=".5"/>'),
-    cls: "lib-list", render: listHTML, noZoom: true },
+    cls: "lib-list", item: listRow, head: listHead, noZoom: true },
   shelves: { label: "Shelves", icon: V('<path d="M3 8h18M3 16h18"/><rect x="4" y="3" width="3" height="5"/><rect x="9" y="4" width="3" height="4"/><rect x="5" y="11" width="3" height="5"/><rect x="10" y="12" width="3" height="4"/><rect x="15" y="11" width="3" height="5"/>'),
     cls: "shelves", render: shelvesHTML },
 };
@@ -163,11 +166,13 @@ function tileCardHTML(g) {
 }
 
 const COLS = [["name", "Name"], ["playtime", "Play time"], ["recent", "Last played"], ["ach", "Achievements"], ["size", "Size"]];
-function listHTML(list) {
+function listHead() {
   const sort = S.config.sort || "recent";
-  const head = `<div class="lrow lhead"><span></span>${COLS.map(([k, l]) =>
+  return `<div class="lrow lhead"><span></span>${COLS.map(([k, l]) =>
     `<button class="lcol-${k}${sort === k ? " on" : ""}" data-sortcol="${k}">${l}${sort === k ? " ▾" : ""}</button>`).join("")}<span></span></div>`;
-  return head + list.map((g) => {
+}
+function listRow(g) {
+  {
     const a = (L.ach || {})[g.appid];
     const pct = a ? Math.round((100 * a[0]) / a[1]) : 0;
     const fav = favs().has(g.appid);
@@ -184,7 +189,7 @@ function listHTML(list) {
       <span class="lcol-size">${g.size ? C.fmtSize(g.size) : "—"}</span>
       <span class="lcol-act"><span class="lplay" data-play="${g.appid}" title="${g.installed ? "Play" : "Install"}">${g.installed ? ICON.play : ICON.down}</span></span>
     </div>`;
-  }).join("");
+  }
 }
 
 function shelvesHTML(list) {
@@ -217,12 +222,54 @@ function renderViews() {
   $("#lib-zoom-wrap").hidden = !!LAYOUTS[cur].noZoom;
 }
 
+// Cards are kept per game and only rebuilt when their markup changes, so searching,
+// filtering and small updates don't recreate (and re-fade) hundreds of covers.
+const pool = new Map();  // appid -> {html, el}
+let poolLayout = "";
+const tpl = document.createElement("template");
+
+function patchGrid(grid, lay, layId, list) {
+  if (poolLayout !== layId) { pool.clear(); poolLayout = layId; grid.textContent = ""; }
+  const els = new Array(list.length);
+  const fresh = [];
+  list.forEach((g, i) => {
+    const html = lay.item(g);
+    const p = pool.get(g.appid);
+    if (p && p.html === html) els[i] = p.el;
+    else fresh.push([i, g.appid, html]);
+  });
+  if (fresh.length) {
+    tpl.innerHTML = fresh.map((f) => f[2]).join("");
+    const nodes = Array.from(tpl.content.children);
+    fresh.forEach(([i, appid, html], k) => {
+      const el = nodes[k];
+      C.markLoaded(el);
+      pool.set(appid, { html, el });
+      els[i] = el;
+    });
+  }
+  if (lay.head) {
+    tpl.innerHTML = lay.head();
+    els.unshift(tpl.content.firstElementChild);
+  }
+  const kids = grid.children;
+  if (kids.length === els.length && els.every((el, i) => kids[i] === el)) return;  // nothing moved
+  grid.replaceChildren(...els);
+}
+
 function render() {
+  favMemo = new Set(S.config.favorites || []);
+  try { renderNow(); } finally { favMemo = null; }
+}
+
+function renderNow() {
   const list = visible();
-  const lay = LAYOUTS[layoutId()];
+  const layId = layoutId();
+  const lay = LAYOUTS[layId];
   const grid = $("#grid");
-  grid.className = lay.cls;
-  grid.innerHTML = lay.render(list);
+  if (grid.className !== lay.cls) grid.className = lay.cls;
+  if (lay.item) patchGrid(grid, lay, layId, list);
+  else { poolLayout = ""; pool.clear(); grid.innerHTML = lay.render(list); C.markLoaded(grid); }
   renderViews();
   $("#count").textContent = list.length === S.games.length ? S.games.length : `${list.length} of ${S.games.length}`;
   $("#chip-installed").hidden = !S.games.some((g) => !g.installed);
@@ -231,14 +278,18 @@ function render() {
   if ((L.filter === "favorites" && $("#chip-favorites").hidden) || (L.filter === "hidden" && $("#chip-hidden").hidden)) {
     L.filter = "all";
     $$("#filters button").forEach((x) => x.classList.toggle("on", x.dataset.filter === "all"));
-    return render();
+    return renderNow();
   }
 
   const hid = hiddenSet();
   const recent = S.games.filter((g) => g.lastplayed && g.installed && !hid.has(g.appid)).sort(SORTS.recent).slice(0, 6);
   const showRecent = !L.q && L.filter === "all" && recent.length > 0 && layoutId() !== "shelves";
   $("#recent").hidden = !showRecent;
-  if (showRecent) $("#recent-row").innerHTML = recent.map(tileHTML).join("");
+  if (showRecent) {
+    const html = recent.map(tileHTML).join("");
+    const row = $("#recent-row");
+    if (row._html !== html) { row.innerHTML = html; row._html = html; C.markLoaded(row); }
+  }
 
   const empty = $("#empty");
   if (list.length) { empty.hidden = true; return; }
@@ -252,7 +303,7 @@ function render() {
   else empty.innerHTML = `<strong>Nothing matches “${esc(L.q)}”</strong>Try a different search or filter.`;
 }
 
-let lastJSON = "";
+let lastJSON = "", lastRaw = "";
 function setGames(games, json) {
   if (json === lastJSON) return false;  // nothing changed: skip the re-render
   lastJSON = json;
@@ -273,15 +324,19 @@ function paintCached() {
   } catch { /* no cache */ }
 }
 
-async function load(quiet = false) {
+async function load(quiet = false, soft = false) {
   try {
-    const res = await fetch("/api/library", { headers: { "X-Cinder-Token": window.CINDER_TOKEN } });
+    const res = await fetch("/api/library" + (soft ? "?soft=1" : ""), { headers: { "X-Cinder-Token": window.CINDER_TOKEN } });
     const json = await res.text();
     const data = JSON.parse(json);
     if (!res.ok || data.ok === false) throw new Error(data.error || res.statusText);
-    const games = JSON.stringify(data.games);
-    setGames(data.games, games);
-    try { localStorage.setItem("cinder.library", games); } catch { /* full or blocked */ }
+    if (json !== lastRaw) {  // unchanged responses skip parsing work, re-rendering and saving
+      lastRaw = json;
+      const games = JSON.stringify(data.games);
+      if (setGames(data.games, games)) {
+        try { localStorage.setItem("cinder.library", games); } catch { /* full or blocked */ }
+      }
+    }
     if (!quiet) C.toast(`${data.games.length} games`);
   } catch (e) { C.toast(e.message, true); }
 }
@@ -505,10 +560,12 @@ C.library = { updateOne, load, render, paintCached, openDetail, sorts: SORTS, vi
 C.views.library = {
   placeholder: "Search your library",
   show() { render(); },
+  searchValue: () => L.q,
   search(q, enter) {
     L.q = q.trim();
-    render();
-    if (enter) { const first = visible()[0]; if (first) C.launch(first.appid); }
+    clearTimeout(L.searchTimer);
+    if (enter) { render(); const first = visible()[0]; if (first) C.launch(first.appid); return; }
+    L.searchTimer = setTimeout(render, S.games.length > 300 ? 120 : 30);
   },
   refresh() { return load(); },
   init: bind,

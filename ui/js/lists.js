@@ -8,8 +8,11 @@ const cinderLists = () => S.config.lists || [];
 const newId = () => "l-" + Math.random().toString(36).slice(2, 10);
 
 async function loadSteam() {
-  try { LS.steam = (await C.api("/api/collections")).steam || []; } catch { LS.steam = []; }
-  if (LS.active && !find(LS.active)) LS.active = null;
+  const before = JSON.stringify(LS.steam);
+  try { LS.steam = (await C.api("/api/collections")).steam || []; } catch { return; }  // keep what we had
+  if (LS.active && !find(LS.active)) { LS.active = null; C.library.render(); return; }
+  // A Steam collection you're viewing changed in Steam: show its new games.
+  if (LS.active && !String(LS.active).startsWith("l-") && JSON.stringify(LS.steam) !== before) C.library.render();
 }
 
 function find(id) {

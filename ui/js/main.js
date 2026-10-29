@@ -41,11 +41,17 @@ function bindGlobal() {
   });
 
   window.addEventListener("hashchange", C.onRoute);
-  window.addEventListener("focus", () => { C.library.load(true); C.refreshStatus(); });
-  // Nothing polls while Cinder is hidden or minimized; it catches up when shown.
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) { C.library.load(true); C.refreshStatus(); }
-  });
+  // Nothing polls while Cinder is hidden or minimized; it catches up when you come back.
+  let lastWake = Date.now();
+  const wake = () => {
+    if (document.hidden || Date.now() - lastWake < 20000) return;
+    lastWake = Date.now();
+    C.library.load(true, true);
+    C.refreshStatus();
+    C.lists.loadSteam().then(() => C.lists.renderChip());
+  };
+  window.addEventListener("focus", wake);
+  document.addEventListener("visibilitychange", wake);
   setInterval(() => { if (!document.hidden) C.refreshStatus(); }, 15000);
 }
 
@@ -59,6 +65,7 @@ async function init() {
   C.gamepage.init();
   C.lists.init();
   const libraryLoad = C.library.load(true);  // start reading the library right away
+  C.library.paintCached();  // and show last session's library while it loads
   try {
     const st = await C.api("/api/state");
     Object.assign(S, { config: st.config, themes: st.themes, user: st.user, steam: st.steam, platform: st.platform, install: st.install });
@@ -81,7 +88,6 @@ async function init() {
   }
 
   C.lists.loadSteam().then(() => { C.lists.renderChip(); });
-  C.library.paintCached();
   C.onRoute();
   await libraryLoad;
   C.library.ensureAch();

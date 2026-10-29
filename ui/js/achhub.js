@@ -15,8 +15,15 @@ const SORTS = {
 async function load(quiet = false) {
   if (!A.data && !quiet) el().innerHTML = C.loading("Gathering your achievements…");
   try {
+    const prev = A.shown;
     A.data = await C.api("/api/achievements");
-    if (C.route.tab === "achievements") render();
+    if (C.route.tab === "achievements") {
+      // While scanning, only redraw when there's something new to show; otherwise just tick the counter.
+      const scan = el().querySelector(".scan");
+      if (quiet && A.data.scanning && scan && prev === A.data.games.length + ":" + A.data.stats.unlocked) {
+        scan.lastChild.textContent = `Checking ${A.data.done} of ${A.data.total} games…`;
+      } else render();
+    }
   } catch (e) {
     if (!A.data) el().innerHTML = C.failed(e.message);
     return;
@@ -49,6 +56,7 @@ function gameRow(g) {
 
 function render() {
   const d = A.data;
+  A.shown = d.games.length + ":" + d.stats.unlocked;
   const st = d.stats;
   let games = d.games;
   if (A.q) { const q = A.q.toLowerCase(); games = games.filter((g) => g.name.toLowerCase().includes(q)); }

@@ -61,18 +61,23 @@ async function openGame(appid, tab) {
 }
 
 async function loadBrowse(more = false) {
-  if (W.busy) return;
+  if (more && W.busy) return;  // only "Load more" waits; a new sort, search or game replaces what's loading
+  const tok = (W.seq = (W.seq || 0) + 1);
   W.busy = true;
   const appid = W.appid;
   if (!more) { W.page = 1; W.browse = null; renderGame(); }
+  let next;
   try {
     const r = await C.api(`/api/workshop/${appid}/browse?sort=${W.sort}&q=${encodeURIComponent(W.q)}&page=${W.page}`);
-    if (W.appid !== appid) return;
-    W.browse = more && W.browse ? { ...r, items: [...W.browse.items, ...r.items.filter((x) => !W.browse.items.some((y) => y.id === x.id))] } : r;
+    next = more && W.browse ? { ...r, items: [...W.browse.items, ...r.items.filter((x) => !W.browse.items.some((y) => y.id === x.id))] } : r;
   } catch (e) {
-    W.browse = { items: [], error: e.message };
-  } finally { W.busy = false; }
-  renderGame();
+    next = more && W.browse ? { ...W.browse, more: false } : { items: [], error: e.message };
+    if (more) C.toast(e.message, true);
+  }
+  if (tok !== W.seq || W.appid !== appid) return;  // a newer request owns the view now
+  W.busy = false;
+  W.browse = next;
+  if (C.route.tab === "workshop") renderGame();
 }
 
 function itemCard(it, mode) {
