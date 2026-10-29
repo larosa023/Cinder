@@ -282,7 +282,11 @@
         <h3>Steam</h3>
         <div class="row"><div><strong>Block Steam client updates</strong><small>Keeps steam.cfg in your Steam folder so the client stays on its current build.</small></div>
           <label class="switch"><input type="checkbox" id="set-freeze"><span></span></label></div>
-        <div class="row"><div><strong>Start Steam in the background</strong><small>Launches Steam silently with update-blocking flags when Cinder opens.</small></div>
+        <div class="row"><div><strong>Only run Steam when needed</strong><small>Steam stays closed while you browse in Cinder (saves about 800 MB). Play, Update, status changes and Steam's own windows start it in the background. Once no game is running, nothing is downloading and no Steam window is open, Cinder closes it after the time below. While Steam is closed, friends see you as offline and messages wait until it runs again.</small></div>
+          <label class="switch"><input type="checkbox" id="set-ondemand"><span></span></label></div>
+        <div class="row" id="row-idle"><div><strong>Close Steam after</strong><small>How long Steam waits with nothing to do before closing. Cloud saves finish syncing first.</small></div>
+          <select id="set-idle"><option value="2">2 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option></select></div>
+        <div class="row" id="row-autostart"><div><strong>Start Steam in the background</strong><small>Launches Steam silently with update-blocking flags when Cinder opens.</small></div>
           <label class="switch"><input type="checkbox" id="set-autostart"><span></span></label></div>
         <div class="row"><div><strong>Keep Steam's window hidden when launching games</strong><small>Hides Steam's library window and its "Starting game" popup when you launch a game. If a Steam popup is still open after 10 seconds it probably needs you (cloud save conflict, launch options, shader processing), so Cinder shows it again.</small></div>
           <label class="switch"><input type="checkbox" id="set-quiet"><span></span></label></div>

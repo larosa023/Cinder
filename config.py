@@ -30,13 +30,16 @@ DEFAULTS = {
     "sale_alerts": True,
     "lists": [],          # [{"id", "name", "appids"}] - your Cinder game lists
     "profile_style": {},  # background appid, showcase appids, sections
-    "steam_bridge": True,  # update games / pause downloads through Steam's own interface
+    "steam_bridge": True,
+    "steam_on_demand": False,  # only run Steam while a game, download or Steam window needs it
+    "steam_idle_minutes": 5,  # update games / pause downloads through Steam's own interface
 }
 EDITABLE = {"theme", "sort", "card_size", "freeze_updates", "autostart_steam", "frameless", "steam_path", "check_updates",
             "store_region", "api_key", "start_tab", "style", "show_steam_updates",
             "hide_steam_on_launch", "persona", "close_to_tray", "tray_hint_shown",
             "when_playing", "restore_after_play", "favorites", "hidden", "sale_alerts",
-            "lists", "profile_style", "steam_bridge"}
+            "lists", "profile_style", "steam_bridge",
+            "steam_on_demand", "steam_idle_minutes"}
 
 
 def data_dir() -> Path:

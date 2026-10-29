@@ -71,6 +71,7 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 **Steam and updates**
 
 - Launches games through your installed Steam; never asks for your password
+- **Only run Steam when needed** (Settings → Steam, off by default): Steam stays closed while you browse in Cinder, starts in the background for Play, Update, status changes or Steam windows, and closes after a few idle minutes (no game running, nothing downloading, no Steam window open). While it's closed, friends see you offline
 - **Steam update freeze**: keeps the client on its current build; update it on demand from Settings
 - **Built-in Cinder updater**: new versions install from GitHub releases, so you don't re-download the exe
 
@@ -192,6 +193,7 @@ The `@swatch` colors are what the theme picker shows. A user theme with the same
 | `winsnap.py` | Moving, snapping and resizing for the borderless window |
 | `steamart.py` | Finds every game's art: Steam's local cache and asset index (`assetcache.vdf`), Steam's image servers, then the store API |
 | `steambridge.py` | Asks the running Steam client to update games and pause/resume downloads (Steam's local debugging connection) |
+| `steamidle.py` | "Only run Steam when needed": closes Steam once nothing needs it |
 | `steamquiet.py` | Keeps Steam's main window in the tray while Cinder launches games or changes your status |
 | `server.py` | Local-only HTTP server (127.0.0.1) that serves the UI and a small JSON API, guarded by a per-session token |
 | `updater.py` | Cinder self-updater (GitHub releases) |

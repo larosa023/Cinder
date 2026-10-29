@@ -57,6 +57,13 @@ const EXPECT = { online: ["online", "ingame"], away: ["away"], invisible: ["offl
 const P = { seen: null, checkedAt: 0, verifying: null };
 const statusLabel = (p) => (STATUSES.find((x) => x[0] === p) || STATUSES[0])[1];
 
+function syncOnDemand() {
+  const on = !!S.config.steam_on_demand;
+  $("#row-idle").hidden = !on;
+  $("#row-autostart").classList.toggle("disabled", on);
+  $("#set-autostart").disabled = on;
+}
+
 function renderSteam() {
   const s = S.steam;
   if (C.activity) { C.activity.renderPlaying(); C.activity.renderBadge(); }
@@ -64,8 +71,16 @@ function renderSteam() {
   const persona = S.config.persona || "online";
   dot.dataset.p = s.running ? persona : "closed";
   dot.title = s.running ? `Steam: ${statusLabel(persona)}` : "Steam is not running";
+  const od = s.on_demand;
+  let run = s.running ? "Running" : "Not running";
+  if (od && od.enabled) {
+    run = !s.running ? "Closed, starts when needed"
+      : od.busy ? `Running (${od.busy})`
+      : od.closes_in ? `Running, closes in ${Math.max(1, Math.round(od.closes_in / 60))} min` : "Running";
+  }
   $("#steam-info").textContent = !s.found ? "Steam folder not found"
-    : `${s.running ? "Running" : "Not running"} · ${s.frozen ? "updates blocked" : "updates allowed"} · ${s.path}`;
+    : `${run} · ${s.frozen ? "updates blocked" : "updates allowed"} · ${s.path}`;
+  dot.title = s.running ? `Steam: ${statusLabel(persona)}` : od && od.enabled ? "Steam is closed until something needs it" : "Steam is not running";
   $("#set-freeze").checked = !!s.frozen;
 }
 
@@ -306,6 +321,13 @@ function bind() {
   });
   $("#set-freeze").addEventListener("change", (e) => C.saveConfig({ freeze_updates: e.target.checked }));
   $("#set-autostart").addEventListener("change", (e) => C.saveConfig({ autostart_steam: e.target.checked }));
+  $("#set-ondemand").addEventListener("change", (e) => {
+    S.config.steam_on_demand = e.target.checked;
+    syncOnDemand();
+    C.saveConfig({ steam_on_demand: e.target.checked });
+    if (e.target.checked) C.toast(`Steam will close after ${S.config.steam_idle_minutes || 5} min with nothing to do`);
+  });
+  $("#set-idle").addEventListener("change", (e) => { S.config.steam_idle_minutes = +e.target.value; C.saveConfig({ steam_idle_minutes: +e.target.value }); });
   $("#set-frameless").addEventListener("change", (e) => C.saveConfig({ frameless: e.target.checked }));
   $("#set-start").addEventListener("change", (e) => C.saveConfig({ start_tab: e.target.value }));
   $("#set-region").addEventListener("change", (e) => C.saveConfig({ store_region: e.target.value }).then(() => {
@@ -387,6 +409,9 @@ function fill() {
   if ($("#lib-zoom")) $("#lib-zoom").value = c.card_size;
   document.documentElement.style.setProperty("--card-w", `${c.card_size}px`);
   $("#set-autostart").checked = !!c.autostart_steam;
+  $("#set-ondemand").checked = !!c.steam_on_demand;
+  $("#set-idle").value = String(c.steam_idle_minutes || 5);
+  syncOnDemand();
   $("#set-frameless").checked = !!c.frameless;
   $("#set-checkupd").checked = !!c.check_updates;
   $("#set-quiet").checked = c.hide_steam_on_launch !== false;

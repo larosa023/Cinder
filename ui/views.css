@@ -398,3 +398,5 @@ input[type=range] { accent-color: var(--accent); width: 200px; }
   .ws-panel { grid-template-columns: 1fr; overflow-y: auto; }
   .wsi-body { overflow: visible; }
 }
+.row[hidden] { display: none; }
+.row.disabled { opacity: .5; }

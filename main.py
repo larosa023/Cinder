@@ -172,7 +172,7 @@ def main() -> None:
     if steam.found:
         if cfg["freeze_updates"] and not steam.freeze_enabled():
             steam.set_freeze(True)  # best effort; the UI reports if it couldn't
-        if cfg["autostart_steam"] and not args.no_steam and not steam.running():
+        if cfg["autostart_steam"] and not cfg["steam_on_demand"] and not args.no_steam and not steam.running():
             steam.start(silent=True)
 
     updater = Updater(app_dir())
@@ -223,6 +223,10 @@ def main() -> None:
         window_api=window_api,
     )
     ctx.migrated_from = args.migrated_from
+    from steamidle import SteamIdle
+    ctx.idle = SteamIdle(steam, cfg, steam_updater)
+    if steam.found:
+        ctx.idle.start()
     if steam.found:
         from achievements import AchievementIndex
         ctx.ach = AchievementIndex(steam, cfg, ddir)

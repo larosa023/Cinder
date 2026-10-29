@@ -43,6 +43,7 @@ class Context:
         self.token = token
         self.updater = updater
         self.ach = None  # achievements.AchievementIndex, set by main
+        self.idle = None  # steamidle.SteamIdle, set by main
         self.steam_updater = steam_updater
         self.restart = restart
         self.steam = steam
@@ -365,6 +366,7 @@ class Handler(BaseHTTPRequestHandler):
             "frozen": s.freeze_enabled(),
             "playing": playing,
             "downloads": sum(1 for g in downloads if g["download"]["state"] != "paused"),
+            "on_demand": self.ctx.idle.status() if self.ctx.idle else None,
         }
 
     def _state(self) -> dict:
@@ -428,6 +430,13 @@ class Handler(BaseHTTPRequestHandler):
             if not install.set_startup(bool(body.pop("start_with_windows"))):
                 return self._json({"ok": False, "error": "Windows didn't allow changing the startup setting"})
             msg = "Cinder will start with Windows" if install.startup_enabled() else "Cinder won't start with Windows"
+        if "steam_idle_minutes" in body:
+            try:
+                body["steam_idle_minutes"] = max(1, min(240, int(body["steam_idle_minutes"])))
+            except (TypeError, ValueError):
+                body.pop("steam_idle_minutes")
+        if body.get("steam_on_demand") and c.idle:
+            c.idle.touch()  # start the countdown from now, not from whenever Steam was last used
         if "steam_bridge" in body:
             on = bool(body["steam_bridge"])
             if c.steam.bridge:
@@ -764,6 +773,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": False, "error": "bad appid"}, 400)
             appid = int(appid)
 
+        if c.idle and action not in ("cinder_check", "cinder_update", "cinder_restart", "steam_check", "open_web",
+                                     "folder", "themes_folder", "delete_old_exe", "workshop_folder", "steam_exit"):
+            # Anything else that talks to Steam keeps it around a while (a launch long enough to start the game).
+            c.idle.touch(hold=600 if action == "launch" else 180 if action == "steam_open" else 60)
         if action == "launch" and appid:
             s.launch(appid)
         elif action == "install" and appid:
