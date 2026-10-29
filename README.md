@@ -75,6 +75,8 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 - **Steam update freeze**: keeps the client on its current build; update it on demand from Settings
 - **Built-in Cinder updater**: new versions install from GitHub releases, so you don't re-download the exe
 
+The ✦ button in the top bar opens **What's new**: every Cinder update, newest first, with a dot when there's something you haven't seen.
+
 Shortcuts: `Ctrl+B` collapses the sidebar to icons, `Ctrl+1`–`8` switch tabs, `Alt+←` / mouse back button goes back, `F5` refreshes, `Ctrl+,` opens Settings.
 
 ## Optional: Steam Web API key
@@ -130,7 +132,7 @@ Cinder checks this repo's latest GitHub release. When a newer version is out, a 
 | `run.bat` from a `git clone` | `git pull --ff-only`, then refreshes dependencies |
 | `run.bat` from a downloaded zip | Unpacks the release's source over the folder (your `.venv` is left alone) |
 
-**Publishing a new version** (for the repo owner): bump `VERSION` in `version.py` (e.g. `0.3.1`) and push to `main`. The **Release** GitHub Action builds `Cinder.exe` on Windows and publishes release `v0.3.1`, usually within a few minutes. Every copy of Cinder will then offer the update. Publishing a release by hand on GitHub still works too.
+**Publishing a new version** (for the repo owner): add an entry at the top of `ui/changelog.json` (it feeds the What's new panel), bump `VERSION` in `version.py` (e.g. `0.3.1`) and push to `main`. The **Release** GitHub Action builds `Cinder.exe` on Windows and publishes release `v0.3.1`, usually within a few minutes. Every copy of Cinder will then offer the update. Publishing a release by hand on GitHub still works too.
 
 ### Steam
 

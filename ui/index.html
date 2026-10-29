@@ -28,6 +28,7 @@
     <i></i><span id="np-name"></span><b id="np-time"></b>
   </button>
   <div class="tb-actions">
+    <button class="icon-btn" id="btn-news" title="What's new in Cinder"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15.5l-1.8-4.7L5.5 9l4.7-1.3z"/><path d="M18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8z"/></svg><span class="news-dot" id="news-dot" hidden></span></button>
     <button class="icon-btn" id="btn-downloads" title="Downloads"><svg viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg><span class="count-badge" id="dl-badge" hidden></span></button>
     <button class="icon-btn" id="btn-refresh" title="Refresh (F5)"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg></button>
     <button class="icon-btn" id="btn-settings" title="Settings (Ctrl+,)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></button>
@@ -149,6 +150,15 @@
       <p class="d-path" id="d-path"></p>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- What's new -->
+<div class="overlay" id="news" hidden>
+  <div class="panel news-panel">
+    <div class="news-head"><div><h2>What's new</h2><small id="news-sub"></small></div>
+      <button class="icon-btn" data-close title="Close (Esc)"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="news-body" id="news-body"></div>
   </div>
 </div>
 
@@ -393,6 +403,7 @@
 <script src="/ui/js/profile.js"></script>
 <script src="/ui/js/downloads.js"></script>
 <script src="/ui/js/workshop.js"></script>
+<script src="/ui/js/news.js"></script>
 <script src="/ui/js/settings.js"></script>
 <script src="/ui/js/activity.js"></script>
 <script src="/ui/js/gamepage.js"></script>
