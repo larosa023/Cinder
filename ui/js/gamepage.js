@@ -19,14 +19,14 @@ async function load(tab) {
   if (!G.cache[key]) {
     pane.innerHTML = C.loading("Loading…");
     try {
-      G.cache[key] = await C.api(`/api/game/${appid}/${tab}`);
+      G.cache[key] = await C.api(tab === "workshop" ? `/api/workshop/${appid}` : `/api/game/${appid}/${tab}`);
     } catch (e) {
       if (G.appid === appid && G.tab === tab) pane.innerHTML = C.failed(e.message, false);
       return;
     }
   }
   if (G.appid !== appid || G.tab !== tab) return;
-  pane.innerHTML = ({ achievements: renderAch, news: renderNews, dlc: renderDlc })[tab](G.cache[key]);
+  pane.innerHTML = ({ achievements: renderAch, news: renderNews, dlc: renderDlc, workshop: renderWorkshop })[tab](G.cache[key]);
 }
 
 function renderAch(d) {
@@ -64,6 +64,19 @@ function renderDlc(d) {
       </button>`).join("")}</div>`;
 }
 
+function renderWorkshop(d) {
+  const ups = d.items.filter((i) => i.needs_update).length;
+  return `<div class="ach-head"><strong>${d.items.length ? `${d.items.length} workshop item${d.items.length > 1 ? "s" : ""} · ${C.fmtSize(d.size)}` : "No workshop items"}</strong>
+      <span>${ups ? `${ups} update${ups > 1 ? "s" : ""} ready` : ""}</span></div>
+    ${d.items.length ? `<div class="dlc-list">${d.items.slice(0, 8).map((i) => `
+      <button class="dlc" data-wsitem="${i.id}">
+        <img alt="" loading="lazy" src="${esc(i.preview || "")}" data-fail="hide">
+        <span class="name">${esc(i.title)}</span>
+        ${i.needs_update ? '<span class="pill">Update</span>' : `<small>${C.fmtSize(i.size)}</small>`}
+      </button>`).join("")}</div>` : ""}
+    <div class="ws-more"><button class="btn" data-wsgo="${d.appid}">${d.items.length ? "Open in Workshop" : "Browse the Workshop"}</button></div>`;
+}
+
 function open(g) {
   G.appid = g.appid;
   const nonSteam = !!g.shortcut;
@@ -81,6 +94,14 @@ function bind() {
   $("#d-pane").addEventListener("click", (e) => {
     const n = e.target.closest("[data-url]");
     if (n) { e.preventDefault(); C.act("steam_url_open", { url: n.dataset.url }); return; }
+    const wg = e.target.closest("[data-wsgo]"), wi = e.target.closest("[data-wsitem]");
+    if (wg || wi) {
+      const id = G.appid;
+      C.closeOverlays();
+      C.go(`workshop/${id}`);
+      if (wi) setTimeout(() => C.workshop.openItem(wi.dataset.wsitem), 80);
+      return;
+    }
     const d = e.target.closest("[data-store]");
     if (d) { C.closeOverlays(); C.go(`store/app/${d.dataset.store}`); }
   });

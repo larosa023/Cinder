@@ -30,7 +30,7 @@ function bindGlobal() {
       e.preventDefault(); search.focus(); search.select();
     } else if (e.key === "," && e.ctrlKey) { e.preventDefault(); C.openSettings(); }
     else if (e.ctrlKey && e.key.toLowerCase() === "b") { e.preventDefault(); C.style.toggleSidebar(); }
-    else if (e.ctrlKey && /^[1-7]$/.test(e.key)) { e.preventDefault(); C.go(C.TABS[+e.key - 1].id); }
+    else if (e.ctrlKey && /^[1-8]$/.test(e.key)) { e.preventDefault(); C.go(C.TABS[+e.key - 1].id); }
     else if (e.altKey && e.key === "ArrowLeft") { e.preventDefault(); history.back(); }
     else if (e.altKey && e.key === "ArrowRight") { e.preventDefault(); history.forward(); }
   });

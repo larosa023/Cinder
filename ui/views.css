@@ -349,3 +349,52 @@ input[type=range] { accent-color: var(--accent); width: 200px; }
 .pe-foot { display: flex; justify-content: flex-end; gap: 8px; padding-top: 14px; border-top: 1px solid var(--border); margin-top: 12px; }
 .checks.left { justify-content: flex-start; margin-top: 8px; }
 @media (max-width: 900px) { .showcase { grid-template-columns: repeat(2, 1fr); } .ach-summary { grid-template-columns: repeat(3, 1fr); } .ach-icons { grid-column: 1 / -1; } }
+
+/* ---------- Workshop ---------- */
+.ws-games { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: calc(14px * var(--gap)); }
+.ws-games.small { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.ws-game { position: relative; text-align: left; border-radius: var(--card-radius); overflow: hidden; background: var(--surface);
+  border: 1px solid var(--border); transition: transform .15s, border-color .15s; }
+.ws-game:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
+.ws-game img { width: 100%; aspect-ratio: 460 / 215; object-fit: cover; display: block; }
+.ws-gmeta { display: block; padding: 9px 11px 10px; }
+.ws-gmeta small { display: block; color: var(--text-dim); font-size: 12px; margin-top: 2px; }
+.ws-hero { position: relative; overflow: hidden; border-radius: var(--panel-radius); border: 1px solid var(--border); margin-bottom: 16px; min-height: 210px; }
+.ws-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ws-shade { position: absolute; inset: 0; background: linear-gradient(90deg, var(--bg-elev) 0%, color-mix(in srgb, var(--bg-elev) 70%, transparent) 55%, transparent 100%),
+  linear-gradient(0deg, var(--bg-elev), transparent 70%); }
+.ws-hbody { position: relative; padding: 18px 24px 22px; display: flex; flex-direction: column; gap: 10px; }
+.ws-back { align-self: flex-start; margin: 0; color: var(--text-dim); font-weight: 600; }
+.ws-back:hover { color: var(--text); }
+.ws-hbody h1 { font-size: 30px; text-shadow: 0 2px 14px var(--shadow); }
+.ws-hstats { display: flex; gap: 18px; color: var(--text-dim); font-size: 13px; }
+.ws-hstats b { color: var(--text); }
+.ws-upd b, .ws-upd { color: var(--accent); }
+.ws-tabs .count { color: var(--text-dim); font-size: 12px; margin-left: 2px; }
+.ws-sorts { margin-bottom: 14px; flex-wrap: wrap; }
+.ws-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: calc(14px * var(--gap)); }
+.ws-item { text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 0 0 8px; border-radius: var(--card-radius); }
+.ws-thumb { position: relative; display: block; aspect-ratio: 1; border-radius: var(--card-radius); overflow: hidden;
+  background: var(--surface); border: 1px solid var(--border); transition: transform .15s, box-shadow .15s; }
+.ws-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ws-item:hover .ws-thumb { transform: translateY(-2px); box-shadow: 0 10px 26px var(--shadow); }
+.ws-title { font-weight: 600; font-size: 13px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ws-item small { color: var(--text-dim); font-size: 12px; }
+.ws-more { display: flex; justify-content: center; padding: 18px 0 6px; }
+.ws-note { color: var(--text-dim); font-size: 12px; margin: 6px 0 12px; }
+.ws-panel { position: relative; width: min(940px, 94vw); max-height: 88%; display: grid; grid-template-columns: minmax(240px, 42%) 1fr; overflow: hidden; }
+#ws-item-body { display: contents; }
+#ws-item-body > .state { grid-column: 1 / -1; padding: 60px 20px; }
+.wsi-media { background: var(--surface); display: flex; align-items: flex-start; justify-content: center; overflow: hidden; }
+.wsi-media img { width: 100%; height: auto; display: block; }
+.wsi-body { padding: 22px 26px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.wsi-game { color: var(--accent); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+.wsi-body h2 { font-size: 22px; line-height: 1.2; padding-right: 30px; }
+.wsi-stats { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--text-dim); font-size: 13px; }
+.wsi-stats b { color: var(--text); }
+.wsi-actions { flex-wrap: wrap; }
+.wsi-desc { white-space: pre-wrap; color: var(--text-dim); font-size: 13px; line-height: 1.55; border-top: 1px solid var(--border); padding-top: 12px; }
+@media (max-width: 760px) {
+  .ws-panel { grid-template-columns: 1fr; overflow-y: auto; }
+  .wsi-body { overflow: visible; }
+}

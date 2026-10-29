@@ -30,6 +30,13 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 - Game lists: your Steam collections appear automatically (read from Steam's files), plus Cinder lists you make. Pick a list from **Lists** in the library; right-click a game to add it to a list
 - Customize your Cinder profile: background from any game's art, a showcase of up to 4 games, which sections show, banner size. **Edit on Steam** jumps to each part of Steam's own profile editor
 
+**Steam Workshop**
+
+- Workshop tab: every game you have workshop items for, with item counts, size on disk and updates waiting (read from Steam's own files)
+- Each game's workshop: **Your items** (subscribed mods, plus items the game installed itself) and **Browse** (Trending, Most popular, Top rated, Newest, Recently updated, or search with Enter)
+- Item pages with preview, subscribers, favorites, size, tags and description. **Subscribe in Steam** opens the item in Steam to subscribe or unsubscribe, the same way buying works. **Open folder** goes to its files. **Update now** asks Steam for the newest version when you're connected
+- Also on each game page (Workshop tab) and in the right-click menu
+
 **Game pages**
 
 - Tabs for Achievements (unlock dates and how rare each one is), News and patch notes, and DLC (with what you have installed)
@@ -66,7 +73,7 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 - **Steam update freeze**: keeps the client on its current build; update it on demand from Settings
 - **Built-in Cinder updater**: new versions install from GitHub releases, so you don't re-download the exe
 
-Shortcuts: `Ctrl+B` collapses the sidebar to icons, `Ctrl+1`–`7` switch tabs, `Alt+←` / mouse back button goes back, `F5` refreshes, `Ctrl+,` opens Settings.
+Shortcuts: `Ctrl+B` collapses the sidebar to icons, `Ctrl+1`–`8` switch tabs, `Alt+←` / mouse back button goes back, `F5` refreshes, `Ctrl+,` opens Settings.
 
 ## Optional: Steam Web API key
 
@@ -191,6 +198,7 @@ The `@swatch` colors are what the theme picker shows. A user theme with the same
 | `install.py` | Install location, shortcuts, start with Windows, swapping in updates after exit |
 | `tray.py` | Tray icon, its menu, and Windows notifications |
 | `playing.py` | Notices when a game starts and stops (Steam's RunningAppID) |
+| `workshop.py` | Your workshop items (from Steam's files), item details and workshop browsing |
 | `achievements.py` | Gathers your achievements across games in the background for the Achievements tab |
 | `sales.py` | Checks your wishlist every few hours for new sales |
 | `main.py` | Starts everything and opens the window |

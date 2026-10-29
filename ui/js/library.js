@@ -295,6 +295,7 @@ function cardMenu(e, appid) {
     <button data-cm="list">Add to list…</button>
     <hr>
     <button data-cm="details">Details</button>
+    ${g.shortcut ? "" : '<button data-cm="workshop">Workshop</button>'}
     ${g.shortcut ? '<button data-cm="folder">Open folder</button>' : `<button data-cm="store">Store page</button>
     ${g.installed ? '<button data-cm="folder">Open install folder</button><button data-cm="props">Steam properties</button>' : ""}`}`;
   m.dataset.appid = appid;
@@ -323,6 +324,7 @@ function bind() {
       list: () => { const r = $("#card-menu").getBoundingClientRect(); C.lists.picker(id, r.left, r.top); },
       hide: () => toggleList("hidden", id),
       details: () => openDetail(id),
+      workshop: () => C.go(`workshop/${id}`),
       store: () => C.go(`store/app/${id}`),
       folder: () => C.act("folder", { appid: id }),
       props: () => C.act("properties", { appid: id }),

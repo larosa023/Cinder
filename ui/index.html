@@ -101,6 +101,7 @@
   <section class="view" id="view-friends" hidden></section>
   <section class="view" id="view-achievements" hidden></section>
   <section class="view" id="view-profile" hidden></section>
+  <section class="view" id="view-workshop" hidden></section>
   <section class="view" id="view-downloads" hidden></section>
 </main>
 
@@ -130,6 +131,7 @@
         <button data-dtab="achievements">Achievements</button>
         <button data-dtab="news">News</button>
         <button data-dtab="dlc">DLC</button>
+        <button data-dtab="workshop">Workshop</button>
       </nav>
       <div class="d-pane" id="d-pane" hidden></div>
       <div id="d-overview">
@@ -142,6 +144,14 @@
       <p class="d-path" id="d-path"></p>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Workshop item -->
+<div class="overlay" id="ws-item" hidden>
+  <div class="panel ws-panel">
+    <button class="icon-btn d-close" data-close title="Close (Esc)"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <div id="ws-item-body"></div>
   </div>
 </div>
 
@@ -371,6 +381,7 @@
 <script src="/ui/js/achhub.js"></script>
 <script src="/ui/js/profile.js"></script>
 <script src="/ui/js/downloads.js"></script>
+<script src="/ui/js/workshop.js"></script>
 <script src="/ui/js/settings.js"></script>
 <script src="/ui/js/activity.js"></script>
 <script src="/ui/js/gamepage.js"></script>

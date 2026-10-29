@@ -200,10 +200,65 @@ class Handler(BaseHTTPRequestHandler):
         c.steam.prefetch_art([g["appid"] for g in games])
         return games
 
+    # -- workshop ----------------------------------------------------------------
+    def _workshop(self, path: str, q: dict, key: str):
+        import workshop
+        c = self.ctx
+        names = {g["appid"]: g["name"] for g in c.steam.library()}
+        if path == "/api/workshop":
+            games = []
+            for appid, e in workshop.installed(c.steam).items():
+                games.append({"appid": appid, "name": names.get(appid) or f"App {appid}", "size": e["size"],
+                              "count": len(e["items"]), "subscribed": sum(i["subscribed"] for i in e["items"]),
+                              "needs_update": e["needs_update"],
+                              "updates": sum(i["needs_update"] for i in e["items"])})
+            games.sort(key=lambda g: g["name"].lower())
+            return self._json({"ok": True, "games": games})
+        m = re.fullmatch(r"/api/workshop/(\d+)", path)
+        if m:
+            appid = int(m.group(1))
+            e = workshop.installed(c.steam).get(appid) or {"items": [], "size": 0, "needs_update": False}
+            info, err = {}, None
+            try:
+                info = workshop.details([i["id"] for i in e["items"]])
+            except storeapi.SteamDataError as ex:
+                err = str(ex)
+            items = [{**(info.get(i["id"]) or {"id": i["id"], "title": f"Item {i['id']}", "preview": ""}), **{
+                "size": i["size"] or (info.get(i["id"]) or {}).get("size", 0), "installed_updated": i["updated"],
+                "needs_update": i["needs_update"], "subscribed": i["subscribed"], "has_folder": bool(i["folder"])}}
+                for i in e["items"]]
+            items.sort(key=lambda x: (not x.get("needs_update"), not x.get("subscribed"), -(x.get("installed_updated") or 0)))
+            return self._json({"ok": True, "appid": appid, "name": names.get(appid) or f"App {appid}",
+                               "size": e["size"], "items": items, "error": err, "has_key": bool(key)})
+        m = re.fullmatch(r"/api/workshop/(\d+)/browse", path)
+        if m:
+            page = max(1, min(50, int(q.get("page", "1")) if str(q.get("page", "1")).isdigit() else 1))
+            res = workshop.browse(int(m.group(1)), q.get("sort", "trend"), q.get("q", ""), page, key)
+            mine = {i["id"]: i for i in (workshop.installed(c.steam).get(int(m.group(1))) or {"items": []})["items"]}
+            for it in res["items"]:
+                it["have"] = it["id"] in mine
+                it["subscribed"] = bool(mine.get(it["id"], {}).get("subscribed"))
+            return self._json({"ok": True, **res})
+        m = re.fullmatch(r"/api/workshop/item/(\d+)", path)
+        if m:
+            fid = m.group(1)
+            it = workshop.details([fid]).get(fid)
+            if not it or not it["ok"]:
+                raise storeapi.SteamDataError("This workshop item is private or was removed")
+            local = (workshop.installed(c.steam).get(it["appid"]) or {"items": []})["items"]
+            mine = next((i for i in local if i["id"] == fid), None)
+            it.update(have=bool(mine), subscribed=bool(mine and mine["subscribed"]),
+                      needs_update=bool(mine and mine["needs_update"]), has_folder=bool(mine and mine["folder"]),
+                      game=names.get(it["appid"]) or "")
+            return self._json({"ok": True, "item": it})
+        return self._json({"ok": False, "error": "unknown endpoint"}, 404)
+
     def _steam_data(self, path: str, q: dict):
         c = self.ctx
         cc = (c.config["store_region"] or "US").upper()[:2]
         key = c.config["api_key"] or ""
+        if path.startswith("/api/workshop"):
+            return self._workshop(path, q, key)
         if path == "/api/store/home":
             return self._json({"ok": True, **storeapi.store_home(cc)})
         if path == "/api/store/search":
@@ -564,6 +619,43 @@ class Handler(BaseHTTPRequestHandler):
         except steambridge.BridgeError as e:
             log.info("bridge check failed: %s", e)
 
+    def _workshop_action(self, action: str, body: dict, appid):
+        import workshop
+        import steambridge
+        s = self.ctx.steam
+        fid = str(body.get("id", ""))
+        if action == "workshop_browse_steam" and appid:
+            s.steam_url(f"steam://openurl/https://steamcommunity.com/app/{appid}/workshop/")
+            return self._json({"ok": True})
+        if not fid.isdigit():
+            return self._json({"ok": False, "error": "bad item"}, 400)
+        if action == "workshop_open":
+            s.steam_url("steam://openurl/" + workshop.item_url(fid))  # subscribe / unsubscribe there
+            return self._json({"ok": True})
+        mine = next((i for e in workshop.installed(s).values() for i in e["items"] if i["id"] == fid), None)
+        app = next((a for a, e in workshop.installed(s).items() if any(i["id"] == fid for i in e["items"])), appid)
+        if action == "workshop_folder":
+            if not mine or not mine["folder"]:
+                return self._json({"ok": False, "error": "This item isn't downloaded yet"})
+            _open_path(mine["folder"])
+            return self._json({"ok": True})
+        # workshop_update: ask Steam to fetch the newest version now
+        if not app or not s.bridge or self._bridge_state() != "on":
+            return self._json({"ok": False, "error": "Connect Cinder to Steam first (Downloads tab), or update it by launching the game"})
+        try:
+            r = s.bridge.run(f"""(async () => {{
+  const A = SteamClient.Apps;
+  if (typeof A.DownloadWorkshopItem !== "function") return {{ok: false}};
+  const r = A.DownloadWorkshopItem({int(app)}, "{fid}", true); if (r && r.then) await r;
+  return {{ok: true}};
+}})()""")
+        except steambridge.BridgeError as e:
+            return self._json({"ok": False, "error": f"Steam didn't take the request ({e})"})
+        log.info("workshop update %s/%s: %s", app, fid, r)
+        if not (isinstance(r, dict) and r.get("ok")):
+            return self._json({"ok": False, "error": "This Steam build can't update workshop items from Cinder"})
+        return self._json({"ok": True})
+
     def _bridge_action(self, action: str, body: dict):
         """Update games and control the download queue without opening a Steam window."""
         import threading
@@ -703,6 +795,8 @@ class Handler(BaseHTTPRequestHandler):
             s.steam_url("steam://store")
         elif action == "steam_exit":
             s.shutdown()
+        elif action in ("workshop_open", "workshop_folder", "workshop_update", "workshop_browse_steam"):
+            return self._workshop_action(action, body, appid)
         elif action in ("game_update", "download_pause", "download_cmd"):
             return self._bridge_action(action, body)
         elif action == "cinder_check":

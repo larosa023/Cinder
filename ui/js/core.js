@@ -147,6 +147,7 @@ C.TABS = [
   { id: "friends", label: "Friends", icon: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M21.5 20a6.5 6.5 0 0 0-4-6"/></svg>' },
   { id: "achievements", label: "Achievements", icon: '<svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/></svg>' },
   { id: "profile", label: "Profile", icon: C.ICON.user },
+  { id: "workshop", label: "Workshop", icon: '<svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg>' },
   { id: "downloads", label: "Downloads", icon: C.ICON.down },
 ];
 C.views = {};  // id -> { show(params), search?(q, enter), refresh?(), placeholder }
