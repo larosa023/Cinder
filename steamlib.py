@@ -269,6 +269,8 @@ class Steam:
         self._running, self._running_at = False, -10.0
         self._lc: tuple[Path | None, float, dict] = (None, 0.0, {})
         self._lock = threading.Lock()
+        self._lib_lock = threading.Lock()
+        self._lib_cache: tuple[float, list] | None = None
 
     # -- basics -------------------------------------------------------------
     @property
@@ -366,7 +368,26 @@ class Steam:
         return node if isinstance(node, dict) else {}
 
     # -- library ------------------------------------------------------------
+    LIBRARY_TTL = 2.0  # many callers per second (status, downloads, idle check) share one scan
+
     def library(self) -> list[dict]:
+        """Every game: installed ones from Steam's manifests plus your non-Steam shortcuts.
+
+        The scan is shared for a couple of seconds; callers get their own copies of each game."""
+        now = time.monotonic()
+        with self._lib_lock:
+            hit = self._lib_cache
+            if hit and now - hit[0] < self.LIBRARY_TTL:
+                return [dict(g) for g in hit[1]]
+            games = self._scan_library()
+            self._lib_cache = (time.monotonic(), games)
+            return [dict(g) for g in games]
+
+    def invalidate_library(self) -> None:
+        with self._lib_lock:
+            self._lib_cache = None
+
+    def _scan_library(self) -> list[dict]:
         stats = self._localconfig_apps()
         games: dict[int, dict] = {}
         for lib in self.library_dirs():

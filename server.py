@@ -166,6 +166,7 @@ class Handler(BaseHTTPRequestHandler):
                     log.exception("recording Steam's download calls failed")
             return self._json(self._downloads())
         if path == "/api/library":
+            c.steam.invalidate_library()  # an explicit reload always reads Steam's files fresh
             return self._json({"ok": True, "games": self._library()})
         try:
             return self._steam_data(path, query)
