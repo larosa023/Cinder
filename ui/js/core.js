@@ -100,6 +100,16 @@ C.fmtSize = (b) => {
   while (b >= 1024 && i < 4) { b /= 1024; i++; }
   return `${b.toFixed(i >= 3 ? 1 : 0)} ${u[i]}`;
 };
+/** Download speed in MB/s, Mbps (megabits, like internet plans), or both (Settings → Appearance). */
+C.fmtSpeed = (bps, fmt) => {
+  if (!bps) return "—";
+  const f = fmt || (C.style && C.style.get().speedFmt) || "MB";
+  const mbps = (bps * 8) / 1e6;
+  const bits = `${mbps >= 100 ? Math.round(mbps) : mbps.toFixed(1)} Mbps`;
+  const mb = bps / 1048576;
+  const bytes = mb >= 1 ? `${mb >= 100 ? Math.round(mb) : mb.toFixed(1)} MB/s` : `${Math.round(bps / 1024)} KB/s`;
+  return f === "Mbps" ? bits : f === "both" ? `${bytes} · ${bits}` : bytes;
+};
 C.money = (cents, currency) => {
   try { return new Intl.NumberFormat(undefined, { style: "currency", currency: currency || "USD" }).format(cents / 100); }
   catch { return `${(cents / 100).toFixed(2)} ${currency || ""}`; }

@@ -75,7 +75,7 @@ function heroLive(d, speed, eta) {
   return `<div class="dlp-bar ${d.state}"><i style="width:${p.pct.toFixed(1)}%"></i></div>
       <div class="dlp-stats">
         <div><span>${STATE[d.state] || d.state}${d.error ? ` · ${esc(d.error)}` : ""}</span><b>${p.total ? `${Math.floor(p.pct)}%` : "—"}</b><small>${p.total ? `${C.fmtSize(p.done)} of ${C.fmtSize(p.total)}` : "Waiting for Steam"}</small></div>
-        <div><span>Speed</span><b>${speed > 1024 ? `${C.fmtSize(speed)}/s` : "—"}</b><small>${DL.data.peak > 1024 ? `Peak ${C.fmtSize(DL.data.peak)}/s` : ""}</small></div>
+        <div class="dlp-speed" data-speedfmt title="Click to switch between MB/s, Mbps and both"><span>Speed <em>${{ MB: "MB/s", Mbps: "Mbps", both: "MB/s + Mbps" }[(C.style && C.style.get().speedFmt) || "MB"]}</em></span><b>${speed > 1024 ? C.fmtSpeed(speed) : "—"}</b><small>${DL.data.peak > 1024 ? `Peak ${C.fmtSpeed(DL.data.peak)}` : ""}</small></div>
         <div><span>Time left</span><b>${eta ? fmtLeft(eta) : "—"}</b><small>${eta ? `Done around ${new Date(Date.now() + eta * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}</small></div>
         <div class="dlp-graph">${spark()}</div>
       </div>
@@ -201,6 +201,12 @@ async function cmd(c, appid, extra = {}) {
 function bind() {
   el().addEventListener("click", async (e) => {
     const t = e.target;
+    if (t.closest("[data-speedfmt]")) {
+      const order = ["MB", "Mbps", "both"];
+      const cur = (C.style.get().speedFmt) || "MB";
+      C.style.set("speedFmt", order[(order.indexOf(cur) + 1) % order.length]);
+      return render();
+    }
     const b = t.closest("[data-cmd]");
     if (b) { e.stopPropagation(); return cmd(b.dataset.cmd, b.dataset.id ? +b.dataset.id : 0); }
     const st = t.closest("[data-start]");

@@ -8,6 +8,7 @@ const DEFAULTS = {
   font: "segoe", bg: "solid", sideCollapsed: false, glow: true, blur: true, motion: true, recent: true, labels: true,
   // Game cards
   libView: "",
+  speedFmt: "MB",
   cardSub: "playtime", playFmt: "hours", dateFmt: "relative", achBadge: "lists", nameLines: "1", cleanNames: false,
 };
 const CARD_KEYS = ["cardSub", "playFmt", "dateFmt", "achBadge", "nameLines", "cleanNames"];
@@ -79,6 +80,7 @@ function syncControls() {
   $$("[data-style-select]").forEach((sel) => (sel.value = style[sel.dataset.styleSelect]));
   const ex = (id, txt) => { const e = $(id); if (e) e.textContent = txt; };
   ex("#fmt-play-ex", `Example: ${C.fmtPlay(44000)}`);
+  ex("#fmt-speed-ex", `Example: ${C.fmtSpeed(12.5 * 1048576)}`);
   ex("#fmt-date-ex", `Example: ${C.fmtAgo(Date.now() / 1000 - 2 * 86400)}`);
   $$("#st-accent [data-accent]").forEach((btn) => btn.classList.toggle("on", btn.dataset.accent === (style.accent || "")));
   const custom = $("#st-accent-custom");
