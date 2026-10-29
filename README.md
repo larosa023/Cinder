@@ -11,6 +11,7 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 **Tabs, like Steam, on your theme**
 
 - **Library**: cover grid of installed games across every Steam library folder, a "Jump back in" row, instant search (`/`, `Enter` launches the top result), filters and sorting. With an API key it also shows owned games you haven't installed, with an Install button.
+- **Library layouts** (switcher next to Lists, with a size slider): **Covers**, **Banners**, **Tiles** (wide art with the name on it), **List** (sortable columns for play time, last played, achievements and size) and **Shelves** (Favorites, Updates ready, Continue playing, Installed, Haven't played yet, Most played, Not installed). New layouts are one entry in `LAYOUTS` in `ui/js/library.js`
 - **Store**: featured deals, top sellers, new releases and coming soon, store search, and full game pages with screenshots, details, tags and price. **Buy in Steam** opens the checkout in your real Steam client.
 - **Wishlist**: your wishlist with live prices and discounts, total value, sorting and an "On sale" filter.
 - **Friends**: your friends list. With an API key you also see who's online and what they're playing. **Message** opens Steam chat.

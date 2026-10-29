@@ -312,7 +312,10 @@ function bind() {
     C.views.store.refresh && (C.route.tab === "store") && C.views.store.refresh();
   }));
   const size = $("#set-size");
-  size.addEventListener("input", () => document.documentElement.style.setProperty("--card-w", `${size.value}px`));
+  size.addEventListener("input", () => {
+    document.documentElement.style.setProperty("--card-w", `${size.value}px`);
+    if ($("#lib-zoom")) $("#lib-zoom").value = size.value;
+  });
   size.addEventListener("change", () => C.saveConfig({ card_size: +size.value }));
   $$("[data-act]").forEach((b) => b.addEventListener("click", async () => {
     if (await C.act(b.dataset.act)) { C.toast("Done"); setTimeout(C.refreshStatus, 2500); }
@@ -381,6 +384,7 @@ function renderSteamUpdToggle() {
 function fill() {
   const c = S.config;
   $("#set-size").value = c.card_size;
+  if ($("#lib-zoom")) $("#lib-zoom").value = c.card_size;
   document.documentElement.style.setProperty("--card-w", `${c.card_size}px`);
   $("#set-autostart").checked = !!c.autostart_steam;
   $("#set-frameless").checked = !!c.frameless;

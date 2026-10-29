@@ -288,7 +288,7 @@ document.addEventListener("error", (e) => {
 /* Click-and-drag scrolling for horizontal rows, with a little momentum on release.
    A press that doesn't move still counts as a normal click. */
 (() => {
-  const ROWS = ".srow-items, .recent-row, .sp-thumbs";
+  const ROWS = ".srow-items, .recent-row, .sp-thumbs, .shelf-row";
   const THRESHOLD = 6;
   let row = null, startX = 0, startLeft = 0, dragged = false, lastX = 0, lastT = 0, vel = 0, glide = 0;
 

@@ -7,6 +7,7 @@ const DEFAULTS = {
   accent: "", nav: "top", covers: "portrait", radius: "soft", density: "cozy",
   font: "segoe", bg: "solid", sideCollapsed: false, glow: true, blur: true, motion: true, recent: true, labels: true,
   // Game cards
+  libView: "",
   cardSub: "playtime", playFmt: "hours", dateFmt: "relative", achBadge: "lists", nameLines: "1", cleanNames: false,
 };
 const CARD_KEYS = ["cardSub", "playFmt", "dateFmt", "achBadge", "nameLines", "cleanNames"];
@@ -86,10 +87,13 @@ function syncControls() {
 
 function set(key, value) {
   style[key] = value;
+  // "Tall/Wide covers" and the Covers/Banners views are the same choice.
+  if (key === "covers" && (!style.libView || style.libView === "grid" || style.libView === "wide")) style.libView = value === "wide" ? "wide" : "grid";
+  if (key === "libView" && (value === "grid" || value === "wide")) style.covers = value === "wide" ? "wide" : "portrait";
   apply();
-  if (key === "covers" || CARD_KEYS.includes(key)) {
+  if (key === "covers" || key === "libView" || CARD_KEYS.includes(key)) {
     C.library.render();
-    if (CARD_KEYS.includes(key)) C.library.ensureAch && C.library.ensureAch();
+    if (CARD_KEYS.includes(key) || key === "libView") C.library.ensureAch && C.library.ensureAch();
   }
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => C.saveConfig({ style }), 400);
@@ -164,6 +168,6 @@ function bind() {
 C.style = {
   get: () => style,
   load(saved) { style = { ...DEFAULTS, ...(saved || {}) }; apply(); },
-  apply, refreshArt, toggleSidebar, init: bind,
+  apply, refreshArt, toggleSidebar, set, init: bind,
 };
 })();

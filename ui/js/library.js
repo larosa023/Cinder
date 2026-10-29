@@ -10,7 +10,9 @@ const SORTS = {
   playtime: (a, b) => (b.playtime - a.playtime) || C.sortKey(a.name).localeCompare(C.sortKey(b.name)),
   size: (a, b) => b.size - a.size,
   updated: (a, b) => b.lastupdated - a.lastupdated,
+  ach: (a, b) => achPct(b) - achPct(a) || C.sortKey(a.name).localeCompare(C.sortKey(b.name)),
 };
+const achPct = (g) => { const a = (L.ach || {})[g.appid]; return a ? a[0] / a[1] : -1; };
 
 const favs = () => new Set(S.config.favorites || []);
 const hiddenSet = () => new Set(S.config.hidden || []);
@@ -37,7 +39,7 @@ function visible() {
   return [...g].sort((a, b) => (fav.has(b.appid) - fav.has(a.appid)) || sort(a, b));
 }
 
-const wide = () => C.style && C.style.get().covers === "wide";
+const wide = () => layoutId() === "wide";
 
 const TROPHY = '<svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3"/></svg>';
 
@@ -46,7 +48,8 @@ let achTimer = 0;
 const achFor = (g) => (L.ach || {})[g.appid];
 function achWanted() {
   const st = C.style ? C.style.get() : {};
-  return st.cardSub === "ach" || st.achBadge === "always" || (st.achBadge === "lists" && !!(C.lists && C.lists.active()));
+  return st.cardSub === "ach" || st.achBadge === "always" || layoutId() === "list" || S.config.sort === "ach"
+    || (st.achBadge === "lists" && !!(C.lists && C.lists.active()));
 }
 const badgeOn = () => {
   const b = C.style ? C.style.get().achBadge : "lists";
@@ -122,10 +125,105 @@ function tileHTML(g) {
   </button>`;
 }
 
+// ---------- library layouts ----------
+// Each layout is one entry here: a button in the view switcher, a class for #grid, and a
+// render function. Add a format by adding an entry.
+const V = (d) => `<svg viewBox="0 0 24 24">${d}</svg>`;
+const LAYOUTS = {
+  grid: { label: "Covers", icon: V('<rect x="4" y="4" width="6" height="9" rx="1"/><rect x="14" y="4" width="6" height="9" rx="1"/><path d="M4 17h6M14 17h6M4 20h4M14 20h4"/>'),
+    cls: "grid", render: (list) => list.map((g) => cardHTML(g)).join("") },
+  wide: { label: "Banners", icon: V('<rect x="3" y="5" width="8" height="5" rx="1"/><rect x="13" y="5" width="8" height="5" rx="1"/><rect x="3" y="14" width="8" height="5" rx="1"/><rect x="13" y="14" width="8" height="5" rx="1"/>'),
+    cls: "grid wide", render: (list) => list.map((g) => cardHTML(g)).join("") },
+  tiles: { label: "Tiles", icon: V('<rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/>'),
+    cls: "grid tiles", render: (list) => list.map(tileCardHTML).join("") },
+  list: { label: "List", icon: V('<path d="M9 6h11M9 12h11M9 18h11"/><rect x="3" y="4.5" width="3" height="3" rx=".5"/><rect x="3" y="10.5" width="3" height="3" rx=".5"/><rect x="3" y="16.5" width="3" height="3" rx=".5"/>'),
+    cls: "lib-list", render: listHTML, noZoom: true },
+  shelves: { label: "Shelves", icon: V('<path d="M3 8h18M3 16h18"/><rect x="4" y="3" width="3" height="5"/><rect x="9" y="4" width="3" height="4"/><rect x="5" y="11" width="3" height="5"/><rect x="10" y="12" width="3" height="4"/><rect x="15" y="11" width="3" height="5"/>'),
+    cls: "shelves", render: shelvesHTML },
+};
+
+function layoutId() {
+  const v = C.style ? C.style.get().libView : "";
+  return LAYOUTS[v] ? v : (C.style && C.style.get().covers === "wide" ? "wide" : "grid");
+}
+
+function tileCardHTML(g) {
+  const fav = favs().has(g.appid);
+  const sub = subText(g);
+  return `<button class="card tilecard${g.installed ? "" : " not-installed"}${fav ? " fav" : ""}" data-appid="${g.appid}" title="${esc(g.name)}">
+    <div class="art" data-name="${esc(C.gname(g.name))}"><img loading="lazy" decoding="async" alt="" src="/art/${g.appid}/header">
+      <span class="shade"></span>
+      ${fav ? `<span class="star" title="Favorite">${STAR}</span>` : ""}
+      ${g.update_pending && g.installed && !g.download ? `<span class="badge upd" data-update="${g.appid}" title="Update now">${ICON.down}Update</span>` : g.installed ? "" : '<span class="badge muted">Not installed</span>'}
+      ${achHTML(g)}
+      <span class="t-meta"><span class="t-name">${esc(C.gname(g.name))}</span>${sub ? `<span class="t-sub">${esc(sub)}</span>` : ""}</span>
+      <span class="play" data-play="${g.appid}" title="${g.installed ? "Play" : "Install"}">${g.installed ? ICON.play : ICON.down}</span>
+    </div>
+  </button>`;
+}
+
+const COLS = [["name", "Name"], ["playtime", "Play time"], ["recent", "Last played"], ["ach", "Achievements"], ["size", "Size"]];
+function listHTML(list) {
+  const sort = S.config.sort || "recent";
+  const head = `<div class="lrow lhead"><span></span>${COLS.map(([k, l]) =>
+    `<button class="lcol-${k}${sort === k ? " on" : ""}" data-sortcol="${k}">${l}${sort === k ? " ▾" : ""}</button>`).join("")}<span></span></div>`;
+  return head + list.map((g) => {
+    const a = (L.ach || {})[g.appid];
+    const pct = a ? Math.round((100 * a[0]) / a[1]) : 0;
+    const fav = favs().has(g.appid);
+    const tags = [fav ? `<span class="ltag fav">${STAR}</span>` : "",
+      g.update_pending && g.installed && !g.download ? `<span class="ltag upd" data-update="${g.appid}" title="Update now">Update</span>` : "",
+      g.download ? `<span class="ltag">${g.download.state === "paused" ? "Paused" : "Updating"}</span>` : "",
+      !g.installed ? '<span class="ltag dim">Not installed</span>' : "", g.shortcut ? '<span class="ltag dim">Non-Steam</span>' : ""].join("");
+    return `<div class="lrow${g.installed ? "" : " not-installed"}" data-appid="${g.appid}" tabindex="0" title="${esc(g.name)}">
+      <img loading="lazy" alt="" src="/art/${g.appid}/header" data-fail="hide">
+      <span class="lcol-name"><span class="name">${esc(C.gname(g.name))}</span>${tags}</span>
+      <span class="lcol-playtime">${g.playtime ? C.fmtPlay(g.playtime) : "—"}</span>
+      <span class="lcol-recent">${g.lastplayed ? C.fmtAgo(g.lastplayed) : "Never"}</span>
+      <span class="lcol-ach">${a ? `<span class="bar${a[0] >= a[1] ? " gold" : ""}"><i style="width:${pct}%"></i></span><small>${a[0]}/${a[1]}</small>` : g.shortcut ? "" : "<small>—</small>"}</span>
+      <span class="lcol-size">${g.size ? C.fmtSize(g.size) : "—"}</span>
+      <span class="lcol-act"><span class="lplay" data-play="${g.appid}" title="${g.installed ? "Play" : "Install"}">${g.installed ? ICON.play : ICON.down}</span></span>
+    </div>`;
+  }).join("");
+}
+
+function shelvesHTML(list) {
+  const fav = favs();
+  const month = Date.now() / 1000 - 30 * 86400;
+  const shelves = [
+    ["Favorites", list.filter((g) => fav.has(g.appid))],
+    ["Updates ready", list.filter((g) => g.installed && g.update_pending)],
+    ["Continue playing", list.filter((g) => g.installed && g.lastplayed > month).sort(SORTS.recent)],
+    ["Installed", list.filter((g) => g.installed)],
+    ["Haven't played yet", list.filter((g) => g.installed && !g.playtime)],
+    ["Most played", list.filter((g) => g.playtime > 60).sort(SORTS.playtime)],
+    ["Not installed", list.filter((g) => !g.installed)],
+  ].filter(([, gs]) => gs.length);
+  return shelves.map(([title, gs]) => `<section class="shelf">
+      <h3>${title} <span class="count">${gs.length}</span></h3>
+      <div class="shelf-row">${gs.slice(0, 60).map((g) => cardHTML(g)).join("")}</div>
+    </section>`).join("");
+}
+
+function renderViews() {
+  const cur = layoutId();
+  const box = $("#lib-views");
+  if (!box) return;
+  if (!box.children.length) {
+    box.innerHTML = Object.entries(LAYOUTS).map(([id, l]) =>
+      `<button data-view="${id}" title="${l.label}">${l.icon}<span>${l.label}</span></button>`).join("");
+  }
+  $$("#lib-views [data-view]").forEach((b) => b.classList.toggle("on", b.dataset.view === cur));
+  $("#lib-zoom-wrap").hidden = !!LAYOUTS[cur].noZoom;
+}
+
 function render() {
   const list = visible();
-  $("#grid").innerHTML = list.map(cardHTML).join("");
-  $("#grid").classList.toggle("wide", wide());
+  const lay = LAYOUTS[layoutId()];
+  const grid = $("#grid");
+  grid.className = lay.cls;
+  grid.innerHTML = lay.render(list);
+  renderViews();
   $("#count").textContent = list.length === S.games.length ? S.games.length : `${list.length} of ${S.games.length}`;
   $("#chip-installed").hidden = !S.games.some((g) => !g.installed);
   $("#chip-favorites").hidden = !(S.config.favorites || []).length;
@@ -138,7 +236,7 @@ function render() {
 
   const hid = hiddenSet();
   const recent = S.games.filter((g) => g.lastplayed && g.installed && !hid.has(g.appid)).sort(SORTS.recent).slice(0, 6);
-  const showRecent = !L.q && L.filter === "all" && recent.length > 0;
+  const showRecent = !L.q && L.filter === "all" && recent.length > 0 && layoutId() !== "shelves";
   $("#recent").hidden = !showRecent;
   if (showRecent) $("#recent-row").innerHTML = recent.map(tileHTML).join("");
 
@@ -355,6 +453,31 @@ function bind() {
     const card = e.target.closest("[data-appid]");
     if (card) { C.closeOverlays(); C.launch(+card.dataset.appid); }
   });
+  $("#lib-views").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-view]");
+    if (b) C.style.set("libView", b.dataset.view);
+  });
+  const zoom = $("#lib-zoom");
+  zoom.value = S.config.card_size || 180;
+  zoom.addEventListener("input", () => {
+    document.documentElement.style.setProperty("--card-w", `${zoom.value}px`);
+    if ($("#set-size")) $("#set-size").value = zoom.value;
+  });
+  zoom.addEventListener("change", () => { S.config.card_size = +zoom.value; C.saveConfig({ card_size: +zoom.value }); });
+  $("#grid").addEventListener("click", (e) => {
+    const col = e.target.closest("[data-sortcol]");
+    if (!col) return;
+    e.stopPropagation();
+    S.config.sort = col.dataset.sortcol;
+    $("#sort").value = S.config.sort;
+    if (S.config.sort === "ach") ensureAch();
+    render();
+    C.saveConfig({ sort: S.config.sort });
+  }, true);
+  $("#grid").addEventListener("keydown", (e) => {
+    const r = e.target.closest(".lrow[data-appid]");
+    if (r && e.key === "Enter") openDetail(+r.dataset.appid);
+  });
   $("#filters").addEventListener("click", (e) => {
     const b = e.target.closest("[data-filter]");
     if (!b) return;
@@ -364,6 +487,7 @@ function bind() {
   });
   $("#sort").addEventListener("change", (e) => {
     S.config.sort = e.target.value;
+    if (e.target.value === "ach") ensureAch();
     render();
     C.saveConfig({ sort: e.target.value });
   });

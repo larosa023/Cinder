@@ -81,6 +81,9 @@
           <button data-filter="hidden" id="chip-hidden" hidden>Hidden</button>
         </div>
         <div class="spacer"></div>
+        <div class="lib-views" id="lib-views" role="group" aria-label="Library layout"></div>
+        <label class="lib-zoom" id="lib-zoom-wrap" title="Cover size"><svg viewBox="0 0 24 24"><rect x="5" y="7" width="6" height="10" rx="1"/><rect x="14" y="4" width="7" height="16" rx="1"/></svg>
+          <input type="range" id="lib-zoom" min="110" max="300" step="5"></label>
         <button class="btn sm" id="btn-lists" title="Your lists and Steam collections"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>Lists</button>
         <button class="btn sm" id="btn-random" title="Pick a random installed game"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2" class="fill"/><circle cx="15" cy="15" r="1.2" class="fill"/><circle cx="15" cy="9" r="1.2" class="fill"/><circle cx="9" cy="15" r="1.2" class="fill"/></svg>Pick for me</button>
         <select id="sort" title="Sort">
@@ -88,6 +91,7 @@
           <option value="name">Name</option>
           <option value="playtime">Play time</option>
           <option value="size">Size on disk</option>
+          <option value="ach">Achievements</option>
           <option value="updated">Recently updated</option>
         </select>
       </div>
