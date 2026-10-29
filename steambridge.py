@@ -208,36 +208,41 @@ class SteamBridge:
     try { D.RegisterForDownloadItems((active, items) => { st.active = active; st.items = items; st.at = Date.now(); }); } catch (e) { st.err = String(e); }
   }"""
 
-    def update(self, appids: list[int]) -> object:
-        """Start updates now, like Steam's own Update button.
+    # Steam's own buttons pass the client id as a second argument (it can also manage
+    # downloads on other PCs); without it Steam quietly ignores the call. "0" is this PC.
+    _CID = """const cid = (id) => {
+    try {
+      const o = window.appStore && window.appStore.GetAppOverviewByAppID(id);
+      const p = (o && o.per_client_data) || [];
+      const l = p.find((c) => String(c.clientid) === "0") || p[0];
+      return l ? l.clientid : "0";
+    } catch (e) { return "0"; }
+  };"""
 
-        A scheduled ("update delayed") update ignores a plain re-queue, so an update that
-        isn't running is taken off the list and queued again as one you asked for.
+    def update(self, appids: list[int], queue: bool = False) -> object:
+        """Start updates now, exactly like Steam's Update button: ResumeAppUpdate(appid, clientid).
+
+        queue=True also (re)queues it first, for an update Steam hasn't listed yet.
         Every step is reported back so problems show up in cinder.log.
         """
         ids = json.dumps([int(a) for a in appids])
         return self.run(f"""(async () => {{
   {self._INIT}
+  {self._CID}
   const ids = {ids}, log = [];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const find = (id) => (st.items || []).find((i) => i.appid === id);
   const step = async (name, ...args) => {{
     if (typeof D[name] !== "function") {{ log.push(name + ": missing"); return false; }}
     try {{ const r = D[name](...args); if (r && r.then) await r; log.push(name + "(" + args.join(",") + ")"); return true; }}
     catch (e) {{ log.push(name + ": " + e); return false; }}
   }};
-  if (typeof D.QueueAppUpdate !== "function") return {{ok: false, missing: Object.keys(D || {{}})}};
-  const before = ids.map((id) => find(id) || {{appid: id, missing: true}});
-  await step("EnableAllDownloads", true);
+  if (typeof D.ResumeAppUpdate !== "function") return {{ok: false, missing: Object.keys(D || {{}})}};
+  await step("EnableAllDownloads", true, cid(ids[0]));
   for (const id of ids.slice().reverse()) {{
-    const it = find(id);
-    if (it && !it.active && !it.completed) {{ await step("RemoveFromDownloadList", id); await sleep(500); }}
-    await step("QueueAppUpdate", id);
-    await sleep(400);
-    await step("SetQueueIndex", id, 0);
-    await step("ResumeAppUpdate", id);
+    if ({str(queue).lower()}) {{ await step("QueueAppUpdate", id, cid(id)); await sleep(300); }}
+    await step("ResumeAppUpdate", id, cid(id));
   }}
-  return {{ok: true, log, before, overview: st.overview || null}};
+  return {{ok: true, log}};
 }})()""", 30)
 
     def item(self, appid: int) -> dict:
@@ -324,18 +329,21 @@ class SteamBridge:
         """pause / resume / top / remove for given apps; pause_all / resume_all for the queue."""
         ids = json.dumps([int(a) for a in appids])
         return self.run(f"""(async () => {{
-  const D = SteamClient.Downloads, cmd = {json.dumps(cmd)};
+  {self._INIT}
+  {self._CID}
+  const cmd = {json.dumps(cmd)};
   let ids = {ids};
-  const need = {{pause: "PauseAppUpdate", resume: "ResumeAppUpdate", top: "SetQueueIndex",
-    remove: "RemoveFromDownloadList", pause_all: "PauseAppUpdate", resume_all: "ResumeAppUpdate"}}[cmd];
-  if (!D || !D[need]) return {{ok: false, missing: Object.keys(D || {{}})}};
-  const st = window.__cinderDl || {{}};
-  if (cmd === "pause_all" || cmd === "resume_all")
-    ids = (st.items || []).filter((i) => !i.completed).map((i) => i.appid);
-  if (cmd.startsWith("resume") || cmd === "top") {{ try {{ D.EnableAllDownloads && await D.EnableAllDownloads(true); }} catch (e) {{}} }}
+  if (cmd === "pause_all") {{ D.EnableAllDownloads(false, "0"); return {{ok: true}}; }}
+  if (cmd === "resume_all") {{
+    D.EnableAllDownloads(true, "0");
+    for (const i of (st.items || []).filter((i) => i.paused && !i.completed)) D.ResumeAppUpdate(i.appid, cid(i.appid));
+    return {{ok: true}};
+  }}
   for (const id of ids) {{
-    if (cmd === "top") {{ await D.SetQueueIndex(id, 0); try {{ await D.ResumeAppUpdate(id); }} catch (e) {{}} }}
-    else await D[need](id);
+    if (cmd === "pause") D.PauseAppUpdate(id, cid(id));
+    else if (cmd === "resume") {{ D.EnableAllDownloads(true, cid(id)); D.ResumeAppUpdate(id, cid(id)); }}
+    else if (cmd === "top") {{ D.SetQueueIndex(id, 0); D.ResumeAppUpdate(id, cid(id)); }}
+    else if (cmd === "remove") D.RemoveFromDownloadList(id, cid(id));
   }}
   return {{ok: true}};
 }})()""")

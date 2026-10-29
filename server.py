@@ -528,14 +528,14 @@ class Handler(BaseHTTPRequestHandler):
             log.warning("bridge update %s failed: %s", ids, e)
         ok = self._started(ids, pos, 5)
         if len(ok) < len(ids):
-            # Steam's console command, the same as typing it into steam://open/console.
-            for a in [x for x in ids if x not in ok]:
-                try:
-                    out = b.console(f"app_update {a}")
-                    log.info("bridge console app_update %s: %s", a, json.dumps(out)[:1500])
-                except steambridge.BridgeError as e:
-                    log.warning("bridge console failed: %s", e)
-            ok = sorted(set(ok) | set(self._started(ids, pos, 7)))
+            # Not on Steam's list yet: queue it, then start it.
+            rest = [x for x in ids if x not in ok]
+            try:
+                r = b.update(rest, queue=True)
+                log.info("bridge update %s (queue) steps: %s", rest, "; ".join((r or {}).get("log") or []) if isinstance(r, dict) else r)
+            except steambridge.BridgeError as e:
+                log.warning("bridge update %s (queue) failed: %s", rest, e)
+            ok = sorted(set(ok) | set(self._started(ids, pos, 6)))
         if len(ok) == len(ids):
             log.info("bridge update %s: Steam started it", ids)
             return {"ok": True, "state": "queued"}
