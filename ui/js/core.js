@@ -33,6 +33,7 @@ C.act = async (action, extra = {}) => {
 C.updateGames = async (appids, label) => {
   const what = label || (appids.length === 1 ? "the update" : `${appids.length} updates`);
   try {
+    C.toast(`Asking Steam to download ${what}…`);
     let r = await C.api("/api/action", { action: "game_update", appids });
     if (r.state === "need_restart") {
       const ok = window.confirm("To update games without opening Steam, Cinder needs to restart Steam once in the background "
@@ -41,10 +42,11 @@ C.updateGames = async (appids, label) => {
       r = await C.api("/api/action", { action: "game_update", appids, restart: true });
     }
     const msg = {
-      queued: `Downloading ${what}. Progress is in Downloads`,
+      queued: `Steam is downloading ${what}`,
       starting: `Starting Steam in the background, then downloading ${what}…`,
       restarting: `Restarting Steam in the background, then downloading ${what}…`,
       steam: "Opened the game in Steam; click Update there",
+      steam_fallback: "Steam didn't start it from Cinder, so its page is open in Steam; click Update there",
     }[r.state];
     if (msg) C.toast(msg);
     setTimeout(() => { C.refreshStatus && C.refreshStatus(); C.library.load(true); }, r.state === "queued" ? 2500 : 30000);

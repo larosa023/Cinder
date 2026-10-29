@@ -249,6 +249,47 @@ class SteamBridge:
 }})()""", 5)
         return r if isinstance(r, dict) else {}
 
+    def console(self, command: str) -> dict:
+        """Run a Steam console command (what you'd type in steam://open/console) and return its output."""
+        r = self.run(f"""(async () => {{
+  const C = SteamClient.Console;
+  if (!C || typeof C.ExecCommand !== "function") return {{ok: false, missing: Object.keys(SteamClient)}};
+  const out = [];
+  let h = null;
+  try {{ if (typeof C.RegisterForSpewOutput === "function") h = C.RegisterForSpewOutput((...a) => out.push(JSON.stringify(a).slice(0, 300))); }} catch (e) {{ out.push("spew: " + e); }}
+  try {{ const r = C.ExecCommand({json.dumps(command)}); if (r && r.then) await r; }} catch (e) {{ out.push("exec: " + e); }}
+  await new Promise((r) => setTimeout(r, 1500));
+  try {{ h && h.unregister && h.unregister(); }} catch (e) {{}}
+  return {{ok: true, out: out.slice(-30)}};
+}})()""", 20)
+        return r if isinstance(r, dict) else {"ok": False}
+
+    def diagnose(self) -> dict:
+        """What this Steam build offers for updates, and how its own UI calls it (for the log)."""
+        r = self.run(r"""(async () => {
+  const fns = {};
+  for (const k of Object.keys(SteamClient)) {
+    const o = SteamClient[k];
+    if (o && typeof o === "object") {
+      const f = Object.keys(o).filter((n) => /updat|queue|download|schedul|install/i.test(n));
+      if (f.length) fns[k] = f;
+    }
+  }
+  const urls = [...new Set([...performance.getEntriesByType("resource").map((e) => e.name), ...[...document.scripts].map((s) => s.src)]
+    .filter((u) => u && /\.js(\?|$)/.test(u)))].slice(0, 60);
+  const snippets = [];
+  for (const u of urls) {
+    try {
+      const t = await (await fetch(u)).text();
+      const re = /.{0,140}(Downloads\.QueueAppUpdate|AppUpdate\(|ScheduleAppUpdate|UpdateApp\w*\().{0,140}/g;
+      let m;
+      while ((m = re.exec(t)) && snippets.length < 30) snippets.push(u.split("/").pop().slice(0, 40) + ": " + m[0]);
+    } catch (e) {}
+  }
+  return {fns, snippets, scripts: urls.length};
+})()""", 40)
+        return r if isinstance(r, dict) else {}
+
     # -- learning what Steam's own buttons do -------------------------------------
     _REC = """(() => {
   if (typeof SteamClient !== "object" || !SteamClient.Downloads) return "no";

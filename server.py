@@ -476,6 +476,79 @@ class Handler(BaseHTTPRequestHandler):
                           if g.get("installed") and g.get("update_pending") and not g.get("shortcut") and a not in busy]
         return out
 
+    # Steam writes every update it starts to logs/content_log.txt, so that's how Cinder
+    # checks a request really worked (Steam's API calls return nothing either way).
+    def _content_log(self):
+        p = self.ctx.steam.path / "logs" / "content_log.txt" if self.ctx.steam.path else None
+        return p if p and p.exists() else None
+
+    def _log_pos(self) -> int:
+        p = self._content_log()
+        try:
+            return p.stat().st_size if p else 0
+        except OSError:
+            return 0
+
+    def _started(self, ids: list[int], pos: int, wait: float) -> list[int]:
+        import time
+        p = self._content_log()
+        b = self.ctx.steam.bridge
+        end = time.time() + wait
+        while True:
+            hit = set()
+            if p:
+                try:
+                    with open(p, "rb") as f:
+                        f.seek(pos)
+                        text = f.read().decode("utf-8", "replace")
+                    for a in ids:
+                        if re.search(rf"AppID {a} (scheduler update|update started|state changed : [^\n]*Update (Running|Started))", text):
+                            hit.add(a)
+                except OSError:
+                    pass
+            try:
+                ov = (b.item(ids[0]).get("overview") or {}) if b else {}
+                if int(ov.get("update_appid") or 0) in ids:
+                    hit.add(int(ov["update_appid"]))
+            except Exception:
+                pass
+            if hit or time.time() >= end:
+                return sorted(hit)
+            time.sleep(0.7)
+
+    def _start_updates(self, ids: list[int]) -> dict:
+        """Try each way of starting an update, checking Steam's own log after each one."""
+        import steambridge
+        b = self.ctx.steam.bridge
+        pos = self._log_pos()
+        try:
+            r = b.update(ids)
+            log.info("bridge update %s steps: %s", ids, "; ".join((r or {}).get("log") or []) if isinstance(r, dict) else r)
+        except steambridge.BridgeError as e:
+            log.warning("bridge update %s failed: %s", ids, e)
+        ok = self._started(ids, pos, 5)
+        if len(ok) < len(ids):
+            # Steam's console command, the same as typing it into steam://open/console.
+            for a in [x for x in ids if x not in ok]:
+                try:
+                    out = b.console(f"app_update {a}")
+                    log.info("bridge console app_update %s: %s", a, json.dumps(out)[:1500])
+                except steambridge.BridgeError as e:
+                    log.warning("bridge console failed: %s", e)
+            ok = sorted(set(ok) | set(self._started(ids, pos, 7)))
+        if len(ok) == len(ids):
+            log.info("bridge update %s: Steam started it", ids)
+            return {"ok": True, "state": "queued"}
+        try:
+            log.info("bridge diagnose: %s", json.dumps(b.diagnose())[:6000])
+        except Exception as e:
+            log.info("bridge diagnose failed: %s", e)
+        missing = [a for a in ids if a not in ok]
+        log.warning("bridge update %s: Steam didn't start %s", ids, missing)
+        # Last resort: Steam's own page for it, which has a working Update button.
+        self.ctx.steam.steam_url(f"steam://nav/games/details/{missing[0]}")
+        return {"ok": True, "state": "steam_fallback", "started": ok}
+
     def _check_started(self, ids: list[int]) -> None:
         """A few seconds after an update request, note in the log whether Steam actually started it."""
         import time
@@ -514,8 +587,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": False, "error": "Nothing to update"})
 
         def do():
+            if cmd == "update":
+                return self._start_updates(ids)
             try:
-                r = b.update(ids) if cmd == "update" else b.command(cmd, ids) if cmd != "connect" else {"ok": True}
+                r = b.command(cmd, ids) if cmd != "connect" else {"ok": True}
             except steambridge.BridgeError as e:
                 log.warning("bridge %s %s failed: %s", cmd, ids, e)
                 return {"ok": False, "error": f"Steam didn't take the request ({e})"}
