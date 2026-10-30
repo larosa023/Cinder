@@ -1,5 +1,14 @@
 [
  {
+  "version": "0.18.4",
+  "date": "2026-10-30",
+  "title": "Drag shelves in couch mode",
+  "items": [
+   "Couch mode: click and drag a shelf left or right to scroll through it (flick to go further); drag up or down to switch shelves",
+   "Letting go after a drag never opens the game under the mouse"
+  ]
+ },
+ {
   "version": "0.18.3",
   "date": "2026-10-30",
   "title": "Controllers in couch mode",

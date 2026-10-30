@@ -141,3 +141,8 @@ html:has(body.couch-on), body.couch-on { background: #06070a !important; }
 
 body.no-motion #couch * { transition: none !important; animation: none !important; }
 .ci-meta .ci-rv .rv-badge span { color: rgba(255,255,255,.7); }
+/* Click and drag a shelf. */
+#couch .crow { cursor: grab; }
+#couch.grabbing, #couch.grabbing * { cursor: grabbing !important; }
+.ctrack.dragging { transition: none !important; }
+#couch .cc img { -webkit-user-drag: none; user-select: none; }

@@ -459,6 +459,7 @@ function bind() {
       K.row = ri; K.col[ri] = i; place(false);
     }
   });
+  bindDrag();
   root().addEventListener("dblclick", (e) => { const cc = e.target.closest(".cc"); if (cc) play(cur()); });
   // Mouse wheel / trackpad moves along the shelf.
   let wheelAt = 0;
@@ -471,6 +472,72 @@ function bind() {
     if (Math.abs(e.deltaX) > Math.abs(e.deltaY) || e.shiftKey) move(0, (e.deltaX || e.deltaY) > 0 ? 1 : -1);
     else move((e.deltaY > 0 ? 1 : -1), 0);
   }, { passive: false });
+}
+
+// Mouse: click and drag a shelf sideways to scroll it (with a flick to keep going); drag up or down to switch shelves.
+function bindDrag() {
+  let d = null;
+  let swallowClick = false;
+  const el = root();
+  el.addEventListener("pointerdown", (e) => {
+    if (!K.open || K.sheet || e.button !== 0 || e.pointerType === "touch" && false) return;
+    const rowEl = e.target.closest(".crow");
+    if (!rowEl || e.target.closest("button:not(.cc), a, input")) return;
+    const ri = +rowEl.dataset.r;
+    const track = rowEl.querySelector(".ctrack");
+    d = { id: e.pointerId, x: e.clientX, y: e.clientY, ri, track, col: ri === K.row ? (K.col[ri] || 0) : (K.col[ri] || 0),
+          moved: false, vert: false, pts: [[e.clientX, performance.now()]] };
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (!d || e.pointerId !== d.id) return;
+    const dx = e.clientX - d.x, dy = e.clientY - d.y;
+    if (!d.moved) {
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      d.moved = true;
+      d.vert = Math.abs(dy) > Math.abs(dx) * 1.3;
+      try { el.setPointerCapture(d.id); } catch { /* fine */ }
+      el.classList.add("grabbing");
+      if (!d.vert) d.track.classList.add("dragging");
+    }
+    if (d.vert) {
+      if (Math.abs(dy) > 70) { move(dy < 0 ? 1 : -1, 0); d.y = e.clientY; }
+      return;
+    }
+    const step = CASE_W() + GAP;
+    const n = (K.rows[d.ri] || { games: [] }).games.length;
+    let off = -d.col * step + dx;
+    const min = -(n - 1) * step;
+    if (off > 0) off *= 0.35; else if (off < min) off = min + (off - min) * 0.35;  // a little give at the ends
+    d.track.style.transform = `translate3d(${off}px, 0, 0)`;
+    d.pts.push([e.clientX, performance.now()]);
+    if (d.pts.length > 6) d.pts.shift();
+  });
+  const end = (e) => {
+    if (!d || e.pointerId !== d.id) return;
+    const g = d;
+    d = null;
+    el.classList.remove("grabbing");
+    g.track.classList.remove("dragging");
+    if (!g.moved) return;
+    swallowClick = true;
+    setTimeout(() => { swallowClick = false; }, 0);
+    if (g.vert) return;
+    const step = CASE_W() + GAP;
+    const n = (K.rows[g.ri] || { games: [] }).games.length;
+    const [x0, t0] = g.pts[0], [x1, t1] = g.pts[g.pts.length - 1];
+    const v = t1 > t0 ? (x1 - x0) / (t1 - t0) : 0;  // px per ms
+    const fling = Math.abs(v) > 0.4 ? v * 220 : 0;
+    const c = Math.max(0, Math.min(n - 1, Math.round(g.col - (e.clientX - g.x + fling) / step)));
+    K.row = g.ri;
+    K.col[g.ri] = c;
+    K.idle = Date.now();
+    place(false);
+  };
+  el.addEventListener("pointerup", end);
+  el.addEventListener("pointercancel", end);
+  // The click that ends a drag shouldn't also open the game it lands on.
+  el.addEventListener("click", (e) => { if (swallowClick) { e.stopImmediatePropagation(); e.preventDefault(); swallowClick = false; } }, true);
+  el.addEventListener("dragstart", (e) => e.preventDefault());
 }
 
 C.couch = { open, close, isOpen: () => K.open };
