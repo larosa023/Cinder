@@ -1,5 +1,14 @@
 [
  {
+  "version": "0.17.8",
+  "date": "2026-10-30",
+  "title": "Reviewer profiles in Cinder",
+  "items": [
+   "Fixed: every reviewer showed the same picture (Steam's thumbs-up icon) instead of their own avatar",
+   "Clicking a reviewer now opens their profile right in Cinder instead of Steam"
+  ]
+ },
+ {
   "version": "0.17.7",
   "date": "2026-10-30",
   "title": "See who wrote each review",

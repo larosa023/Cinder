@@ -520,10 +520,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": True, **storeapi.friends(c.steam.local_friends(), me, key)})
         if path == "/api/profile":
             sid = q.get("id") or me
-            if not sid or not sid.isdigit():
+            if not sid or not re.fullmatch(r"\d{17}|[A-Za-z0-9_.-]{2,64}", sid):
                 raise storeapi.SteamDataError("No Steam account found")
             p = storeapi.profile(sid, key)
-            p["is_me"] = sid == me
+            p["is_me"] = p["steamid"] == me
             if p["is_me"]:
                 lib = c.steam.library()
                 p["local"] = {

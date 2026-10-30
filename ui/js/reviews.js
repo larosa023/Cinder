@@ -25,12 +25,13 @@ async function summary(appid) {
 
 /** The reviewer: avatar and Steam name; clicking opens their profile in Steam. */
 function who(r) {
-  if (!r.author && !r.profile) return "";
+  if (!r.author && !r.steamid && !r.vanity) return "";
   const name = r.author || "Steam user";
   const inner = `<span class="rv-av"><b>${esc(name[0].toUpperCase())}</b>${r.avatar ? `<img loading="lazy" alt="" src="${esc(r.avatar)}" data-fail="hide">` : ""}</span>
     <span class="rv-name"><b>${esc(name)}</b>${r.owned ? `<small>${n(r.owned)} games</small>` : ""}</span>`;
-  return r.profile
-    ? `<button class="rv-who" data-rv-profile="${esc(r.profile)}" title="View ${esc(name)}'s Steam profile">${inner}</button>`
+  const id = r.steamid || r.vanity;
+  return id
+    ? `<button class="rv-who" data-rv-profile="${esc(id)}" title="View ${esc(name)}'s profile">${inner}</button>`
     : `<span class="rv-who">${inner}</span>`;
 }
 
@@ -101,7 +102,7 @@ function mount(el, appid) {
     const m = e.target.closest("[data-rv-more]");
     if (m) { m.previousElementSibling.classList.remove("clamp"); m.remove(); }
     const p = e.target.closest("[data-rv-profile]");
-    if (p) return C.act("steam_url_open", { url: p.dataset.rvProfile });
+    if (p) { C.closeOverlays(); return C.go(`profile/${encodeURIComponent(p.dataset.rvProfile)}`); }
     if (e.target.closest("[data-retry]")) { st.error = null; load(); }
     if (e.target.closest("[data-rv-steam]")) C.act("steam_url_open", { url: `https://store.steampowered.com/app/${appid}/#app_reviews_hash` });
   };

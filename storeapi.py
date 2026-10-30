@@ -339,13 +339,21 @@ def _xml_text(root, tag):
 
 
 def profile(steamid: str, api_key: str = "") -> dict:
-    raw = _fetch(f"{COMMUNITY}/profiles/{steamid}/?xml=1", ttl=300, as_json=False)
+    """A Steam profile by 64-bit id, or by custom URL name (steamcommunity.com/id/<name>)."""
+    if steamid.isdigit():
+        raw = _fetch(f"{COMMUNITY}/profiles/{steamid}/?xml=1", ttl=300, as_json=False)
+    else:
+        raw = _fetch(f"{COMMUNITY}/id/{urllib.parse.quote(steamid, safe='')}/?xml=1", ttl=300, as_json=False)
     try:
         root = ET.fromstring(raw)
     except ET.ParseError as e:
         raise SteamDataError("Couldn't read this profile") from e
     if root.tag == "response":
         raise SteamDataError(_xml_text(root, "error") or "Profile not found")
+    if not steamid.isdigit():
+        steamid = _xml_text(root, "steamID64")
+        if not steamid.isdigit():
+            raise SteamDataError("Profile not found")
     state = strip_html(_xml_text(root, "stateMessage"))
     p = {
         "steamid": steamid,
@@ -609,6 +617,7 @@ def parse_reviews(data: dict) -> dict:
             "author_reviews": _int(a.get("num_reviews")), "owned": _int(a.get("num_games_owned")),
             "author": "", "avatar": "",
             "profile": f"https://steamcommunity.com/profiles/{a['steamid']}/" if str(a.get("steamid", "")).isdigit() else "",
+            "steamid": str(a.get("steamid", "")) if str(a.get("steamid", "")).isdigit() else "", "vanity": "",
         })
     return out
 
@@ -651,12 +660,20 @@ def _card_author(c: str, modal_url: str = "") -> dict:
         profile = m.group(1) if m else ""
     if not re.match(r'^https://steamcommunity\.com/(?:id|profiles)/[^/?#"]+/?$', profile):
         profile = ""
-    av = re.search(r'<img[^>]+src="(https://[^"]*(?:avatars|steamstatic|steamcdn)[^"]*)"', c)
+    # The avatar sits in the author block; other images in the card (the thumbs-up icon) come first.
+    blk = c[c.find("AuthorBlock"):] if "AuthorBlock" in c else c[c.find("appHubIconHolder"):] if "appHubIconHolder" in c else ""
+    av = (re.search(r'<img[^>]+(?:data-src|src)="(https://avatars[^"]+)"', blk)
+          or re.search(r'<img[^>]+(?:data-src|src)="(https://avatars[^"]+)"', c))
+    acct = re.search(r'data-miniprofile="(\d+)"', blk or c)
+    sid = re.search(r'/profiles/(\d{17})/', profile)
+    vanity = re.search(r'/id/([^/?#"]+)/?$', profile)
     owned = re.search(r'([\d,]+)\s+products? in account', c)
     return {
         "author": strip_html(name.group(2)).strip()[:64] if name else "",
         "avatar": av.group(1).replace("_medium.", "_full.") if av else "",
         "profile": profile,
+        "steamid": sid.group(1) if sid else str(76561197960265728 + int(acct.group(1))) if acct and int(acct.group(1)) else "",
+        "vanity": vanity.group(1) if vanity else "",
         "owned": _int((owned.group(1) if owned else "0").replace(",", "")),
     }
 
@@ -718,10 +735,10 @@ def community_reviews(appid: int, sort: str = "helpful", page: int = 1, html: st
     if "apphub_Card" not in html and "<title>" in html[:2000]:
         raise SteamDataError("Steam wouldn't send reviews right now")
     items = parse_community_reviews(html, sort)
-    if items and not any(r["author"] for r in items):
+    if items and not all(r["author"] and r["avatar"] for r in items[:3]):
         from cinderlog import log
         i = html.find("AuthorBlock")
-        log.info("community reviews: no reviewer names found; sample: %r", html[max(0, i - 50):i + 900] if i >= 0 else html[-900:])
+        log.info("community reviews: reviewer name or picture missing; sample: %r", html[max(0, i - 50):i + 900] if i >= 0 else html[-900:])
     if not items and sort not in ("positive", "negative"):
         from cinderlog import log
         i = html.find("apphub_Card")
