@@ -175,6 +175,7 @@ class WinSnap:
                 dwm(hwnd, 34, 0xFFFFFFFE)  # DWMWA_BORDER_COLOR = none
                 dwm(hwnd, 33, 1)           # DWMWA_WINDOW_CORNER_PREFERENCE = don't round
                 form.Activate()
+                self._focus_browser(form)  # keyboard and controller input go to the page, not the bare form
             elif getattr(self, "_fs", None) is not None:
                 style, state, bounds, top = self._fs
                 self._fs = None
@@ -185,9 +186,41 @@ class WinSnap:
                 form.Bounds = bounds
                 form.WindowState = state
                 form.TopMost = top
+                self._focus_browser(form)
             log.info("full screen %s: bounds %s", "on" if on else "off", form.Bounds)
             return True
         return bool(self.on_ui(do))
+
+    @staticmethod
+    def _focus_browser(form):
+        """Give focus to the WebView2 control inside the form (changing the frame leaves it on the form)."""
+        def walk(c):
+            for child in c.Controls:
+                if "WebView2" in child.GetType().Name:
+                    return child
+                found = walk(child)
+                if found is not None:
+                    return found
+            return None
+        try:
+            wv = walk(form)
+            if wv is not None:
+                wv.Focus()
+        except Exception:
+            log.exception("couldn't focus the page")
+
+    def foreground(self) -> bool:
+        """Is Cinder the window you're using right now?"""
+        if not IS_WIN:
+            return True
+        try:
+            fg = ctypes.windll.user32.GetForegroundWindow()
+            h = self.hwnd()
+            if not h:
+                return True
+            return int(fg or 0) == int(h) or int(ctypes.windll.user32.GetAncestor(fg, 2) or 0) == int(h)  # GA_ROOT
+        except Exception:
+            return True
 
     # --------------------------------------------------------------- actions
     def _maximize(self, pt=None, save=True):

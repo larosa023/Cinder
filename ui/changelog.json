@@ -1,5 +1,15 @@
 [
  {
+  "version": "0.18.3",
+  "date": "2026-10-30",
+  "title": "Controllers in couch mode",
+  "items": [
+   "Fixed: couch mode could ignore your controller after going full screen, because the page didn't think it had focus. Cinder now hands focus to the page and checks with Windows that it's the window in front",
+   "Reads every connected controller with a standard layout (Xbox, Elite, PlayStation), so a keyboard knob or other device that shows up first no longer hides your controller",
+   "A press that Steam's desktop controller layout also turns into a key press only counts once"
+  ]
+ },
+ {
   "version": "0.18.2",
   "date": "2026-10-30",
   "title": "Even wider search",

@@ -311,6 +311,8 @@ function onKey(e) {
   if (!b) return;
   e.preventDefault();
   e.stopPropagation();
+  // Steam's desktop controller layout also types arrows / Enter / Esc for the same press: count it once.
+  if (performance.now() - (K.padAt || 0) < 200) return;
   press(b);
 }
 
@@ -318,20 +320,54 @@ function onKey(e) {
 const PAD = { 0: "a", 1: "b", 2: "x", 3: "y", 4: "lb", 5: "rb", 9: "start", 12: "up", 13: "down", 14: "left", 15: "right" };
 const DIRS = new Set(["up", "down", "left", "right"]);
 
+// Controllers to read: ones Windows reports with the standard layout (Xbox, Elite, PlayStation…).
+// Other devices that show up as "gamepads" (keyboard knobs, wheels, Steam's virtual pads with odd
+// layouts) are only used when there's nothing else.
+function readPads() {
+  const all = navigator.getGamepads ? [...navigator.getGamepads()].filter((p) => p && p.connected !== false) : [];
+  const std = all.filter((p) => p.mapping === "standard");
+  return std.length ? std : all;
+}
+
+// Whether input should count: Cinder must be the window you're using. The page's own focus can be
+// wrong after the window goes full screen, so ask Windows too (twice a second).
+function active() {
+  if (document.hidden) return false;
+  if (document.hasFocus()) return true;
+  return K.fg === true;
+}
+function watchForeground() {
+  clearInterval(K.fgTimer);
+  const api = window.pywebview && window.pywebview.api;
+  if (!api || typeof api.foreground !== "function") { K.fg = null; return; }
+  const ask = () => api.foreground().then((v) => { K.fg = !!v; }).catch(() => { K.fg = null; });
+  ask();
+  K.fgTimer = setInterval(ask, 500);
+}
+
+function logPads() {
+  const all = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];
+  C.log(`couch mode controllers: ${all.length ? all.map((p) => `[${p.index}] ${p.id} (${p.mapping || "no mapping"}, ${p.buttons.length} buttons)`).join("; ") : "none yet (press a button)"}`
+    + ` · focus ${document.hasFocus()}`);
+}
+
 function pollPad(t) {
   if (!K.open) return;
   K.raf = requestAnimationFrame(pollPad);
-  const pads = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];
-  const pad = pads[0];
-  $("#cpad").classList.toggle("on", !!pad);
-  // Only while Cinder itself has focus: buttons pressed in a game must never reach couch mode.
-  if (!pad || document.hidden || !document.hasFocus()) { K.prevButtons = ["a", "b", "x", "y", "start"]; return; }
+  const pads = readPads();
+  $("#cpad").classList.toggle("on", pads.length > 0);
+  if (pads.length && !K.loggedPads) { K.loggedPads = true; logPads(); }
+  // Only while Cinder itself is in front: buttons pressed in a game must never reach couch mode.
+  if (!pads.length || !active()) { K.prevButtons = ["a", "b", "x", "y", "start"]; return; }
   const down = new Set();
-  pad.buttons.forEach((b, i) => { if (b.pressed && PAD[i]) down.add(PAD[i]); });
-  const [ax, ay] = pad.axes;
-  if (ax < -0.55) down.add("left"); else if (ax > 0.55) down.add("right");
-  if (ay < -0.55) down.add("up"); else if (ay > 0.55) down.add("down");
+  for (const pad of pads) {
+    pad.buttons.forEach((b, i) => { if ((b.pressed || b.value > 0.5) && PAD[i]) down.add(PAD[i]); });
+    const [ax = 0, ay = 0] = pad.axes;
+    if (ax < -0.55) down.add("left"); else if (ax > 0.55) down.add("right");
+    if (ay < -0.55) down.add("up"); else if (ay > 0.55) down.add("down");
+  }
   // Buttons fire once per press.
+  if (down.size) K.padAt = performance.now();
   for (const b of down) if (!DIRS.has(b) && !K.prevButtons.includes(b)) press(b);
   // Directions repeat while held, getting quicker.
   const dir = ["up", "down", "left", "right"].find((d) => down.has(d)) || "";
@@ -347,9 +383,9 @@ function lazyPoll() {
   clearInterval(lazy);
   lazy = setInterval(() => {
     if (K.open || document.hidden || !document.hasFocus()) return;
-    const pad = navigator.getGamepads && [...navigator.getGamepads()].find(Boolean);
-    if (!pad) { clearInterval(lazy); lazy = 0; return; }
-    if ((pad.buttons[9] && pad.buttons[9].pressed) || (pad.buttons[16] && pad.buttons[16].pressed)) open();
+    const pads = readPads();
+    if (!pads.length) { clearInterval(lazy); lazy = 0; return; }
+    if (pads.some((pad) => (pad.buttons[9] && pad.buttons[9].pressed) || (pad.buttons[16] && pad.buttons[16].pressed))) open();
   }, 250);
 }
 
@@ -369,6 +405,9 @@ async function open() {
   K.clock = setInterval(tick, 15000);
   K.prevButtons = ["start", "a"];  // the press that opened couch mode doesn't also act
   K.raf = requestAnimationFrame(pollPad);
+  K.loggedPads = false;
+  watchForeground();
+  setTimeout(() => { if (K.open && !K.loggedPads) logPads(); }, 4000);
   requestAnimationFrame(() => el.classList.add("open"));
   if (window.pywebview && window.pywebview.api && window.pywebview.api.fullscreen) {
     try { await window.pywebview.api.fullscreen(true); } catch { /* stay windowed */ }
@@ -382,6 +421,7 @@ async function close() {
   if (!K.open) return;
   K.open = false;
   cancelAnimationFrame(K.raf);
+  clearInterval(K.fgTimer);
   clearInterval(K.clock);
   clearTimeout(K.bgFor);
   const el = root();

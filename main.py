@@ -117,6 +117,10 @@ class WindowApi:
         self._window.toggle_fullscreen()
         return "max"
 
+    def foreground(self):
+        """Couch mode asks this so controller presses only count while you're in Cinder."""
+        return self._snap.foreground()
+
     def fullscreen(self, on):
         """Couch mode: fill the whole screen (and back)."""
         on = bool(on)
