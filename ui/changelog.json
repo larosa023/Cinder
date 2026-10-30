@@ -1,5 +1,13 @@
 [
  {
+  "version": "0.17.6",
+  "date": "2026-10-30",
+  "title": "Reviews show up",
+  "items": [
+   "Fixed: the Reviews tab said \"No reviews here yet\" because Steam's review cards are laid out slightly differently than expected"
+  ]
+ },
+ {
   "version": "0.17.5",
   "date": "2026-10-30",
   "title": "Steam reviews from the Community hub",

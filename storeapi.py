@@ -643,7 +643,8 @@ def _posted(text: str) -> int:
 def parse_community_reviews(html: str, sort: str = "helpful") -> list[dict]:
     """Review cards from a Community hub page (HTML)."""
     out = []
-    chunks = re.split(r'<div class="apphub_Card\b', html or "")[1:]
+    # Each card is a <div ... class="apphub_Card modalContentLink ..."> (other attributes come first).
+    chunks = re.split(r'class="apphub_Card\b', html or "")[1:]
     for c in chunks:
         title = re.search(r'class="title"[^>]*>\s*(.*?)\s*<', c, re.S)
         if not title:
@@ -676,7 +677,8 @@ def parse_community_reviews(html: str, sort: str = "helpful") -> list[dict]:
             "helpful": _int((helpful.group(1) if helpful else "0").replace(",", "")),
             "funny": _int((funny.group(1) if funny else "0").replace(",", "")),
             "hours": float((hours.group(1) if hours else "0").replace(",", "") or 0),
-            "hours_at": 0, "date": _posted(strip_html(posted.group(1)) if posted else ""),
+            "hours_at": float((at.group(1) if (at := re.search(r'\(([\d,\.]+) hrs at review time\)', c)) else "0").replace(",", "") or 0),
+            "date": _posted(strip_html(posted.group(1)) if posted else ""),
             "date_text": strip_html(posted.group(1)).replace("Posted:", "").strip() if posted else "",
             "updated": 0, "early": early, "free": "free" in c.lower() and "received this product for free" in c.lower(),
             "author_reviews": 0,
@@ -699,7 +701,7 @@ def community_reviews(appid: int, sort: str = "helpful", page: int = 1, html: st
         from cinderlog import log
         i = html.find("apphub_Card")
         log.info("community reviews: no cards parsed (%d bytes); sample: %r", len(html), html[max(0, i - 50):i + 900])
-    more = html.count('class="apphub_Card') >= 8
+    more = len(re.findall(r'class="apphub_Card\b', html)) >= 8
     return {"reviews": items, "cursor": f"p{page + 1}" if more else ""}
 
 
