@@ -1,5 +1,13 @@
 [
  {
+  "version": "0.18.2",
+  "date": "2026-10-30",
+  "title": "Even wider search",
+  "items": [
+   "The search bar now takes all the spare room in the top bar (up to about twice its old size), with just a sliver left to drag the window"
+  ]
+ },
+ {
   "version": "0.18.1",
   "date": "2026-10-30",
   "title": "Wider search",
