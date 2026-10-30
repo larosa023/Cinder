@@ -606,7 +606,9 @@ def parse_reviews(data: dict) -> dict:
             "hours_at": round(_int(a.get("playtime_at_review")) / 60, 1),
             "date": _int(r.get("timestamp_created")), "updated": _int(r.get("timestamp_updated")),
             "early": bool(r.get("written_during_early_access")), "free": bool(r.get("received_for_free")),
-            "author_reviews": _int(a.get("num_reviews")),
+            "author_reviews": _int(a.get("num_reviews")), "owned": _int(a.get("num_games_owned")),
+            "author": "", "avatar": "",
+            "profile": f"https://steamcommunity.com/profiles/{a['steamid']}/" if str(a.get("steamid", "")).isdigit() else "",
         })
     return out
 
@@ -640,6 +642,25 @@ def _posted(text: str) -> int:
     return 0
 
 
+def _card_author(c: str, modal_url: str = "") -> dict:
+    """Who wrote a Community hub review card: name, avatar, profile link, games owned."""
+    name = re.search(r'class="apphub_CardContentAuthorName[^"]*"[^>]*>\s*<a\s[^>]*href="([^"]+)"[^>]*>(.*?)</a>', c, re.S)
+    profile = name.group(1) if name else ""
+    if not profile:  # the review's own link is <profile>/recommended/<appid>/
+        m = re.match(r'(https://steamcommunity\.com/(?:id|profiles)/[^/]+/)', modal_url)
+        profile = m.group(1) if m else ""
+    if not re.match(r'^https://steamcommunity\.com/(?:id|profiles)/[^/?#"]+/?$', profile):
+        profile = ""
+    av = re.search(r'<img[^>]+src="(https://[^"]*(?:avatars|steamstatic|steamcdn)[^"]*)"', c)
+    owned = re.search(r'([\d,]+)\s+products? in account', c)
+    return {
+        "author": strip_html(name.group(2)).strip()[:64] if name else "",
+        "avatar": av.group(1).replace("_medium.", "_full.") if av else "",
+        "profile": profile,
+        "owned": _int((owned.group(1) if owned else "0").replace(",", "")),
+    }
+
+
 def parse_community_reviews(html: str, sort: str = "helpful") -> list[dict]:
     """Review cards from a Community hub page (HTML)."""
     out = []
@@ -671,7 +692,7 @@ def parse_community_reviews(html: str, sort: str = "helpful") -> list[dict]:
         else:
             text, early = "", False
         link = re.search(r'data-modal-content-url="([^"]+)"', c)
-        out.append({
+        out.append({**_card_author(c, link.group(1) if link else ""),
             "id": link.group(1) if link else f"c{len(out)}",
             "up": up, "text": text[:5000],
             "helpful": _int((helpful.group(1) if helpful else "0").replace(",", "")),
@@ -697,6 +718,10 @@ def community_reviews(appid: int, sort: str = "helpful", page: int = 1, html: st
     if "apphub_Card" not in html and "<title>" in html[:2000]:
         raise SteamDataError("Steam wouldn't send reviews right now")
     items = parse_community_reviews(html, sort)
+    if items and not any(r["author"] for r in items):
+        from cinderlog import log
+        i = html.find("AuthorBlock")
+        log.info("community reviews: no reviewer names found; sample: %r", html[max(0, i - 50):i + 900] if i >= 0 else html[-900:])
     if not items and sort not in ("positive", "negative"):
         from cinderlog import log
         i = html.find("apphub_Card")

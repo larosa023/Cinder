@@ -601,6 +601,18 @@ body.no-motion .dlp-bar i { animation: none; }
 .rv header b { display: block; }
 .rv header small { color: var(--text-dim); font-size: 12px; }
 .rv .rv-date { margin-left: auto; flex: none; }
+.rv-who { display: flex; align-items: center; gap: 10px; width: 190px; flex: none; min-width: 0; padding: 4px 8px 4px 4px; margin: -4px 4px -4px -4px;
+  border-radius: 10px; background: none; border: 0; color: inherit; font: inherit; text-align: left; }
+button.rv-who { cursor: pointer; }
+button.rv-who:hover { background: var(--surface-hover); }
+button.rv-who:hover .rv-name b { color: var(--accent, #66c0f4); text-decoration: underline; }
+.rv-av { position: relative; width: 40px; height: 40px; flex: none; }
+.rv .rv-av b { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 700; color: var(--text-dim); background: var(--surface-hover); border-radius: 8px; }
+.rv-av img { position: relative; width: 40px; height: 40px; border-radius: 8px; display: block; object-fit: cover; }
+.rv-name { min-width: 0; display: flex; flex-direction: column; }
+.rv-name b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rv-who + .rv-thumb { border-left: 0; }
+@media (max-width: 640px) { .rv-who { width: auto; max-width: 45%; } }
 .rv-thumb { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; flex: none; }
 .rv-thumb svg { width: 18px; height: 18px; }
 .rv.up .rv-thumb { background: color-mix(in srgb, #66c0f4 20%, transparent); color: #66c0f4; }

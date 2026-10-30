@@ -1,5 +1,14 @@
 [
  {
+  "version": "0.17.7",
+  "date": "2026-10-30",
+  "title": "See who wrote each review",
+  "items": [
+   "Reviews show the reviewer's Steam name, profile picture and how many games they own",
+   "Click a reviewer to open their Steam profile in Steam"
+  ]
+ },
+ {
   "version": "0.17.6",
   "date": "2026-10-30",
   "title": "Reviews show up",
