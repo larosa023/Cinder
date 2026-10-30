@@ -221,6 +221,7 @@ The `@swatch` colors are what the theme picker shows. A user theme with the same
 | `install.py` | Install location, shortcuts, start with Windows, swapping in updates after exit |
 | `tray.py` | Tray icon, its menu, and Windows notifications |
 | `playing.py` | Notices when a game starts and stops (Steam's RunningAppID) |
+| `browserfetch.py` | Fetches pages that need a real browser (Steam reviews) through a hidden window |
 | `workshop.py` | Your workshop items (from Steam's files), item details and workshop browsing |
 | `gamedata.py` | Your ratings, status and notes; play sessions and stats; launch options |
 | `achievements.py` | Gathers your achievements across games in the background for the Achievements tab |

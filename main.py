@@ -256,6 +256,9 @@ def main() -> None:
     ctx.playing = lambda: None
     ctx.activate = lambda: None
     ctx.notify = lambda title, text: None
+    if not args.browser:
+        from browserfetch import BrowserFetch
+        ctx.browser = BrowserFetch()
     srv = make_server(ctx, args.port)
     url = f"http://127.0.0.1:{srv.server_address[1]}/"
 

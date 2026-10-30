@@ -1,5 +1,13 @@
 [
  {
+  "version": "0.17.4",
+  "date": "2026-10-30",
+  "title": "Steam reviews, take three",
+  "items": [
+   "Steam's firewall turns away reviews requests that don't come from a real browser. Cinder now fetches them through a hidden browser window (the same engine its own window uses), which closes itself after a minute"
+  ]
+ },
+ {
   "version": "0.17.3",
   "date": "2026-10-30",
   "title": "Steam reviews, take two",

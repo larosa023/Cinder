@@ -44,6 +44,7 @@ class Context:
         self.updater = updater
         self.ach = None  # achievements.AchievementIndex, set by main
         self.idle = None  # steamidle.SteamIdle, set by main
+        self.browser = None  # browserfetch.BrowserFetch when running in Cinder's own window
         import gamedata
         self.meta = gamedata.GameMeta(data_dir)
         self.sessions = gamedata.Sessions(data_dir)
@@ -439,11 +440,20 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 return self._json({"ok": True, **storeapi.reviews(appid, sort, cur)})
             except storeapi.SteamDataError:
+                url = storeapi.review_url(appid, sort, cur)
+                # Steam's firewall turns away programmatic requests for reviews; a real browser
+                # request (a hidden window of the same engine Cinder uses) gets through.
+                if c.browser:
+                    try:
+                        data = c.browser.get_json(url)
+                        storeapi.review_way_note("browser")
+                        return self._json({"ok": True, **storeapi.parse_reviews(data)})
+                    except Exception as e:
+                        log.info("reviews through a hidden browser failed: %r", e)
                 if self._bridge_state() != "on":
                     raise
                 # Last resort: ask the Steam client itself (it's signed in to the store).
                 import steambridge
-                url = storeapi.review_url(appid, sort, cur)
                 try:
                     data = c.steam.bridge.run(f"fetch({json.dumps(url)}, {{credentials: 'include'}}).then((r) => r.json())", 20)
                 except steambridge.BridgeError as e:

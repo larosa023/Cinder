@@ -569,8 +569,15 @@ def _review_json(url: str, ttl: float) -> dict:
     raise last or SteamDataError("Steam wouldn't send reviews right now")
 
 
+def review_way_note(way: str) -> None:
+    """Once a browser request is known to be needed, stop trying the plain ones first."""
+    _review_way["browser"] = way == "browser"
+
+
 def reviews(appid: int, sort: str = "helpful", cursor: str = "*", lang: str = "english") -> dict:
     """Steam user reviews, a page (20) at a time."""
+    if _review_way.get("browser"):
+        raise SteamDataError("Steam wouldn't send reviews right now")  # straight to the browser way
     data = _review_json(review_url(appid, sort, cursor, lang), 900)
     return parse_reviews(data)
 
