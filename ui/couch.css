@@ -6,6 +6,9 @@
 }
 #couch.open { opacity: 1; }
 body.couch-on { overflow: hidden; }
+/* Nothing of the normal window may show at the edges (rounding at odd DPI scales can leave a pixel). */
+html:has(body.couch-on), body.couch-on { background: #06070a !important; }
+#couch { inset: -1px; }
 
 /* Background: the focused game's art, blurred at half size (cheap), crossfading. */
 .cbg { position: absolute; inset: 0; overflow: hidden; }

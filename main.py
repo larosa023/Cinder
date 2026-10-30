@@ -120,9 +120,12 @@ class WindowApi:
     def fullscreen(self, on):
         """Couch mode: fill the whole screen (and back)."""
         on = bool(on)
-        if on != getattr(self, "_fs", False):
-            self._fs = on
-            self._window.toggle_fullscreen()
+        if on == getattr(self, "_fs", False):
+            return on
+        self._fs = on
+        if IS_WIN and self._snap.fullscreen(on):
+            return on
+        self._window.toggle_fullscreen()  # elsewhere, pywebview's own
         return on
 
     def log(self, msg):

@@ -469,6 +469,72 @@ def _bbcode(text: str) -> str:
     return re.sub(r"\s+", " ", strip_html(text)).strip()
 
 
+def _review_text(raw: str) -> str:
+    """Reviews are BBCode; keep the paragraphs, drop the markup."""
+    raw = re.sub(r"\[\*\]", "\n• ", raw or "")
+    out, blank = [], False
+    for line in raw.replace("\r", "").split("\n"):
+        t = _bbcode(line)
+        if t:
+            out.append(t)
+            blank = False
+        elif out and not blank:
+            out.append("")
+            blank = True
+    return "\n".join(out).strip()
+
+
+REVIEW_FILTERS = {  # ours: (filter, review_type)
+    "helpful": ("all", "all"), "recent": ("recent", "all"),
+    "positive": ("all", "positive"), "negative": ("all", "negative"),
+}
+
+
+def reviews(appid: int, sort: str = "helpful", cursor: str = "*", lang: str = "english") -> dict:
+    """Steam user reviews: the score summary plus a page of reviews (20 at a time)."""
+    f, rtype = REVIEW_FILTERS.get(sort, REVIEW_FILTERS["helpful"])
+    q = {"json": 1, "filter": f, "review_type": rtype, "language": lang, "purchase_type": "all",
+         "num_per_page": 20, "cursor": cursor or "*"}
+    if f == "all":
+        q["day_range"] = 365  # "most helpful" over the last year, like the store page
+    data = _fetch(f"{STORE}/appreviews/{int(appid)}?{urllib.parse.urlencode(q)}", ttl=900)
+    if not isinstance(data, dict) or data.get("success") != 1:
+        raise SteamDataError("Steam didn't return reviews for this game")
+    out = {"cursor": data.get("cursor") or "", "reviews": []}
+    qs = data.get("query_summary") or {}
+    if "total_reviews" in qs:
+        pos, neg = _int(qs.get("total_positive")), _int(qs.get("total_negative"))
+        out["summary"] = {"desc": qs.get("review_score_desc") or "", "score": _int(qs.get("review_score")),
+                          "positive": pos, "negative": neg, "total": _int(qs.get("total_reviews")),
+                          "pct": round(100 * pos / (pos + neg)) if pos + neg else None}
+    for r in data.get("reviews") or []:
+        a = r.get("author") or {}
+        out["reviews"].append({
+            "id": str(r.get("recommendationid") or ""),
+            "up": bool(r.get("voted_up")),
+            "text": _review_text(r.get("review") or "")[:5000],
+            "helpful": _int(r.get("votes_up")), "funny": _int(r.get("votes_funny")),
+            "hours": round(_int(a.get("playtime_forever")) / 60, 1),
+            "hours_at": round(_int(a.get("playtime_at_review")) / 60, 1),
+            "date": _int(r.get("timestamp_created")), "updated": _int(r.get("timestamp_updated")),
+            "early": bool(r.get("written_during_early_access")), "free": bool(r.get("received_for_free")),
+            "author_reviews": _int(a.get("num_reviews")),
+        })
+    return out
+
+
+def review_summary(appid: int, lang: str = "all") -> dict | None:
+    """Just the score ("Very Positive", 92% of 45,123), across every language like the store shows."""
+    q = {"json": 1, "language": lang, "purchase_type": "all", "num_per_page": 0}
+    data = _fetch(f"{STORE}/appreviews/{int(appid)}?{urllib.parse.urlencode(q)}", ttl=3600)
+    qs = (data or {}).get("query_summary") or {} if isinstance(data, dict) else {}
+    if not qs or not _int(qs.get("total_reviews")):
+        return None
+    pos, neg = _int(qs.get("total_positive")), _int(qs.get("total_negative"))
+    return {"desc": qs.get("review_score_desc") or "", "score": _int(qs.get("review_score")), "positive": pos,
+            "negative": neg, "total": _int(qs.get("total_reviews")), "pct": round(100 * pos / (pos + neg)) if pos + neg else None}
+
+
 def news(appid: int, count: int = 8) -> list[dict]:
     data = _fetch(f"{API}/ISteamNews/GetNewsForApp/v2/?{_q(appid=appid, count=count, maxlength=600, format='json')}", ttl=1800)
     out = []

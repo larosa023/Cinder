@@ -144,6 +144,36 @@ class WinSnap:
             run()
         return out.get("v")
 
+    # --------------------------------------------------------------- fullscreen
+    def fullscreen(self, on: bool) -> bool:
+        """Borderless full screen on the window's monitor: no title bar, no frame, no 1px edges.
+
+        Done on the WinForms form itself (no frame, bounds = the whole monitor) so nothing of
+        the normal window, its border or the taskbar shows around the page."""
+        if not IS_WIN:
+            return False
+
+        def do():
+            from System.Windows.Forms import FormBorderStyle, FormWindowState, Screen  # pythonnet
+            form = self.window.native
+            if on:
+                if getattr(self, "_fs", None) is None:
+                    self._fs = (form.FormBorderStyle, form.WindowState, form.Bounds, form.TopMost)
+                form.FormBorderStyle = getattr(FormBorderStyle, "None")
+                form.WindowState = FormWindowState.Normal  # bounds can't be set while maximized
+                form.Bounds = Screen.FromHandle(form.Handle).Bounds
+                form.Activate()
+            elif getattr(self, "_fs", None) is not None:
+                style, state, bounds, top = self._fs
+                self._fs = None
+                form.FormBorderStyle = style
+                form.WindowState = FormWindowState.Normal
+                form.Bounds = bounds
+                form.WindowState = state
+                form.TopMost = top
+            return True
+        return bool(self.on_ui(do))
+
     # --------------------------------------------------------------- actions
     def _maximize(self, pt=None, save=True):
         if save and self.state == "normal":

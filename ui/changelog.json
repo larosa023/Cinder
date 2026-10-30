@@ -1,5 +1,15 @@
 [
  {
+  "version": "0.17.1",
+  "date": "2026-10-30",
+  "title": "Steam reviews",
+  "items": [
+   "Steam review scores (like \"Very Positive · 91% of 45,123\") on game pages and store pages",
+   "A Reviews tab on game pages and a Reviews section on store pages: most helpful, recent, positive or negative, with hours played and helpful votes; load more as you scroll",
+   "Couch mode now fills the screen edge to edge, with no thin border around it"
+  ]
+ },
+ {
   "version": "0.17.0",
   "date": "2026-10-30",
   "title": "Couch mode, Stats, Storage and more",

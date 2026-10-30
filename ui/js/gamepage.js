@@ -36,6 +36,7 @@ function setTab(tab) {
 
 async function load(tab) {
   const pane = $("#d-pane");
+  if (tab === "reviews") { C.reviews.mount(pane, G.appid); return; }
   const key = `${G.appid}:${tab}`;
   const appid = G.appid;
   if (!G.cache[key]) {
@@ -106,6 +107,12 @@ function open(g) {
   $("#d-store").hidden = nonSteam;
   if (nonSteam) { $("#d-props").hidden = true; $("#d-uninstall").hidden = true; }
   setTab("overview");
+  $("#d-rv-box").hidden = nonSteam;
+  $("#d-rv").textContent = "…";
+  if (!nonSteam) C.reviews.summary(g.appid).then((s) => {
+    if (G.appid !== g.appid) return;
+    $("#d-rv").innerHTML = s ? C.reviews.badge(s) : "No reviews yet";
+  });
   if (nonSteam) paintWorkshop(g.appid, null); else checkWorkshop(g.appid);
 }
 

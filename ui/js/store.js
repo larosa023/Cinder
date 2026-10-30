@@ -104,7 +104,7 @@ async function showApp(appid) {
     a.developers.length && ["Developer", esc(a.developers.join(", "))],
     a.publishers.length && ["Publisher", esc(a.publishers.join(", "))],
     a.metacritic && ["Metacritic", `<span class="meta-score">${a.metacritic}</span>`],
-    a.recommendations && ["Reviews", `${Number(a.recommendations).toLocaleString()} recommendations`],
+    ["Steam reviews", `<span id="sp-rv">${a.recommendations ? `${Number(a.recommendations).toLocaleString()} recommendations` : "—"}</span>`],
   ].filter(Boolean);
   v.innerHTML = `
     <div class="sp-bg" style="--sp-bg:url('${esc(safeUrl(a.background || a.header))}')"></div>
@@ -139,7 +139,10 @@ async function showApp(appid) {
       </div>
       ${a.about ? `<section class="sp-about"><h2>About this game</h2><div class="prose">${esc(a.about).replace(/\n/g, "<br>")}</div></section>` : ""}
       ${a.categories.length ? `<section class="sp-about"><h2>Features</h2><div class="tags">${a.categories.map((c) => `<span>${esc(c)}</span>`).join("")}</div></section>` : ""}
+      <section class="sp-about"><h2>Reviews</h2><div id="sp-reviews"></div></section>
     </div>`;
+  C.reviews.summary(a.appid).then((s) => { const e = document.getElementById("sp-rv"); if (e && s) e.innerHTML = C.reviews.badge(s); });
+  C.reviews.mount(document.getElementById("sp-reviews"), a.appid);
 }
 
 function setShot(i) {

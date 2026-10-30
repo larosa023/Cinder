@@ -57,6 +57,7 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 **Game pages**
 
 - Tabs for Achievements (unlock dates and how rare each one is), News and patch notes, and DLC (with what you have installed)
+- Steam reviews: the score ("Very Positive · 91% of 45,123") on game and store pages, and a Reviews tab with most helpful, recent, positive and negative reviews
 - Non-Steam games you've added to Steam show up too, with any custom art you've set, and launch through Steam
 - Wishlist sale alerts: a Windows notification when something on your wishlist goes on sale (Settings → Account)
 

@@ -429,6 +429,13 @@ class Handler(BaseHTTPRequestHandler):
             local = next((g for g in c.steam.library() if g["appid"] == app["appid"]), None)
             app["installed"] = bool(local and local["installed"])
             return self._json({"ok": True, "app": app})
+        m = re.fullmatch(r"/api/reviews/(\d+)", path)
+        if m:
+            appid = int(m.group(1))
+            if q.get("summary"):
+                return self._json({"ok": True, "summary": storeapi.review_summary(appid)})
+            cur = q.get("cursor", "*")[:200]
+            return self._json({"ok": True, **storeapi.reviews(appid, q.get("sort", "helpful"), cur)})
         m = re.fullmatch(r"/api/game/(\d+)/workshop_support", path)
         if m:
             return self._json({"ok": True, **self._workshop_support(int(m.group(1)), cc)})
