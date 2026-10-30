@@ -42,14 +42,14 @@ async function load(tab) {
   if (!G.cache[key]) {
     pane.innerHTML = C.loading("Loading…");
     try {
-      G.cache[key] = await C.api(tab === "workshop" ? `/api/workshop/${appid}` : `/api/game/${appid}/${tab}`);
+      G.cache[key] = await C.api(tab === "workshop" ? `/api/workshop/${appid}` : tab === "specs" ? `/api/store/app/${appid}` : `/api/game/${appid}/${tab}`);
     } catch (e) {
       if (G.appid === appid && G.tab === tab) pane.innerHTML = C.failed(e.message, false);
       return;
     }
   }
   if (G.appid !== appid || G.tab !== tab) return;
-  pane.innerHTML = ({ achievements: renderAch, news: renderNews, dlc: renderDlc, workshop: renderWorkshop })[tab](G.cache[key]);
+  pane.innerHTML = ({ achievements: renderAch, news: renderNews, dlc: renderDlc, workshop: renderWorkshop, specs: (d) => C.specsHTML(d.app.requirements) })[tab](G.cache[key]);
 }
 
 function renderAch(d) {
@@ -109,9 +109,11 @@ function open(g) {
   setTab("overview");
   $("#d-rv-box").hidden = nonSteam;
   $("#d-rv").textContent = "…";
+  $("#d-rvtop").innerHTML = "";
   if (!nonSteam) C.reviews.summary(g.appid).then((s) => {
     if (G.appid !== g.appid) return;
     $("#d-rv").innerHTML = s ? C.reviews.badge(s) : "No reviews yet";
+    $("#d-rvtop").innerHTML = s ? C.reviews.badge(s) : "";
   });
   if (nonSteam) paintWorkshop(g.appid, null); else checkWorkshop(g.appid);
 }

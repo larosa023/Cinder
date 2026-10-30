@@ -91,4 +91,13 @@ function mount(el, appid) {
 }
 
 C.reviews = { badge, summary, mount };
+
+/** System requirements, Minimum and Recommended side by side. */
+C.specsHTML = (req) => {
+  const col = (title, rows) => `<div class="specs-col"><h3>${title}</h3>${rows.length
+    ? `<dl>${rows.map(([k, v]) => `<div${k ? "" : ' class="note-row"'}>${k ? `<dt>${esc(k)}</dt>` : ""}<dd>${esc(v)}</dd></div>`).join("")}</dl>`
+    : '<p class="specs-none">Not listed</p>'}</div>`;
+  if (!req || (!req.minimum.length && !req.recommended.length)) return '<div class="state">This game doesn\'t list system requirements.</div>';
+  return `<div class="specs">${col("Minimum", req.minimum)}${col("Recommended", req.recommended)}</div>`;
+};
 })();

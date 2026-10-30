@@ -317,7 +317,7 @@ body.names-2 .card .name { white-space: normal; display: -webkit-box; -webkit-li
 .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(transparent 30%, var(--bg-elev)); }
 .d-close { position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,.45); color: #fff; z-index: 2; }
 .d-body { padding: 0 32px 28px; margin-top: -90px; position: relative; z-index: 1; }
-.d-title { min-height: 90px; display: flex; align-items: flex-end; margin-bottom: 18px; }
+.d-title { min-height: 90px; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; margin-bottom: 18px; }
 .d-title img { max-width: 360px; max-height: 110px; object-fit: contain; filter: drop-shadow(0 4px 12px rgba(0,0,0,.6)); }
 .d-title h1 { font-size: 30px; display: none; text-shadow: 0 2px 12px rgba(0,0,0,.6); }
 .d-title.no-logo img { display: none; }
@@ -613,3 +613,16 @@ body.no-motion .dlp-bar i { animation: none; }
 .rv-more { margin: 6px 0 0; padding: 0; font-size: 13px; }
 .rv footer { margin-top: 10px; font-size: 12px; color: var(--text-dim); }
 .rv footer:empty { display: none; }
+
+/* Review score next to titles, and system requirements */
+.d-rvtop, .sp-rv-top { display: block; margin-top: 6px; text-shadow: 0 2px 12px rgba(0,0,0,.6); }
+.d-rvtop:empty, .sp-rv-top:empty { display: none; }
+.specs { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.specs-col { padding: 14px 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
+.specs-col h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim); margin: 0 0 10px; }
+.specs dl { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.specs dl div { display: grid; grid-template-columns: 110px 1fr; gap: 10px; font-size: 13px; }
+.specs dl div.note-row { grid-template-columns: 1fr; color: var(--text-dim); font-style: italic; }
+.specs dt { color: var(--text-dim); }
+.specs dd { margin: 0; overflow-wrap: anywhere; }
+.specs-none { color: var(--text-dim); font-size: 13px; margin: 0; }

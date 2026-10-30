@@ -112,6 +112,7 @@ async function showApp(appid) {
       <div class="sp-title">
         <img alt="" src="/art/${a.appid}/logo" data-fail="logo">
         <h1>${esc(a.name)}</h1>
+        <span class="sp-rv-top" id="sp-rv-top"></span>
       </div>
       <div class="sp-grid">
         <div class="sp-media">
@@ -139,9 +140,15 @@ async function showApp(appid) {
       </div>
       ${a.about ? `<section class="sp-about"><h2>About this game</h2><div class="prose">${esc(a.about).replace(/\n/g, "<br>")}</div></section>` : ""}
       ${a.categories.length ? `<section class="sp-about"><h2>Features</h2><div class="tags">${a.categories.map((c) => `<span>${esc(c)}</span>`).join("")}</div></section>` : ""}
+      <section class="sp-about"><h2>System requirements</h2>${C.specsHTML(a.requirements)}</section>
       <section class="sp-about"><h2>Reviews</h2><div id="sp-reviews"></div></section>
     </div>`;
-  C.reviews.summary(a.appid).then((s) => { const e = document.getElementById("sp-rv"); if (e && s) e.innerHTML = C.reviews.badge(s); });
+  C.reviews.summary(a.appid).then((s) => {
+    if (!s) return;
+    const e = document.getElementById("sp-rv"), top = document.getElementById("sp-rv-top");
+    if (e) e.innerHTML = C.reviews.badge(s);
+    if (top) top.innerHTML = C.reviews.badge(s, true);
+  });
   C.reviews.mount(document.getElementById("sp-reviews"), a.appid);
 }
 

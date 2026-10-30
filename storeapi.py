@@ -62,8 +62,13 @@ def _fetch(url: str, ttl: float = 600, as_json: bool = True, timeout: float = 12
     except Exception as e:
         raise SteamDataError("Couldn't reach Steam") from e
     try:
-        data = json.loads(raw) if as_json else raw.decode("utf-8", "replace")
+        # utf-8-sig: some Steam endpoints (appreviews) start with a byte-order mark; strict=False
+        # lets through the raw control characters that turn up in user-written text.
+        text = raw.decode("utf-8-sig", "replace")
+        data = json.loads(text, strict=False) if as_json else text
     except ValueError as e:
+        from cinderlog import log
+        log.warning("unexpected reply from %s: %r", url.split("?")[0], raw[:300])
         raise SteamDataError("Steam sent something unexpected. Try again in a minute") from e
     if as_json and not isinstance(data, (dict, list)):
         raise SteamDataError("Steam sent something unexpected. Try again in a minute")
@@ -212,7 +217,38 @@ def app_details(appid: int, cc: str) -> dict:
         "dlc": [int(x) for x in (d.get("dlc") or [])][:120],
         "website": d.get("website") or "",
         "workshop": any(_int(c.get("id")) == 30 for c in d.get("categories") or []),  # Steam Workshop
+        "requirements": _requirements(d.get("pc_requirements")),
     }
+
+
+def _req_list(html: str | None) -> list[list[str]]:
+    """'<li><strong>OS:</strong> Windows 10</li>…' -> [["OS", "Windows 10"], …]."""
+    if not html:
+        return []
+    rows = []
+    for li in re.findall(r"<li[^>]*>(.*?)</li>", html, re.S | re.I):
+        m = re.match(r"\s*<strong>(.*?)</strong>(.*)", li, re.S | re.I)
+        label = strip_html(m.group(1)).strip().rstrip(":") if m else ""
+        value = strip_html(m.group(2) if m else li).strip()
+        if not label and ":" in value[:24]:
+            label, value = (x.strip() for x in value.split(":", 1))
+        if label or value:
+            rows.append([label, value])
+    if not rows:  # some games write plain text instead of a list
+        text = strip_html(re.sub(r"<br\s*/?>", "\n", html, flags=re.I))
+        for line in text.split("\n"):
+            line = line.strip()
+            if not line or line.lower().startswith(("minimum", "recommended")):
+                continue
+            k, _, v = line.partition(":") if ":" in line[:24] else ("", "", line)
+            rows.append([k.strip(), v.strip()])
+    return rows[:20]
+
+
+def _requirements(req) -> dict:
+    if not isinstance(req, dict):
+        return {"minimum": [], "recommended": []}
+    return {"minimum": _req_list(req.get("minimum")), "recommended": _req_list(req.get("recommended"))}
 
 
 def prices(appids: list[int], cc: str) -> dict[int, dict | None]:

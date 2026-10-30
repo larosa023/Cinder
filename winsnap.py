@@ -146,31 +146,46 @@ class WinSnap:
 
     # --------------------------------------------------------------- fullscreen
     def fullscreen(self, on: bool) -> bool:
-        """Borderless full screen on the window's monitor: no title bar, no frame, no 1px edges.
+        """Borderless full screen on the window's monitor: no title bar, frame or edge lines.
 
-        Done on the WinForms form itself (no frame, bounds = the whole monitor) so nothing of
-        the normal window, its border or the taskbar shows around the page."""
+        The WinForms form loses its frame and is maximized (a maximized frameless window
+        covers the whole monitor, taskbar included). Windows 11 also draws a thin accent
+        border and rounds the corners of normal windows; both are switched off while full
+        screen and restored afterwards."""
         if not IS_WIN:
             return False
 
+        def dwm(hwnd, attr, value):
+            try:
+                v = ctypes.c_uint(value)
+                ctypes.windll.dwmapi.DwmSetWindowAttribute(wintypes.HWND(hwnd), attr, ctypes.byref(v), ctypes.sizeof(v))
+            except Exception:
+                pass  # Windows 10: no such attributes, and no border to remove
+
         def do():
-            from System.Windows.Forms import FormBorderStyle, FormWindowState, Screen  # pythonnet
+            from System.Windows.Forms import FormBorderStyle, FormWindowState  # pythonnet
             form = self.window.native
+            hwnd = self.hwnd()
             if on:
                 if getattr(self, "_fs", None) is None:
                     self._fs = (form.FormBorderStyle, form.WindowState, form.Bounds, form.TopMost)
+                form.WindowState = FormWindowState.Normal  # re-maximize after the frame changes
                 form.FormBorderStyle = getattr(FormBorderStyle, "None")
-                form.WindowState = FormWindowState.Normal  # bounds can't be set while maximized
-                form.Bounds = Screen.FromHandle(form.Handle).Bounds
+                form.WindowState = FormWindowState.Maximized
+                dwm(hwnd, 34, 0xFFFFFFFE)  # DWMWA_BORDER_COLOR = none
+                dwm(hwnd, 33, 1)           # DWMWA_WINDOW_CORNER_PREFERENCE = don't round
                 form.Activate()
             elif getattr(self, "_fs", None) is not None:
                 style, state, bounds, top = self._fs
                 self._fs = None
-                form.FormBorderStyle = style
+                dwm(hwnd, 34, 0xFFFFFFFF)  # default border
+                dwm(hwnd, 33, 0)           # default corners
                 form.WindowState = FormWindowState.Normal
+                form.FormBorderStyle = style
                 form.Bounds = bounds
                 form.WindowState = state
                 form.TopMost = top
+            log.info("full screen %s: bounds %s", "on" if on else "off", form.Bounds)
             return True
         return bool(self.on_ui(do))
 

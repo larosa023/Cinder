@@ -140,3 +140,4 @@ html:has(body.couch-on), body.couch-on { background: #06070a !important; }
 .cs-btns button:hover { transform: scale(1.02); }
 
 body.no-motion #couch * { transition: none !important; animation: none !important; }
+.ci-meta .ci-rv .rv-badge span { color: rgba(255,255,255,.7); }

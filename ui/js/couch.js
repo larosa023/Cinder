@@ -150,6 +150,11 @@ function paintInfo() {
     <div class="ci-meta">${bits.map((b) => `<span>${esc(b)}</span>`).join("")}${m.rating ? `<span class="ci-stars">${"★".repeat(m.rating)}</span>` : ""}
       ${m.status ? `<span class="ci-tag">${esc(C.statusLabel(m.status))}</span>` : ""}</div>`;
   C.markLoaded && C.markLoaded(info);
+  if (!g.shortcut && C.reviews) C.reviews.summary(g.appid).then((s) => {
+    if (!s || cur() !== g) return;
+    const meta = info.querySelector(".ci-meta");
+    if (meta) meta.insertAdjacentHTML("beforeend", `<span class="ci-rv">${C.reviews.badge(s)}</span>`);
+  });
   // Background: crossfade to this game's hero art once you settle on it.
   clearTimeout(K.bgFor);
   K.bgFor = setTimeout(() => setBg(g.appid), 140);

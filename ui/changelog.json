@@ -1,5 +1,16 @@
 [
  {
+  "version": "0.17.2",
+  "date": "2026-10-30",
+  "title": "Reviews fixed, specs, edge-to-edge couch mode",
+  "items": [
+   "Fixed: reviews and the Steam rating failed to load (\"Steam sent something unexpected\")",
+   "The overall Steam rating (like Mostly Positive) now shows right under the game's name on game pages and store pages, and in couch mode",
+   "New Specs tab on game pages and a System requirements section on store pages: minimum and recommended",
+   "Couch mode: true full screen with no thin border (Windows 11's window outline and rounded corners are switched off while it's open)"
+  ]
+ },
+ {
   "version": "0.17.1",
   "date": "2026-10-30",
   "title": "Steam reviews",

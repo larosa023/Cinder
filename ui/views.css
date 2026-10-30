@@ -59,7 +59,7 @@
 }
 #view-store { position: relative; }
 .sp { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; }
-.sp-title { min-height: 70px; display: flex; align-items: flex-end; margin-bottom: 18px; }
+.sp-title { min-height: 70px; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; margin-bottom: 18px; }
 .sp-title img { max-height: 96px; max-width: 420px; object-fit: contain; filter: drop-shadow(0 4px 14px rgba(0,0,0,.6)); }
 .sp-title h1 { display: none; font-size: 30px; }
 .sp-title.no-logo img { display: none; }
