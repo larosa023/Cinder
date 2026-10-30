@@ -1,5 +1,15 @@
 [
  {
+  "version": "0.17.3",
+  "date": "2026-10-30",
+  "title": "Steam reviews, take two",
+  "items": [
+   "The overall Steam rating (like Mostly Positive) now comes from Steam's store service, the same one Cinder already uses for game names and art",
+   "Reviews: when Steam answers with its home page instead of reviews, Cinder asks again a different way, then through your Steam client if it's connected",
+   "If reviews still can't load, a Read them in Steam button opens the game's reviews in Steam"
+  ]
+ },
+ {
   "version": "0.17.2",
   "date": "2026-10-30",
   "title": "Reviews fixed, specs, edge-to-edge couch mode",

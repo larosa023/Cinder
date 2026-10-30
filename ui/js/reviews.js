@@ -73,19 +73,23 @@ function mount(el, appid) {
         <div class="chips rv-sorts">${SORTS.map(([k, l]) => `<button data-rv-sort="${k}" class="${st.sort === k ? "on" : ""}">${l}</button>`).join("")}</div>
       </div>
       ${loading ? C.loading("Loading reviews…")
-        : st.error && !st.items.length ? C.failed(st.error)
+        : st.error && !st.items.length ? `<div class="state err"><strong>${esc(st.error)}</strong>
+            <div class="btns"><button class="btn sm" data-retry>Try again</button>
+            <button class="btn sm" data-rv-steam>Read them in Steam</button></div></div>`
         : !st.items.length ? '<div class="state">No reviews here yet.</div>'
         : `<div class="rv-list">${st.items.map(card).join("")}</div>
            ${st.done ? "" : `<div class="ws-more"><button class="btn" data-rv-load ${st.busy ? "disabled" : ""}>${st.busy ? "Loading…" : "More reviews"}</button></div>`}`}`;
   }
 
+  if (!(appid in summaries)) summary(appid).then(() => { if (el.isConnected && !st.busy) paint(); });
   el.onclick = (e) => {
     const s = e.target.closest("[data-rv-sort]");
     if (s && s.dataset.rvSort !== st.sort) { st.sort = s.dataset.rvSort; st.error = null; return load(); }
     if (e.target.closest("[data-rv-load]")) return load(true);
     const m = e.target.closest("[data-rv-more]");
     if (m) { m.previousElementSibling.classList.remove("clamp"); m.remove(); }
-    if (e.target.closest("[data-retry]")) load();
+    if (e.target.closest("[data-retry]")) { st.error = null; load(); }
+    if (e.target.closest("[data-rv-steam]")) C.act("steam_url_open", { url: `https://store.steampowered.com/app/${appid}/#app_reviews_hash` });
   };
   load();
 }

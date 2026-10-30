@@ -433,9 +433,24 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             appid = int(m.group(1))
             if q.get("summary"):
-                return self._json({"ok": True, "summary": storeapi.review_summary(appid)})
+                return self._json({"ok": True, "summary": storeapi.review_summary(appid, cc)})
             cur = q.get("cursor", "*")[:200]
-            return self._json({"ok": True, **storeapi.reviews(appid, q.get("sort", "helpful"), cur)})
+            sort = q.get("sort", "helpful")
+            try:
+                return self._json({"ok": True, **storeapi.reviews(appid, sort, cur)})
+            except storeapi.SteamDataError:
+                if self._bridge_state() != "on":
+                    raise
+                # Last resort: ask the Steam client itself (it's signed in to the store).
+                import steambridge
+                url = storeapi.review_url(appid, sort, cur)
+                try:
+                    data = c.steam.bridge.run(f"fetch({json.dumps(url)}, {{credentials: 'include'}}).then((r) => r.json())", 20)
+                except steambridge.BridgeError as e:
+                    log.info("reviews through Steam failed: %s", e)
+                    raise storeapi.SteamDataError("Steam wouldn't send reviews right now") from e
+                log.info("reviews for %s came through the Steam client", appid)
+                return self._json({"ok": True, **storeapi.parse_reviews(data)})
         m = re.fullmatch(r"/api/game/(\d+)/workshop_support", path)
         if m:
             return self._json({"ok": True, **self._workshop_support(int(m.group(1)), cc)})

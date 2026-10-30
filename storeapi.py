@@ -525,24 +525,69 @@ REVIEW_FILTERS = {  # ours: (filter, review_type)
     "positive": ("all", "positive"), "negative": ("all", "negative"),
 }
 
+# Steam sometimes answers appreviews with its home page instead of JSON (it depends on the
+# request's headers). Try a few ways of asking and remember the one that works.
+_REVIEW_HEADERS = [
+    {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
+     "Accept": "application/json, text/javascript, */*; q=0.01", "X-Requested-With": "XMLHttpRequest"},
+    {"User-Agent": "Valve/Steam HTTP Client 1.0", "Accept": "application/json"},
+    {"User-Agent": "python-requests/2.32", "Accept": "*/*"},
+]
+_review_way = {"i": 0}
+
+
+def _review_json(url: str, ttl: float) -> dict:
+    now = time.time()
+    with _cache_lock:
+        hit = _cache.get("rv:" + url)
+        if hit and now - hit[0] < ttl:
+            return hit[1]
+    order = [_review_way["i"]] + [i for i in range(len(_REVIEW_HEADERS)) if i != _review_way["i"]]
+    last = None
+    for i in order:
+        req = urllib.request.Request(url, headers=_REVIEW_HEADERS[i])
+        try:
+            with urllib.request.urlopen(req, timeout=12) as r:
+                raw = r.read()
+        except urllib.error.HTTPError as e:
+            last = SteamDataError(f"Steam returned {e.code}")
+            continue
+        except Exception as e:
+            raise SteamDataError("Couldn't reach Steam") from e
+        try:
+            data = json.loads(raw.decode("utf-8-sig", "replace"), strict=False)
+        except ValueError:
+            from cinderlog import log
+            log.info("reviews: way %d got a web page, trying another", i)
+            last = SteamDataError("Steam wouldn't send reviews right now")
+            continue
+        if isinstance(data, dict):
+            _review_way["i"] = i
+            with _cache_lock:
+                _cache["rv:" + url] = (now, data)
+            return data
+    raise last or SteamDataError("Steam wouldn't send reviews right now")
+
 
 def reviews(appid: int, sort: str = "helpful", cursor: str = "*", lang: str = "english") -> dict:
-    """Steam user reviews: the score summary plus a page of reviews (20 at a time)."""
+    """Steam user reviews, a page (20) at a time."""
+    data = _review_json(review_url(appid, sort, cursor, lang), 900)
+    return parse_reviews(data)
+
+
+def review_url(appid: int, sort: str = "helpful", cursor: str = "*", lang: str = "english") -> str:
     f, rtype = REVIEW_FILTERS.get(sort, REVIEW_FILTERS["helpful"])
     q = {"json": 1, "filter": f, "review_type": rtype, "language": lang, "purchase_type": "all",
          "num_per_page": 20, "cursor": cursor or "*"}
     if f == "all":
-        q["day_range"] = 365  # "most helpful" over the last year, like the store page
-    data = _fetch(f"{STORE}/appreviews/{int(appid)}?{urllib.parse.urlencode(q)}", ttl=900)
+        q["day_range"] = 365
+    return f"{STORE}/appreviews/{int(appid)}?{urllib.parse.urlencode(q)}"
+
+
+def parse_reviews(data: dict) -> dict:
     if not isinstance(data, dict) or data.get("success") != 1:
         raise SteamDataError("Steam didn't return reviews for this game")
     out = {"cursor": data.get("cursor") or "", "reviews": []}
-    qs = data.get("query_summary") or {}
-    if "total_reviews" in qs:
-        pos, neg = _int(qs.get("total_positive")), _int(qs.get("total_negative"))
-        out["summary"] = {"desc": qs.get("review_score_desc") or "", "score": _int(qs.get("review_score")),
-                          "positive": pos, "negative": neg, "total": _int(qs.get("total_reviews")),
-                          "pct": round(100 * pos / (pos + neg)) if pos + neg else None}
     for r in data.get("reviews") or []:
         a = r.get("author") or {}
         out["reviews"].append({
@@ -559,16 +604,22 @@ def reviews(appid: int, sort: str = "helpful", cursor: str = "*", lang: str = "e
     return out
 
 
-def review_summary(appid: int, lang: str = "all") -> dict | None:
-    """Just the score ("Very Positive", 92% of 45,123), across every language like the store shows."""
-    q = {"json": 1, "language": lang, "purchase_type": "all", "num_per_page": 0}
-    data = _fetch(f"{STORE}/appreviews/{int(appid)}?{urllib.parse.urlencode(q)}", ttl=3600)
-    qs = (data or {}).get("query_summary") or {} if isinstance(data, dict) else {}
-    if not qs or not _int(qs.get("total_reviews")):
+def review_summary(appid: int, cc: str = "US") -> dict | None:
+    """The overall rating ("Mostly Positive", 78% of 20,975) from Steam's store API, the same
+    host Cinder uses for names and art (reliable, no web page detours)."""
+    req = {"ids": [{"appid": int(appid)}], "context": {"language": "english", "country_code": cc},
+           "data_request": {"include_reviews": True}}
+    data = _fetch(f"{API}/IStoreBrowseService/GetItems/v1/?{_q(input_json=json.dumps(req))}", ttl=3600)
+    items = (data.get("response") or {}).get("store_items") or [] if isinstance(data, dict) else []
+    rv = (items[0].get("reviews") or {}) if items else {}
+    s = rv.get("summary_filtered") or rv.get("summary_unfiltered") or {}
+    total = _int(s.get("review_count"))
+    if not total:
         return None
-    pos, neg = _int(qs.get("total_positive")), _int(qs.get("total_negative"))
-    return {"desc": qs.get("review_score_desc") or "", "score": _int(qs.get("review_score")), "positive": pos,
-            "negative": neg, "total": _int(qs.get("total_reviews")), "pct": round(100 * pos / (pos + neg)) if pos + neg else None}
+    pct = _int(s.get("percent_positive"))
+    pos = round(total * pct / 100)
+    return {"desc": s.get("review_score_label") or "", "score": _int(s.get("review_score")),
+            "positive": pos, "negative": total - pos, "total": total, "pct": pct}
 
 
 def news(appid: int, count: int = 8) -> list[dict]:
