@@ -1,5 +1,13 @@
 [
  {
+  "version": "0.18.1",
+  "date": "2026-10-30",
+  "title": "Wider search",
+  "items": [
+   "The search bar grows to fill the empty space in the top bar (up to a comfortable width), leaving a little room to drag the window"
+  ]
+ },
+ {
   "version": "0.18.0",
   "date": "2026-10-30",
   "title": "Deals, guides, recaps and more",
