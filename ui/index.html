@@ -161,6 +161,7 @@
         <div><dt>App ID</dt><dd id="d-appid"></dd></div>
         <div id="d-rv-box"><dt>Steam reviews</dt><dd id="d-rv">—</dd></div>
       </dl>
+      <div class="hltb" id="d-hltb" hidden></div>
       <p class="d-path" id="d-path"></p>
       <div class="d-mine">
         <div class="d-mine-row">
@@ -191,6 +192,17 @@
     <div class="news-body" id="news-body"></div>
   </div>
 </div>
+
+<!-- Steam guide reader -->
+<div class="overlay" id="guide" hidden>
+  <div class="panel guide-panel">
+    <button class="icon-btn d-close" data-gclose title="Close (Esc)"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <div class="guide-body" id="guide-body"></div>
+  </div>
+</div>
+
+<!-- Session recap -->
+<div class="recap" id="recap" hidden></div>
 
 <!-- Workshop item -->
 <div class="overlay" id="ws-item" hidden>
@@ -354,8 +366,10 @@
             <button class="btn sm primary" id="key-save">Save</button>
             <button class="btn sm" id="key-clear">Remove</button>
             <button class="btn sm" id="key-get">Get a key</button></div></div>
-        <div class="row"><div><strong>Wishlist sale alerts</strong><small>Checks your wishlist every few hours and shows a Windows notification when something goes on sale.</small></div>
+        <div class="row"><div><strong>Wishlist sale alerts</strong><small>Checks your wishlist every few hours and shows a Windows notification when something goes on sale, hits its lowest price, or drops to a price you set.</small></div>
           <label class="switch"><input type="checkbox" id="set-sales"><span></span></label></div>
+        <div class="row"><div><strong>Session recap</strong><small>After you close a game, show how long you played, what you unlocked and your new total.</small></div>
+          <label class="switch"><input type="checkbox" id="set-recap"><span></span></label></div>
         <p class="note">Cinder never asks for your Steam password. Buying, chat and wishlist changes open in the real Steam client.</p>
       </div>
 
@@ -442,6 +456,7 @@
 <script src="/ui/js/settings.js"></script>
 <script src="/ui/js/activity.js"></script>
 <script src="/ui/js/gamepage.js"></script>
+<script src="/ui/js/extras.js"></script>
 <script src="/ui/js/main.js"></script>
 </body>
 </html>

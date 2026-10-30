@@ -1,5 +1,18 @@
 [
  {
+  "version": "0.18.0",
+  "date": "2026-10-30",
+  "title": "Deals, guides, recaps and more",
+  "items": [
+   "Price tracker: wishlist games show their lowest-ever Steam price, with a Lowest price ever tag when it's that low now. Store pages show the lowest price anywhere, cheaper stores right now, and a chart of prices Cinder has seen",
+   "Price alerts: click the bell on a wishlist game (or set it on its store page) and get a notification when it drops to your price",
+   "How long to beat: main story, extras and completionist times from HowLongToBeat on game pages and store pages, with how far your play time gets you",
+   "Achievement help: hidden achievements show their description blurred (click to reveal), Tips under each locked achievement pull the matching part of top Steam guides, and guides open in a reader right in Cinder",
+   "Session recap: when you close a game, a card shows how long you played, achievements you unlocked and your new total (turn it off in Settings → Account)",
+   "Recommendations: Because you played … rows on the Store tab, built from the games you play most"
+  ]
+ },
+ {
   "version": "0.17.8",
   "date": "2026-10-30",
   "title": "Reviewer profiles in Cinder",

@@ -29,6 +29,7 @@ C.refreshStatus = async () => {
     const { steam } = await C.api("/api/status");
     S.steam = steam;
     renderSteam();
+    if (C.extras) C.extras.checkRecap();
   } catch { /* server gone */ }
 };
 
@@ -401,6 +402,7 @@ function bind() {
   $("#set-playing").addEventListener("change", (e) => C.saveConfig({ when_playing: e.target.value }));
   $("#set-restore").addEventListener("change", (e) => C.saveConfig({ restore_after_play: e.target.checked }));
   $("#set-sales").addEventListener("change", (e) => C.saveConfig({ sale_alerts: e.target.checked }));
+  $("#set-recap").addEventListener("change", (e) => C.saveConfig({ session_recap: e.target.checked }));
 }
 
 function renderSteamUpdToggle() {
@@ -426,6 +428,7 @@ function fill() {
   $("#set-playing").value = c.when_playing || "minimize";
   $("#set-restore").checked = c.restore_after_play !== false;
   $("#set-sales").checked = c.sale_alerts !== false;
+  $("#set-recap").checked = c.session_recap !== false;
   const inst = S.install || {};
   $("#set-startup").checked = !!inst.startup;
   $("#set-startup").disabled = !inst.frozen;

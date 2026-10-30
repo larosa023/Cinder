@@ -80,6 +80,13 @@ def _fetch(url: str, ttl: float = 600, as_json: bool = True, timeout: float = 12
     return data
 
 
+def forget(*parts: str) -> None:
+    """Drop cached replies whose URL contains any of `parts` (so the next ask is fresh)."""
+    with _cache_lock:
+        for k in [k for k in _cache if any(p in k for p in parts)]:
+            _cache.pop(k, None)
+
+
 def _q(**params) -> str:
     return urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
 

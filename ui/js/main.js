@@ -65,6 +65,7 @@ async function init() {
   C.gamepage.init();
   C.lists.init();
   C.mine.init();
+  C.extras.init();
   const libraryLoad = C.library.load(true);  // start reading the library right away
   C.library.paintCached();  // and show last session's library while it loads
   try {

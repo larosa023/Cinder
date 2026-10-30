@@ -253,6 +253,9 @@ def main() -> None:
         from achievements import AchievementIndex
         ctx.ach = AchievementIndex(steam, cfg, ddir)
         later(30, ctx.ach.scan)  # fill the cache in the background
+    if steam.found:
+        from recap import Recaps
+        ctx.recaps = Recaps(steam, cfg, ctx.sessions, ctx.ach)
     ctx.playing = lambda: None
     ctx.activate = lambda: None
     ctx.notify = lambda title, text: None
@@ -320,6 +323,8 @@ def main() -> None:
     tucked = {"how": None}
 
     def on_game_start(appid):
+        if ctx.recaps:
+            ctx.recaps.started(appid)
         how = cfg["when_playing"]
         if how == "minimize":
             window.minimize()
@@ -332,6 +337,8 @@ def main() -> None:
     def on_game_stop(appid, seconds):
         now = time.time()
         ctx.sessions.record(appid, now - seconds, now)
+        if ctx.recaps:
+            ctx.recaps.stopped(appid, seconds)
         if ctx.ach:
             later(60, ctx.ach.scan)  # pick up what you just unlocked
         if tucked["how"] and cfg["restore_after_play"]:
@@ -344,7 +351,7 @@ def main() -> None:
 
     if tray and steam.found:
         from sales import SaleWatcher
-        SaleWatcher(steam, cfg, ddir, tray.notify).start()
+        SaleWatcher(steam, cfg, ddir, tray.notify, book=ctx.prices).start()
 
     def on_closing():
         # Closing keeps Cinder in the tray (like Steam), unless you quit or it's restarting.

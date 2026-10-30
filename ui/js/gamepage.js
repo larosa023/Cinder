@@ -54,13 +54,22 @@ async function load(tab) {
 
 function renderAch(d) {
   const pct = d.total ? Math.round((100 * d.unlocked) / d.total) : 0;
+  const desc = (a) => a.hidden && !a.unlocked
+    ? (a.desc ? `<small class="ach-hidden" data-reveal title="Hidden achievement: click to reveal"><span>Hidden</span><i>${esc(a.desc)}</i></small>`
+              : '<small class="ach-hidden none"><span>Hidden</span>Steam keeps this one secret until you unlock it</small>')
+    : `<small>${esc(a.desc)}</small>`;
+  // Locked ones first, rarest last, so what's left to do is on top.
+  const items = [...d.items].sort((a, b) => (a.unlocked - b.unlocked) || (a.unlocked ? (b.time || 0) - (a.time || 0) : (b.percent ?? 0) - (a.percent ?? 0)));
   return `<div class="ach-head"><strong>${d.unlocked} of ${d.total} unlocked</strong><span>${pct}%</span></div>
     <div class="bar wide"><i style="width:${pct}%"></i></div>
-    <div class="ach-list">${d.items.map((a) => `
+    ${d.unlocked < d.total ? '<div class="ach-guides" id="ach-guides"><button class="btn sm" data-guides-load>Show achievement guides</button></div>' : ""}
+    <div class="ach-list">${items.map((a, i) => `
       <div class="ach ${a.unlocked ? "got" : ""}">
         <img alt="" loading="lazy" src="${esc(a.icon)}" data-fail="hide">
-        <div><strong>${esc(a.name)}</strong><small>${esc(a.desc)}</small></div>
-        <span class="ach-meta">${a.unlocked && a.time ? C.fmtDate(a.time) : ""}${a.percent != null ? `<em>${a.percent}% of players</em>` : ""}</span>
+        <div><strong>${esc(a.name)}</strong>${desc(a)}</div>
+        <span class="ach-meta">${a.unlocked && a.time ? C.fmtDate(a.time) : ""}${a.percent != null ? `<em>${a.percent}% of players</em>` : ""}
+          ${a.unlocked ? "" : `<button class="link ach-tipbtn" data-tips="${i}" data-name="${esc(a.name)}">Tips</button>`}</span>
+        <div class="ach-tips" id="ach-tips-${i}" hidden></div>
       </div>`).join("")}</div>`;
 }
 
@@ -115,16 +124,33 @@ function open(g) {
     $("#d-rv").innerHTML = s ? C.reviews.badge(s) : "No reviews yet";
     $("#d-rvtop").innerHTML = s ? C.reviews.badge(s) : "";
   });
-  if (nonSteam) paintWorkshop(g.appid, null); else checkWorkshop(g.appid);
+  if (nonSteam) { paintWorkshop(g.appid, null); $("#d-hltb").hidden = true; }
+  else { checkWorkshop(g.appid); C.extras.hltbInto($("#d-hltb"), g.appid, g.playtime || 0); }
 }
 
 function bind() {
   $("#d-workshop").addEventListener("click", () => setTab("workshop"));
+  $("#d-hltb").addEventListener("click", (e) => {
+    const u = e.target.closest("[data-url]");
+    if (u) { e.preventDefault(); C.act("steam_url_open", { url: u.dataset.url }); }
+  });
   $("#d-tabs").addEventListener("click", (e) => {
     const b = e.target.closest("[data-dtab]");
     if (b) setTab(b.dataset.dtab);
   });
   $("#d-pane").addEventListener("click", (e) => {
+    const rv = e.target.closest("[data-reveal]");
+    if (rv) { rv.classList.toggle("open"); return; }
+    if (e.target.closest("[data-guides-load]")) { C.extras.guidesInto($("#ach-guides"), G.appid); return; }
+    const tb = e.target.closest("[data-tips]");
+    if (tb) {
+      const box = $(`#ach-tips-${tb.dataset.tips}`);
+      if (!box.hidden) { box.hidden = true; return; }
+      C.extras.tipsInto(box, G.appid, tb.dataset.name);
+      return;
+    }
+    const gd = e.target.closest("[data-guide]");
+    if (gd) { C.extras.openGuide(gd.dataset.guide); return; }
     const n = e.target.closest("[data-url]");
     if (n) { e.preventDefault(); C.act("steam_url_open", { url: n.dataset.url }); return; }
     const wg = e.target.closest("[data-wsgo]"), wi = e.target.closest("[data-wsitem]");

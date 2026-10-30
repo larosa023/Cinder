@@ -1,4 +1,4 @@
 # Bump VERSION and push to main: GitHub builds Cinder.exe and publishes the release,
 # and every copy of Cinder then offers the update.
-VERSION = "0.17.8"
+VERSION = "0.18.0"
 REPO = "larosa023/Cinder"

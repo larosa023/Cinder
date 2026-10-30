@@ -62,7 +62,25 @@ function renderHome() {
     <div class="page-head"><h1>Store</h1><div class="spacer"></div>
       <button class="btn sm" data-steam-store>${ICON.ext}Open store in Steam</button></div>
     ${spotlightHTML(specials.items)}
+    <div id="recs">${T.recs ? recsHTML(T.recs) : ""}</div>
     ${secs.map(rowHTML).join("")}`;
+  if (!T.recs || Date.now() - T.recsAt > 3600000) loadRecs();
+}
+
+// "Because you played …": games like the ones you play, that you don't own yet.
+function recsHTML(r) {
+  if (!r.rows.length) return "";
+  return r.rows.map((row) => rowHTML({ title: `Because you played ${row.because.name}`, items: row.items }))
+    .join("").replace(/<section class="srow">/g, '<section class="srow recs">');
+}
+
+async function loadRecs() {
+  T.recsAt = Date.now();
+  try {
+    T.recs = await C.api("/api/recommend");
+    const box = document.getElementById("recs");
+    if (box) box.innerHTML = recsHTML(T.recs);
+  } catch { T.recs = null; }
 }
 
 async function showSearch(q) {
@@ -138,6 +156,10 @@ async function showApp(appid) {
         <button class="btn" data-buy="${a.appid}" title="Add to your wishlist in Steam">${ICON.heart}Wishlist</button>
         ${a.workshop ? `<button class="btn" data-ws-app="${a.appid}" title="Mods, maps and more for this game">${WS_ICON}Workshop</button>` : ""}
       </div>
+      <div class="sp-extras">
+        <div class="hltb" id="sp-hltb" hidden></div>
+        ${a.installed || owned || (a.price && a.price.free) || a.coming_soon ? "" : '<section class="sp-price"><h2>Price history</h2><div id="sp-price"></div></section>'}
+      </div>
       ${a.about ? `<section class="sp-about"><h2>About this game</h2><div class="prose">${esc(a.about).replace(/\n/g, "<br>")}</div></section>` : ""}
       ${a.categories.length ? `<section class="sp-about"><h2>Features</h2><div class="tags">${a.categories.map((c) => `<span>${esc(c)}</span>`).join("")}</div></section>` : ""}
       <section class="sp-about"><h2>System requirements</h2>${C.specsHTML(a.requirements)}</section>
@@ -150,6 +172,8 @@ async function showApp(appid) {
     if (top) top.innerHTML = C.reviews.badge(s, true);
   });
   C.reviews.mount(document.getElementById("sp-reviews"), a.appid);
+  C.extras.hltbInto(document.getElementById("sp-hltb"), a.appid, owned ? owned.playtime || 0 : 0);
+  C.extras.pricePanel(document.getElementById("sp-price"), a.appid, a.price);
 }
 
 function setShot(i) {
@@ -172,6 +196,8 @@ function openLightbox(i) {
 function bind() {
   el().addEventListener("click", (e) => {
     const t = e.target;
+    const u = t.closest("[data-url]");
+    if (u) { e.preventDefault(); C.act("steam_url_open", { url: u.dataset.url }); return; }
     const app = t.closest("[data-app]");
     if (app) return C.go(`store/app/${app.dataset.app}`);
     const scroll = t.closest("[data-scroll]");

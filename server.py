@@ -12,6 +12,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import threading
+import time
 
 import install
 import storeapi
@@ -49,6 +50,9 @@ class Context:
         self.meta = gamedata.GameMeta(data_dir)
         self.sessions = gamedata.Sessions(data_dir)
         self.launchopts = gamedata.LaunchOptions(data_dir)
+        import sales
+        self.prices = sales.PriceBook(data_dir)
+        self.recaps = None  # recap.Recaps, set by main
         self.steam_updater = steam_updater
         self.restart = restart
         self.steam = steam
@@ -242,6 +246,148 @@ class Handler(BaseHTTPRequestHandler):
                 pass  # keep the local library
         c.steam.prefetch_art([g["appid"] for g in games])
         return games
+
+    # -- prices, how long to beat, guides, recommendations ---------------------------
+    def _community_page(self, url: str, marker: str, ttl: float = 1800) -> str:
+        """A Steam Community page: straight, or through the hidden browser when Steam turns Cinder away."""
+        c = self.ctx
+        try:
+            page = storeapi._fetch(url, ttl=ttl, as_json=False)
+            if marker in page:
+                return page
+            log.info("community page %s came back without %r (%d bytes)", url.split("?")[0], marker, len(page))
+        except storeapi.SteamDataError as e:
+            log.info("community page %s: %s", url.split("?")[0], e)
+        if c.browser:
+            try:
+                page = c.browser.get_html(url)
+                if marker in page:
+                    return page
+            except Exception as e:
+                log.info("community page via browser failed: %r", e)
+        raise storeapi.SteamDataError("Steam Community didn't answer. Try again in a minute")
+
+    def _guides(self, appid: int) -> list[dict]:
+        import guides
+        def read(tagged):
+            try:
+                page = self._community_page(guides.list_url(appid, tagged), "filedetails")
+            except storeapi.SteamDataError:
+                return None
+            got = guides.parse_list(page)
+            if not got:
+                i = page.find("filedetails")
+                log.info("guides %s: none parsed (%d bytes); sample: %r", appid, len(page), page[max(0, i - 400):i + 600])
+            return got
+        items = read(True)
+        tagged = bool(items)
+        if not items:  # no guides tagged Achievements: top guides of any kind
+            more = read(False)
+            if more is None and items is None:
+                raise storeapi.SteamDataError("Steam Community didn't answer. Try again in a minute")
+            items = more or []
+        for it in items:
+            it["achievements"] = tagged
+        return items[:30]
+
+    def _guide(self, gid: str) -> dict:
+        import guides
+        key = f"guide:{gid}"
+        hit = self.ctx.__dict__.setdefault("guide_cache", {}).get(key)
+        if hit and time.time() - hit[0] < 6 * 3600:
+            return hit[1]
+        page = self._community_page(guides.guide_url(gid), "workshopItemTitle", ttl=6 * 3600)
+        try:
+            g = guides.parse_guide(page, gid)
+        except ValueError:
+            i = page.find("workshopItemTitle")
+            log.info("guide %s unreadable (%d bytes); sample: %r", gid, len(page), page[max(0, i - 200):i + 800])
+            raise
+        if not g["sections"]:
+            log.info("guide %s has no sections; sample: %r", gid, page[page.find("guide"):][:800])
+        cache = self.ctx.guide_cache
+        cache[key] = (time.time(), g)
+        if len(cache) > 40:
+            for k in sorted(cache, key=lambda k: cache[k][0])[:10]:
+                cache.pop(k, None)
+        return g
+
+    def _tips(self, appid: int, name: str) -> dict:
+        """What the top achievement guides say about one achievement (reads up to 3 guides)."""
+        import guides
+        lst = [g for g in self._guides(appid) if g.get("achievements")][:3]
+        read = []
+        for it in lst:
+            try:
+                read.append(self._guide(it["id"]))
+            except (storeapi.SteamDataError, ValueError) as e:
+                log.info("guide %s unreadable: %s", it["id"], e)
+        return {"tips": guides.tips_for(read, name), "guides": lst}
+
+    def _recommend(self, cc: str) -> dict:
+        """Games like the ones you play most, that you don't own, from SteamPeek via Augmented Steam."""
+        import augmented
+        lib = [g for g in self.ctx.steam.library() if g["appid"] < 0x80000000]
+        owned = {g["appid"] for g in lib}
+        recent = sorted((g for g in lib if g.get("lastplayed")), key=lambda g: -g["lastplayed"])[:4]
+        most = sorted(lib, key=lambda g: -(g.get("playtime") or 0))[:8]
+        seeds, seen = [], set()
+        for g in recent + most:
+            if g["appid"] not in seen and (g.get("playtime") or 0) >= 60:
+                seen.add(g["appid"])
+                seeds.append(g)
+        rows, used = [], set()
+        for g in seeds[:5]:
+            if len(rows) >= 3:
+                break
+            picks = [x for x in augmented.similar(g["appid"], 15) if x["appid"] not in owned and x["appid"] not in used]
+            picks = picks[:10]
+            if len(picks) < 3:
+                continue
+            used.update(x["appid"] for x in picks)
+            rows.append({"because": {"appid": g["appid"], "name": g["name"]}, "items": picks})
+        ids = [x["appid"] for r in rows for x in r["items"]]
+        if ids:
+            names = storeapi._names(ids, cc)
+            price = storeapi.prices(ids, cc)
+            for r in rows:
+                for x in r["items"]:
+                    x["name"] = names.get(x["appid"]) or x["name"]
+                    x["price"] = price.get(x["appid"])
+                    x["image"] = f"https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{x['appid']}/header.jpg"
+        return {"rows": rows}
+
+    def _extras(self, path: str, q: dict, cc: str):
+        import augmented
+        c = self.ctx
+        m = re.fullmatch(r"/api/hltb/(\d+)", path)
+        if m:
+            return self._json({"ok": True, "hltb": augmented.hltb(int(m.group(1)))})
+        m = re.fullmatch(r"/api/prices/(\d+)", path)
+        if m:
+            appid = int(m.group(1))
+            lows = augmented.price_lows([appid], cc).get(appid) or {}
+            return self._json({"ok": True, **c.prices.view(appid), **lows})
+        if path == "/api/recommend":
+            return self._json({"ok": True, **self._recommend(cc)})
+        m = re.fullmatch(r"/api/guides/(\d+)", path)
+        if m:
+            return self._json({"ok": True, "items": self._guides(int(m.group(1)))})
+        m = re.fullmatch(r"/api/guide/(\d+)", path)
+        if m:
+            try:
+                return self._json({"ok": True, "guide": self._guide(m.group(1))})
+            except ValueError:
+                raise storeapi.SteamDataError("This guide is private or was removed")
+        m = re.fullmatch(r"/api/tips/(\d+)", path)
+        if m:
+            name = (q.get("name") or "").strip()[:200]
+            if not name:
+                return self._json({"ok": False, "error": "no achievement"}, 400)
+            return self._json({"ok": True, **self._tips(int(m.group(1)), name)})
+        if path == "/api/recap":
+            return self._json({"ok": True, "recap": c.recaps.snapshot() if c.recaps else None})
+        return None
 
     # -- reviews -----------------------------------------------------------------
     def _reviews(self, appid: int, sort: str, cur: str) -> dict:
@@ -470,6 +616,9 @@ class Handler(BaseHTTPRequestHandler):
         key = c.config["api_key"] or ""
         if path.startswith("/api/workshop"):
             return self._workshop(path, q, key)
+        r = self._extras(path, q, cc)
+        if r is not None:
+            return r
         if path == "/api/store/home":
             return self._json({"ok": True, **storeapi.store_home(cc)})
         if path == "/api/store/search":
@@ -504,6 +653,16 @@ class Handler(BaseHTTPRequestHandler):
             if not me:
                 raise storeapi.SteamDataError("Sign in to Steam once so Cinder knows your account")
             res = storeapi.achievements(me, appid, key)
+            import guides
+            local = guides.local_descriptions(c.steam.path, appid)
+            for a in res["items"]:
+                loc = local.get(a["id"] or "") or {}
+                hidden = loc.get("hidden") or a.get("desc") == "Hidden achievement"
+                a["hidden"] = bool(hidden)
+                if loc.get("desc") and (not a.get("desc") or a["desc"] == "Hidden achievement"):
+                    a["desc"] = loc["desc"]
+                elif a.get("desc") == "Hidden achievement":
+                    a["desc"] = ""
             if c.ach:
                 c.ach.record(appid, res)
             return self._json({"ok": True, **res})
@@ -511,7 +670,16 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/wishlist":
             if not me:
                 raise storeapi.SteamDataError("Sign in to Steam once so Cinder knows your account")
-            return self._json({"ok": True, **storeapi.wishlist(me, cc, key)})
+            w = storeapi.wishlist(me, cc, key)
+            items = w.get("items") or []
+            c.prices.record(items)
+            import augmented
+            lows = augmented.price_lows([i["appid"] for i in items], cc)
+            for i in items:
+                i["lows"] = lows.get(i["appid"]) or {}
+                i["target"] = c.prices.targets.get(str(i["appid"]))
+                i["low_seen"] = c.prices.view(i["appid"])["low_seen"]
+            return self._json({"ok": True, **w})
         if path == "/api/presence":
             if not me:
                 raise storeapi.SteamDataError("No Steam account found")
@@ -550,6 +718,8 @@ class Handler(BaseHTTPRequestHandler):
             "playing": playing,
             "downloads": sum(1 for g in downloads if g["download"]["state"] != "paused"),
             "on_demand": self.ctx.idle.status() if self.ctx.idle else None,
+            "recap": (lambda r: {"id": r["id"], "pending": r["pending"], "end": r["end"]} if r else None)(
+                self.ctx.recaps.snapshot() if self.ctx.recaps else None),
         }
 
     def _state(self) -> dict:
@@ -587,6 +757,13 @@ class Handler(BaseHTTPRequestHandler):
                 if not str(body.get("appid", "")).isdigit():
                     return self._json({"ok": False, "error": "bad appid"}, 400)
                 return self._json({"ok": True, "meta": self.ctx.meta.update(int(body["appid"]), body)})
+            if path == "/api/price_target":
+                if not str(body.get("appid", "")).isdigit():
+                    return self._json({"ok": False, "error": "bad appid"}, 400)
+                cents = body.get("cents")
+                cents = int(cents) if isinstance(cents, (int, float)) and cents > 0 else None
+                self.ctx.prices.set_target(int(body["appid"]), cents)
+                return self._json({"ok": True, "target": cents})
             if path == "/api/action":
                 return self._action(body)
             if path == "/api/theme":

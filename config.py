@@ -28,6 +28,7 @@ DEFAULTS = {
     "favorites": [],
     "hidden": [],
     "sale_alerts": True,
+    "session_recap": True,  # show a recap card after you close a game
     "lists": [],          # [{"id", "name", "appids"}] - your Cinder game lists
     "profile_style": {},  # background appid, showcase appids, sections
     "steam_bridge": True,
@@ -40,7 +41,7 @@ EDITABLE = {"theme", "sort", "card_size", "freeze_updates", "autostart_steam", "
             "hide_steam_on_launch", "persona", "close_to_tray", "tray_hint_shown",
             "when_playing", "restore_after_play", "favorites", "hidden", "sale_alerts",
             "lists", "profile_style", "steam_bridge",
-            "steam_on_demand", "steam_idle_minutes", "seen_version"}
+            "steam_on_demand", "steam_idle_minutes", "seen_version", "session_recap"}
 
 
 def data_dir() -> Path:
