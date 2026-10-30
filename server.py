@@ -44,6 +44,10 @@ class Context:
         self.updater = updater
         self.ach = None  # achievements.AchievementIndex, set by main
         self.idle = None  # steamidle.SteamIdle, set by main
+        import gamedata
+        self.meta = gamedata.GameMeta(data_dir)
+        self.sessions = gamedata.Sessions(data_dir)
+        self.launchopts = gamedata.LaunchOptions(data_dir)
         self.steam_updater = steam_updater
         self.restart = restart
         self.steam = steam
@@ -177,6 +181,21 @@ class Handler(BaseHTTPRequestHandler):
                 c.ach.scan()  # refreshes anything stale, in the background
                 return self._json({"ok": True, **c.ach.hub()})
             return self._json({"ok": False, "error": "Not available"})
+        if path == "/api/meta":
+            return self._json({"ok": True, "games": c.meta.all()})
+        if path == "/api/stats":
+            playing = getattr(c, "playing", lambda: None)()
+            return self._json({"ok": True, **c.sessions.stats(c.steam.library(), playing)})
+        if path == "/api/storage":
+            return self._json({"ok": True, **self._storage()})
+        m = re.fullmatch(r"/api/game/(\d+)/launch_options", path)
+        if m:
+            appid = int(m.group(1))
+            pend = c.launchopts.pending().get(str(appid))
+            cur = (c.steam._localconfig_apps().get(str(appid)) or {})
+            cur = cur.get("launchoptions", "") if isinstance(cur, dict) else ""
+            return self._json({"ok": True, "options": pend if pend is not None else cur, "pending": pend is not None,
+                               "live": self._bridge_state() == "on"})
         if path == "/api/downloads":
             if query.get("first") and self.ctx.steam.bridge and self._bridge_state() == "on":
                 try:  # what Steam's own download buttons called since last time (helps support new Steam builds)
@@ -222,6 +241,87 @@ class Handler(BaseHTTPRequestHandler):
                 pass  # keep the local library
         c.steam.prefetch_art([g["appid"] for g in games])
         return games
+
+    # -- launch options ----------------------------------------------------------
+    def _launch_options(self, appid: int, options: str):
+        """Live through Steam when connected; straight into Steam's file when it's closed; else on close."""
+        import steambridge
+        c, s = self.ctx, self.ctx.steam
+        options = options.replace("\r", " ").replace("\n", " ").strip()
+        if s.running() and self._bridge_state() == "on":
+            try:
+                r = s.bridge.run(f"""(async () => {{
+  const A = SteamClient.Apps;
+  if (typeof A.SetAppLaunchOptions !== "function") return {{ok: false}};
+  const r = A.SetAppLaunchOptions({int(appid)}, {json.dumps(options)}); if (r && r.then) await r;
+  return {{ok: true}};
+}})()""")
+                if isinstance(r, dict) and r.get("ok"):
+                    log.info("launch options for %s set through Steam", appid)
+                    return self._json({"ok": True, "state": "live"})
+            except steambridge.BridgeError as e:
+                log.info("launch options via Steam failed: %s", e)
+        c.launchopts.queue(appid, options)
+        if not s.running():
+            p = s._localconfig_path() if hasattr(s, "_localconfig_path") else None
+            if p and c.launchopts.apply_to_file(p):
+                s.invalidate_library()
+                return self._json({"ok": True, "state": "saved"})
+        return self._json({"ok": True, "state": "pending"})
+
+    # -- storage -----------------------------------------------------------------
+    def _storage(self) -> dict:
+        import shutil
+        from steamlib import read_vdf
+        s = self.ctx.steam
+        keys = {}
+        data = read_vdf(s.path / "steamapps" / "libraryfolders.vdf") if s.path else {}
+        for k, v in (data.get("libraryfolders") or {}).items():
+            p = v.get("path") if isinstance(v, dict) else v
+            if k.isdigit() and p:
+                keys[os.path.normcase(os.path.abspath(p))] = int(k)
+        games = [g for g in s.library() if g.get("installed") and not g.get("shortcut")]
+        drives = []
+        for lib in s.library_dirs():
+            norm = os.path.normcase(os.path.abspath(str(lib)))
+            try:
+                du = shutil.disk_usage(str(lib))
+                total, free = du.total, du.free
+            except OSError:
+                total = free = 0
+            mine = [g for g in games if os.path.normcase(os.path.abspath(g["library"])) == norm]
+            drives.append({"path": str(lib), "index": keys.get(norm, 0 if lib == s.path else -1),
+                           "label": (str(lib)[:2].upper() if len(str(lib)) > 1 and str(lib)[1] == ":" else (Path(lib).name or str(lib))),
+                           "total": total, "free": free, "games_size": sum(g["size"] for g in mine),
+                           "count": len(mine)})
+        return {"drives": drives, "bridge": self._bridge_state(),
+                "games": [{"appid": g["appid"], "name": g["name"], "size": g["size"], "lastplayed": g["lastplayed"],
+                           "playtime": g["playtime"], "library": g["library"], "update_pending": g["update_pending"]}
+                          for g in games]}
+
+    def _move_game(self, appid: int, folder: str):
+        import steambridge
+        s = self.ctx.steam
+        if not folder.lstrip("-").isdigit() or int(folder) < 0:
+            return self._json({"ok": False, "error": "Pick a drive"}, 400)
+        if self._bridge_state() != "on":
+            s.steam_url(f"steam://gameproperties/{appid}")
+            return self._json({"ok": True, "state": "steam"})
+        try:
+            r = s.bridge.run(f"""(async () => {{
+  const F = SteamClient.InstallFolder;
+  if (!F || typeof F.MoveInstallFolderForApp !== "function") return {{ok: false}};
+  const r = F.MoveInstallFolderForApp({int(appid)}, {int(folder)}); if (r && r.then) await r;
+  return {{ok: true}};
+}})()""")
+        except steambridge.BridgeError as e:
+            return self._json({"ok": False, "error": f"Steam didn't take the request ({e})"})
+        log.info("move %s to folder %s: %s", appid, folder, r)
+        if not (isinstance(r, dict) and r.get("ok")):
+            s.steam_url(f"steam://gameproperties/{appid}")
+            return self._json({"ok": True, "state": "steam"})
+        s.invalidate_library()
+        return self._json({"ok": True, "state": "moving"})
 
     # -- workshop ----------------------------------------------------------------
     _ws_support: dict | None = None
@@ -424,6 +524,10 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/api/config":
                 return self._config(body)
+            if path == "/api/meta":
+                if not str(body.get("appid", "")).isdigit():
+                    return self._json({"ok": False, "error": "bad appid"}, 400)
+                return self._json({"ok": True, "meta": self.ctx.meta.update(int(body["appid"]), body)})
             if path == "/api/action":
                 return self._action(body)
             if path == "/api/theme":
@@ -872,6 +976,10 @@ class Handler(BaseHTTPRequestHandler):
             s.steam_url("steam://store")
         elif action == "steam_exit":
             s.shutdown()
+        elif action == "launch_options" and appid:
+            return self._launch_options(appid, str(body.get("options") or "")[:1000])
+        elif action == "move_game" and appid:
+            return self._move_game(appid, str(body.get("folder", "")))
         elif action in ("workshop_open", "workshop_folder", "workshop_update", "workshop_browse_steam"):
             return self._workshop_action(action, body, appid)
         elif action in ("game_update", "download_pause", "download_cmd"):

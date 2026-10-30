@@ -6,6 +6,7 @@
 <title>Cinder</title>
 <link rel="stylesheet" href="/ui/app.css">
 <link rel="stylesheet" href="/ui/views.css">
+<link rel="stylesheet" href="/ui/couch.css">
 <link rel="stylesheet" id="theme-css" href="/themes/midnight.css">
 <style id="style-vars"></style>
 <script>window.CINDER_TOKEN = "{{TOKEN}}";</script>
@@ -28,6 +29,7 @@
     <i></i><span id="np-name"></span><b id="np-time"></b>
   </button>
   <div class="tb-actions">
+    <button class="icon-btn" id="btn-couch" title="Couch mode: controller-friendly full screen (F11)"><svg viewBox="0 0 24 24"><path d="M7.5 8h9a4.5 4.5 0 0 1 4.4 5.4l-.7 3.6a2.4 2.4 0 0 1-4.2 1L14 16h-4l-2 2a2.4 2.4 0 0 1-4.2-1l-.7-3.6A4.5 4.5 0 0 1 7.5 8Z"/><path d="M8 11v3M6.5 12.5h3M15.5 12h.01M17.5 13.5h.01"/></svg></button>
     <button class="icon-btn" id="btn-news" title="What's new in Cinder"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15.5l-1.8-4.7L5.5 9l4.7-1.3z"/><path d="M18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8z"/></svg><span class="news-dot" id="news-dot" hidden></span></button>
     <button class="icon-btn" id="btn-downloads" title="Downloads"><svg viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg><span class="count-badge" id="dl-badge" hidden></span></button>
     <button class="icon-btn" id="btn-refresh" title="Refresh (F5)"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg></button>
@@ -87,12 +89,18 @@
           <input type="range" id="lib-zoom" min="110" max="300" step="5"></label>
         <button class="btn sm" id="btn-lists" title="Your lists and Steam collections"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>Lists</button>
         <button class="btn sm" id="btn-random" title="Pick a random installed game"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2" class="fill"/><circle cx="15" cy="15" r="1.2" class="fill"/><circle cx="15" cy="9" r="1.2" class="fill"/><circle cx="9" cy="15" r="1.2" class="fill"/></svg>Pick for me</button>
+        <select id="status-filter" title="Your status">
+          <option value="">Any status</option><option value="playing">Playing</option><option value="backlog">Backlog</option>
+          <option value="beaten">Beaten</option><option value="completed">100%</option><option value="dropped">Dropped</option>
+          <option value="rated">Rated by you</option><option value="noted">Has notes</option>
+        </select>
         <select id="sort" title="Sort">
           <option value="recent">Recently played</option>
           <option value="name">Name</option>
           <option value="playtime">Play time</option>
           <option value="size">Size on disk</option>
           <option value="ach">Achievements</option>
+          <option value="rating">Your rating</option>
           <option value="updated">Recently updated</option>
         </select>
       </div>
@@ -106,6 +114,8 @@
   <section class="view" id="view-friends" hidden></section>
   <section class="view" id="view-achievements" hidden></section>
   <section class="view" id="view-profile" hidden></section>
+  <section class="view" id="view-stats" hidden></section>
+  <section class="view" id="view-storage" hidden></section>
   <section class="view" id="view-workshop" hidden></section>
   <section class="view" id="view-downloads" hidden></section>
 </main>
@@ -148,10 +158,26 @@
         <div><dt>App ID</dt><dd id="d-appid"></dd></div>
       </dl>
       <p class="d-path" id="d-path"></p>
+      <div class="d-mine">
+        <div class="d-mine-row">
+          <div class="d-rate" id="d-rate" title="Your rating"></div>
+          <div class="seg d-status" id="d-status"></div>
+        </div>
+        <textarea class="text d-note" id="d-note" rows="3" placeholder="Notes: where you left off, mods you use, codes…" maxlength="4000"></textarea>
+        <div class="d-lopts" id="d-lopts-row">
+          <label for="d-lopts">Launch options</label>
+          <input class="text" id="d-lopts" placeholder="e.g. -novid -high -fullscreen" maxlength="1000" spellcheck="false">
+          <button class="btn sm" id="d-lopts-save">Save</button>
+          <small id="d-lopts-state"></small>
+        </div>
+      </div>
       </div>
     </div>
   </div>
 </div>
+
+<!-- Couch mode -->
+<div id="couch" hidden></div>
 
 <!-- What's new -->
 <div class="overlay" id="news" hidden>
@@ -231,7 +257,7 @@
           <select data-style-select="cardSub">
             <option value="playtime">Play time</option><option value="last">Last played</option>
             <option value="both">Play time and last played</option><option value="ach">Achievements</option>
-            <option value="size">Size on disk</option><option value="none">Nothing</option>
+            <option value="size">Size on disk</option><option value="mine">Your rating and status</option><option value="none">Nothing</option>
           </select></div>
         <div class="row"><div><strong>Play time</strong><small id="fmt-play-ex"></small></div>
           <div class="seg" data-style="playFmt"><button data-v="hours">733 hrs</button><button data-v="hm">733h 20m</button><button data-v="days">30d 13h</button><button data-v="decimal">733.3 h</button></div></div>
@@ -396,6 +422,7 @@
 <script src="/ui/js/style.js"></script>
 <script src="/ui/js/library.js"></script>
 <script src="/ui/js/lists.js"></script>
+<script src="/ui/js/mine.js"></script>
 <script src="/ui/js/store.js"></script>
 <script src="/ui/js/wishlist.js"></script>
 <script src="/ui/js/friends.js"></script>
@@ -403,7 +430,10 @@
 <script src="/ui/js/profile.js"></script>
 <script src="/ui/js/downloads.js"></script>
 <script src="/ui/js/workshop.js"></script>
+<script src="/ui/js/stats.js"></script>
+<script src="/ui/js/storage.js"></script>
 <script src="/ui/js/news.js"></script>
+<script src="/ui/js/couch.js"></script>
 <script src="/ui/js/settings.js"></script>
 <script src="/ui/js/activity.js"></script>
 <script src="/ui/js/gamepage.js"></script>

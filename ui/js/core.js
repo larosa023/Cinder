@@ -57,18 +57,24 @@ C.updateGames = async (appids, label) => {
 // ---------- formatting ----------
 // Play time and dates follow Settings → Appearance → Game cards.
 const fmtOpt = (k, d) => (C.style && C.style.get()[k]) || d;
+// Number/date formatters are slow to create; make each once (big libraries format thousands of values).
+const NF0 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
+const NF1 = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
+const NF1f = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+const DF_SHORT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" });
+const DF_NUM = new Intl.DateTimeFormat(undefined);
 C.fmtPlay = (m) => {
   if (!m) return "Never";
   const f = fmtOpt("playFmt", "hours");
   const h = Math.floor(m / 60), mm = m % 60;
-  if (f === "hm") return h ? `${h.toLocaleString()}h ${mm}m` : `${mm}m`;
+  if (f === "hm") return h ? `${NF0.format(h)}h ${mm}m` : `${mm}m`;
   if (f === "days") {
     if (m < 60) return `${m}m`;
     const d = Math.floor(h / 24);
     return d ? `${d}d ${h % 24}h` : `${h}h ${mm}m`;
   }
-  if (f === "decimal") return `${(m / 60).toLocaleString(undefined, { maximumFractionDigits: 1, minimumFractionDigits: 1 })} h`;
-  return m < 60 ? `${m} min` : `${(m / 60).toLocaleString(undefined, { maximumFractionDigits: m < 600 ? 1 : 0 })} hrs`;
+  if (f === "decimal") return `${NF1f.format(m / 60)} h`;
+  return m < 60 ? `${m} min` : `${(m < 600 ? NF1 : NF0).format(m / 60)} hrs`;
 };
 const relAgo = (ts) => {
   const s = Date.now() / 1000 - ts;
@@ -82,9 +88,9 @@ const relAgo = (ts) => {
 C.fmtDate = (ts) => {
   const d = new Date(ts * 1000);
   const f = fmtOpt("dateFmt", "relative");
-  if (f === "numeric") return d.toLocaleDateString();
+  if (f === "numeric") return DF_NUM.format(d);
   if (f === "iso") return d.toISOString().slice(0, 10);
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return DF_SHORT.format(d);
 };
 C.fmtAgo = (ts) => {
   if (!ts) return "Never";
@@ -157,6 +163,8 @@ C.TABS = [
   { id: "friends", label: "Friends", icon: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M21.5 20a6.5 6.5 0 0 0-4-6"/></svg>' },
   { id: "achievements", label: "Achievements", icon: '<svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/></svg>' },
   { id: "profile", label: "Profile", icon: C.ICON.user },
+  { id: "stats", label: "Stats", icon: '<svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>' },
+  { id: "storage", label: "Storage", icon: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>' },
   { id: "workshop", label: "Workshop", icon: '<svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg>' },
   { id: "downloads", label: "Downloads", icon: C.ICON.down },
 ];
@@ -291,7 +299,7 @@ document.addEventListener("error", (e) => {
     delete img.dataset.fallback;
     // A tall cover falling back to wide header art: show it centered on a blurred copy.
     const art = img.parentElement;
-    if (art && art.classList.contains("art") && !art.closest(".grid.wide")) {
+    if (art && (art.classList.contains("art") || art.classList.contains("cc-art")) && !art.closest(".grid.wide")) {
       art.classList.add("from-header");
       art.style.setProperty("--fb", `url("${fb}")`);
     }
@@ -301,7 +309,7 @@ document.addEventListener("error", (e) => {
   const fail = img.dataset.fail;
   if (fail === "hide") img.style.visibility = "hidden";
   else if (fail === "logo") img.closest(".d-title, .sp-title")?.classList.add("no-logo");
-  else if (img.parentElement?.classList.contains("art")) img.parentElement.classList.remove("from-header"), img.parentElement.classList.add("missing");
+  else if (img.parentElement?.classList.contains("art") || img.parentElement?.classList.contains("cc-art")) img.parentElement.classList.remove("from-header"), img.parentElement.classList.add("missing");
   else img.style.visibility = "hidden";
 }, true);
 })();

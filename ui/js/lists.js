@@ -181,5 +181,6 @@ function bind() {
   window.addEventListener("focus", () => loadSteam().then(renderChip));
 }
 
-C.lists = { init: bind, loadSteam, activeSet, picker, renderChip, active: () => LS.active && find(LS.active) };
+C.lists = { init: bind, loadSteam, activeSet, picker, renderChip, active: () => LS.active && find(LS.active),
+  all: () => [...cinderLists(), ...LS.steam.filter((l) => !l.dynamic)] };
 })();

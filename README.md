@@ -31,6 +31,22 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 - Game lists: your Steam collections appear automatically (read from Steam's files), plus Cinder lists you make. Pick a list from **Lists** in the library; right-click a game to add it to a list
 - Customize your Cinder profile: background from any game's art, a showcase of up to 4 games, which sections show, banner size. **Edit on Steam** jumps to each part of Steam's own profile editor
 
+**Couch mode**
+
+- A full-screen view made for a controller: your games as retro game cases on shelves (Continue playing, Favorites, Playing, All installed, Backlog, Top rated, your lists), with the focused game's art behind
+- Open it from the controller button in the top bar, F11, or your controller's Start button. D-pad or stick moves (hold to scroll faster), A opens, Y plays, X favorites, LB/RB jump, B or Esc leaves. Mouse and keyboard work too
+- Controller input is ignored whenever a game (or anything else) has focus
+
+**Your games, your notes**
+
+- Rate games 1–5 stars, set a status (Playing, Backlog, Beaten, 100%, Dropped) and keep notes, on each game page; filter by status, sort by rating, and see it in List view and Shelves
+- Launch options per game: saved straight into Steam when connected, into Steam's settings file when Steam is closed, or the next time it closes
+
+**Stats and storage**
+
+- Stats tab: this week, last 30 days, Steam's last two weeks and all-time totals, a 30-day chart, streaks, most played lately and ever, by weekday and time of day, recent sessions (Cinder records sessions from 0.17 on)
+- Storage tab: each drive's games, other files and free space; biggest, not played in 6 months and never played; move a game to another drive (Steam's own move, when connected) or uninstall
+
 **Steam Workshop**
 
 - Workshop tab: every game you have workshop items for, with item counts, size on disk and updates waiting (read from Steam's own files)
@@ -77,7 +93,7 @@ It also **keeps Steam on the build you have now** by managing `steam.cfg` and la
 
 The ✦ button in the top bar opens **What's new**: every Cinder update, newest first, with a dot when there's something you haven't seen.
 
-Shortcuts: `Ctrl+B` collapses the sidebar to icons, `Ctrl+1`–`8` switch tabs, `Alt+←` / mouse back button goes back, `F5` refreshes, `Ctrl+,` opens Settings.
+Shortcuts: `Ctrl+B` collapses the sidebar to icons, `Ctrl+1`–`9` switch tabs, `F11` couch mode, `Alt+←` / mouse back button goes back, `F5` refreshes, `Ctrl+,` opens Settings.
 
 ## Optional: Steam Web API key
 
@@ -204,6 +220,7 @@ The `@swatch` colors are what the theme picker shows. A user theme with the same
 | `tray.py` | Tray icon, its menu, and Windows notifications |
 | `playing.py` | Notices when a game starts and stops (Steam's RunningAppID) |
 | `workshop.py` | Your workshop items (from Steam's files), item details and workshop browsing |
+| `gamedata.py` | Your ratings, status and notes; play sessions and stats; launch options |
 | `achievements.py` | Gathers your achievements across games in the background for the Achievements tab |
 | `sales.py` | Checks your wishlist every few hours for new sales |
 | `main.py` | Starts everything and opens the window |

@@ -338,6 +338,12 @@ class Steam:
         p = self.path / "config" / "avatarcache" / f"{steamid}.png"
         return p if p.exists() else None
 
+    def _localconfig_path(self) -> Path | None:
+        u = self.user()
+        if not u or not u["accountid"] or not self.path:
+            return None
+        return self.path / "userdata" / str(u["accountid"]) / "config" / "localconfig.vdf"
+
     def _localconfig(self) -> dict:
         """Parsed UserLocalConfigStore for the signed-in user (cached by mtime)."""
         u = self.user()
@@ -425,6 +431,7 @@ class Steam:
                     "lastupdated": _int(st.get("lastupdated")),
                     "lastplayed": _int(s.get("lastplayed")) if isinstance(s, dict) else 0,
                     "playtime": _int(s.get("playtime")) if isinstance(s, dict) else 0,
+                    "playtime_2wks": _int(s.get("playtime2wks")) if isinstance(s, dict) else 0,
                     "installdir": str(lib / "steamapps" / "common" / st.get("installdir", "")),
                     "library": str(lib),
                 }

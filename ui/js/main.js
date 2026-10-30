@@ -30,7 +30,7 @@ function bindGlobal() {
       e.preventDefault(); search.focus(); search.select();
     } else if (e.key === "," && e.ctrlKey) { e.preventDefault(); C.openSettings(); }
     else if (e.ctrlKey && e.key.toLowerCase() === "b") { e.preventDefault(); C.style.toggleSidebar(); }
-    else if (e.ctrlKey && /^[1-8]$/.test(e.key)) { e.preventDefault(); C.go(C.TABS[+e.key - 1].id); }
+    else if (e.ctrlKey && /^[1-9]$/.test(e.key)) { e.preventDefault(); C.go(C.TABS[+e.key - 1].id); }
     else if (e.altKey && e.key === "ArrowLeft") { e.preventDefault(); history.back(); }
     else if (e.altKey && e.key === "ArrowRight") { e.preventDefault(); history.forward(); }
   });
@@ -64,6 +64,7 @@ async function init() {
   C.activity.init();
   C.gamepage.init();
   C.lists.init();
+  C.mine.init();
   const libraryLoad = C.library.load(true);  // start reading the library right away
   C.library.paintCached();  // and show last session's library while it loads
   try {
@@ -90,6 +91,7 @@ async function init() {
   C.lists.loadSteam().then(() => { C.lists.renderChip(); });
   C.onRoute();
   await libraryLoad;
+  C.mine.load();
   C.library.ensureAch();
   C.updates.poll();
   setTimeout(C.updates.poll, 5000);  // startup update checks finish in the background

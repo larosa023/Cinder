@@ -21,8 +21,9 @@ BUSY_DOWNLOADS = {"downloading", "installing", "verifying"}  # not "queued": Ste
 class SteamIdle:
     CHECK = 20  # seconds between checks
 
-    def __init__(self, steam, config, steam_updater=None):
+    def __init__(self, steam, config, steam_updater=None, when_closed=None):
         self.steam, self.config, self.steam_updater = steam, config, steam_updater
+        self.when_closed = when_closed  # runs every check while Steam is closed (e.g. pending launch options)
         self.last_active = time.time()
         self.hold_until = 0.0
         self.reason = ""
@@ -84,6 +85,8 @@ class SteamIdle:
     def _run(self):
         while not self._stop.wait(self.CHECK):
             try:
+                if not self.steam.running() and self.when_closed:
+                    self.when_closed()
                 if not self.enabled or not self.steam.running():
                     self.last_active = time.time()
                     self.reason = ""

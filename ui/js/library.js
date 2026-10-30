@@ -11,6 +11,7 @@ const SORTS = {
   size: (a, b) => b.size - a.size,
   updated: (a, b) => b.lastupdated - a.lastupdated,
   ach: (a, b) => achPct(b) - achPct(a) || C.sortKey(a.name).localeCompare(C.sortKey(b.name)),
+  rating: (a, b) => ((C.meta(b.appid).rating || 0) - (C.meta(a.appid).rating || 0)) || C.sortKey(a.name).localeCompare(C.sortKey(b.name)),
 };
 const achPct = (g) => { const a = (L.ach || {})[g.appid]; return a ? a[0] / a[1] : -1; };
 
@@ -30,6 +31,10 @@ function visible() {
   else if (L.filter === "played") g = g.filter((x) => x.playtime > 0);
   else if (L.filter === "unplayed") g = g.filter((x) => !x.playtime);
   else if (L.filter === "updates") g = g.filter((x) => x.update_pending);
+  const sf = L.status;
+  if (sf === "rated") g = g.filter((x) => C.meta(x.appid).rating);
+  else if (sf === "noted") g = g.filter((x) => C.meta(x.appid).note);
+  else if (sf) g = g.filter((x) => C.meta(x.appid).status === sf);
   if (L.q) {
     const q = L.q.toLowerCase();
     const words = q.split(/\s+/).filter(Boolean);
@@ -76,6 +81,10 @@ function subText(g) {
   const play = g.playtime ? C.fmtPlay(g.playtime) + " played" : "Not played yet";
   switch (st.cardSub) {
     case "none": return "";
+    case "mine": {
+      const m = C.meta(g.appid);
+      return [m.rating ? "★".repeat(m.rating) : "", m.status ? C.statusLabel(m.status) : ""].filter(Boolean).join(" · ") || "Not rated";
+    }
     case "last": return g.lastplayed ? C.fmtAgo(g.lastplayed) : "Never played";
     case "both": return g.playtime ? `${C.fmtPlay(g.playtime)} · ${g.lastplayed ? C.fmtAgo(g.lastplayed) : "—"}` : "Not played yet";
     case "size": return g.size ? C.fmtSize(g.size) : (g.installed ? "" : "Not installed");
@@ -165,7 +174,7 @@ function tileCardHTML(g) {
   </button>`;
 }
 
-const COLS = [["name", "Name"], ["playtime", "Play time"], ["recent", "Last played"], ["ach", "Achievements"], ["size", "Size"]];
+const COLS = [["name", "Name"], ["playtime", "Play time"], ["recent", "Last played"], ["ach", "Achievements"], ["rating", "Rating"], ["size", "Size"]];
 function listHead() {
   const sort = S.config.sort || "recent";
   return `<div class="lrow lhead"><span></span>${COLS.map(([k, l]) =>
@@ -186,6 +195,7 @@ function listRow(g) {
       <span class="lcol-playtime">${g.playtime ? C.fmtPlay(g.playtime) : "—"}</span>
       <span class="lcol-recent">${g.lastplayed ? C.fmtAgo(g.lastplayed) : "Never"}</span>
       <span class="lcol-ach">${a ? `<span class="bar${a[0] >= a[1] ? " gold" : ""}"><i style="width:${pct}%"></i></span><small>${a[0]}/${a[1]}</small>` : g.shortcut ? "" : "<small>—</small>"}</span>
+      <span class="lcol-rating">${C.stars(C.meta(g.appid).rating) || "<small>—</small>"}${C.meta(g.appid).status ? `<small class="lstatus">${C.statusLabel(C.meta(g.appid).status)}</small>` : ""}</span>
       <span class="lcol-size">${g.size ? C.fmtSize(g.size) : "—"}</span>
       <span class="lcol-act"><span class="lplay" data-play="${g.appid}" title="${g.installed ? "Play" : "Install"}">${g.installed ? ICON.play : ICON.down}</span></span>
     </div>`;
@@ -197,10 +207,13 @@ function shelvesHTML(list) {
   const month = Date.now() / 1000 - 30 * 86400;
   const shelves = [
     ["Favorites", list.filter((g) => fav.has(g.appid))],
+    ["Playing", list.filter((g) => C.meta(g.appid).status === "playing")],
     ["Updates ready", list.filter((g) => g.installed && g.update_pending)],
     ["Continue playing", list.filter((g) => g.installed && g.lastplayed > month).sort(SORTS.recent)],
     ["Installed", list.filter((g) => g.installed)],
+    ["Backlog", list.filter((g) => C.meta(g.appid).status === "backlog")],
     ["Haven't played yet", list.filter((g) => g.installed && !g.playtime)],
+    ["Your top rated", list.filter((g) => (C.meta(g.appid).rating || 0) >= 4).sort(SORTS.rating)],
     ["Most played", list.filter((g) => g.playtime > 60).sort(SORTS.playtime)],
     ["Not installed", list.filter((g) => !g.installed)],
   ].filter(([, gs]) => gs.length);
@@ -225,7 +238,7 @@ function renderViews() {
 // Cards are kept per game and only rebuilt when their markup changes, so searching,
 // filtering and small updates don't recreate (and re-fade) hundreds of covers.
 const pool = new Map();  // appid -> {html, el}
-let poolLayout = "";
+let poolLayout = "", headCache = null;
 const tpl = document.createElement("template");
 
 function patchGrid(grid, lay, layId, list) {
@@ -249,8 +262,12 @@ function patchGrid(grid, lay, layId, list) {
     });
   }
   if (lay.head) {
-    tpl.innerHTML = lay.head();
-    els.unshift(tpl.content.firstElementChild);
+    const html = lay.head();
+    if (!headCache || headCache.html !== html) {
+      tpl.innerHTML = html;
+      headCache = { html, el: tpl.content.firstElementChild };
+    }
+    els.unshift(headCache.el);
   }
   const kids = grid.children;
   if (kids.length === els.length && els.every((el, i) => kids[i] === el)) return;  // nothing moved
@@ -377,6 +394,7 @@ function openDetail(appid) {
   renderDetailToggles(g.appid);
   if (g.shortcut) { $("#d-size").textContent = "—"; $("#d-path").textContent = g.exe || g.installdir; }
   C.gamepage.open(g);
+  C.mine.open(g);
   $("#detail").hidden = false;
   $("#d-play").focus();
 }
@@ -540,6 +558,7 @@ function bind() {
     $$("#filters button").forEach((x) => x.classList.toggle("on", x === b));
     render();
   });
+  $("#status-filter").addEventListener("change", (e) => { L.status = e.target.value; render(); });
   $("#sort").addEventListener("change", (e) => {
     S.config.sort = e.target.value;
     if (e.target.value === "ach") ensureAch();
@@ -556,7 +575,7 @@ function bind() {
   });
 }
 
-C.library = { updateOne, load, render, paintCached, openDetail, sorts: SORTS, visible, ensureAch };
+C.library = { achFor: (g) => achFor(g), updateOne, load, render, paintCached, openDetail, sorts: SORTS, visible, ensureAch };
 C.views.library = {
   placeholder: "Search your library",
   show() { render(); },

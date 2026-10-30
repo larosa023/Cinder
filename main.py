@@ -7,6 +7,7 @@ import os
 import secrets
 import sys
 import threading
+import time
 import webbrowser
 from pathlib import Path
 
@@ -116,6 +117,14 @@ class WindowApi:
         self._window.toggle_fullscreen()
         return "max"
 
+    def fullscreen(self, on):
+        """Couch mode: fill the whole screen (and back)."""
+        on = bool(on)
+        if on != getattr(self, "_fs", False):
+            self._fs = on
+            self._window.toggle_fullscreen()
+        return on
+
     def log(self, msg):
         """Lets the page write to cinder.log."""
         log.info("page: %s", str(msg)[:500])
@@ -172,6 +181,11 @@ def main() -> None:
     if steam.found:
         if cfg["freeze_updates"] and not steam.freeze_enabled():
             steam.set_freeze(True)  # best effort; the UI reports if it couldn't
+        if not steam.running():  # launch options saved while Steam was running last time
+            import gamedata
+            lo, lc = gamedata.LaunchOptions(ddir), steam._localconfig_path()
+            if lc and lo.pending():
+                lo.apply_to_file(lc)
         if cfg["autostart_steam"] and not cfg["steam_on_demand"] and not args.no_steam and not steam.running():
             steam.start(silent=True)
 
@@ -224,7 +238,12 @@ def main() -> None:
     )
     ctx.migrated_from = args.migrated_from
     from steamidle import SteamIdle
-    ctx.idle = SteamIdle(steam, cfg, steam_updater)
+    def apply_launch_options():
+        p = steam._localconfig_path()
+        if p and ctx.launchopts.pending() and not steam.running():
+            if ctx.launchopts.apply_to_file(p):
+                steam.invalidate_library()
+    ctx.idle = SteamIdle(steam, cfg, steam_updater, when_closed=apply_launch_options)
     if steam.found:
         ctx.idle.start()
     if steam.found:
@@ -305,6 +324,8 @@ def main() -> None:
         tucked["how"] = how
 
     def on_game_stop(appid, seconds):
+        now = time.time()
+        ctx.sessions.record(appid, now - seconds, now)
         if ctx.ach:
             later(60, ctx.ach.scan)  # pick up what you just unlocked
         if tucked["how"] and cfg["restore_after_play"]:

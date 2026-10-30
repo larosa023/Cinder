@@ -1,5 +1,18 @@
 [
  {
+  "version": "0.17.0",
+  "date": "2026-10-30",
+  "title": "Couch mode, Stats, Storage and more",
+  "items": [
+   "Couch mode: a full-screen, controller-friendly view with your games as retro game cases. Open it with the controller button in the top bar, F11, or your controller's Start button; B or Esc leaves",
+   "Stats tab: hours this week and month, a 30-day chart, streaks, most played, play by weekday and time of day, recent sessions",
+   "Storage tab: every drive with what games take up, biggest and unplayed games, move a game to another drive, uninstall",
+   "Rate games 1–5 stars, set a status (Playing, Backlog, Beaten, 100%, Dropped) and keep notes on each game page; filter and sort by them",
+   "Edit a game's Steam launch options from its game page",
+   "Library redraws are now about 10× faster again on big libraries"
+  ]
+ },
+ {
   "version": "0.16.0",
   "date": "2026-10-29",
   "title": "Smoother and lighter",
