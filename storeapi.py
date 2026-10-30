@@ -611,6 +611,98 @@ def parse_reviews(data: dict) -> dict:
     return out
 
 
+# ---- reviews from the Community hub (what the game's Steam Community page shows) ----
+COMMUNITY_SORTS = {"helpful": "toprated", "recent": "mostrecent", "positive": "toprated", "negative": "toprated"}
+
+
+def community_reviews_url(appid: int, sort: str = "helpful", page: int = 1) -> str:
+    q = {"userreviewsoffset": (page - 1) * 10, "p": page, "numperpage": 10,
+         "browsefilter": COMMUNITY_SORTS.get(sort, "toprated"), "appHubSubSection": 10, "l": "english",
+         "filterLanguage": "default", "searchText": "", "maxInappropriateScore": 100}
+    return f"{COMMUNITY}/app/{int(appid)}/homecontent/?{urllib.parse.urlencode(q)}"
+
+
+def _posted(text: str) -> int:
+    """'Posted: October 29' / 'Posted: March 12, 2024' -> timestamp (0 if unknown)."""
+    from datetime import datetime
+    t = re.sub(r"^\s*Posted:?\s*", "", text or "").split(".")[0].strip()
+    for fmt, add_year in (("%B %d, %Y", False), ("%d %B, %Y", False), ("%B %d", True), ("%d %B", True)):
+        try:
+            d = datetime.strptime(t, fmt)
+            if add_year:
+                now = datetime.now()
+                d = d.replace(year=now.year)
+                if d > now:
+                    d = d.replace(year=now.year - 1)
+            return int(d.timestamp())
+        except ValueError:
+            continue
+    return 0
+
+
+def parse_community_reviews(html: str, sort: str = "helpful") -> list[dict]:
+    """Review cards from a Community hub page (HTML)."""
+    out = []
+    chunks = re.split(r'<div class="apphub_Card\b', html or "")[1:]
+    for c in chunks:
+        title = re.search(r'class="title"[^>]*>\s*(.*?)\s*<', c, re.S)
+        if not title:
+            continue
+        up = "not" not in title.group(1).lower()
+        hours = re.search(r'class="hours"[^>]*>\s*([\d,\.]+)', c)
+        posted = re.search(r'class="date_posted"[^>]*>(.*?)</div>', c, re.S)
+        helpful = re.search(r'([\d,]+)\s+(?:people|person)\s+found this review helpful', c)
+        funny = re.search(r'([\d,]+)\s+(?:people|person)\s+found this review funny', c)
+        body = ""
+        m = re.search(r'class="apphub_CardTextContent"[^>]*>(.*)', c, re.S)
+        if m:
+            body = m.group(1)
+            body = re.sub(r'<div class="date_posted".*?</div>', "", body, count=1, flags=re.S)
+            early = 'early_access_review' in body
+            body = re.sub(r'<div class="early_access_review".*?</div>', "", body, flags=re.S)
+            cut = re.search(r'<div class="(?:UserReviewCardContent_Footer|apphub_CardContentAuthorBlock|apphub_CardContentMoreLink)', body)
+            if cut:
+                body = body[:cut.start()]
+            body = re.sub(r"<br\s*/?>", "\n", body, flags=re.I)
+            body = re.sub(r"</?(?:div|p)[^>]*>", "\n", body, flags=re.I)
+            text = "\n".join(line.strip() for line in strip_html(body).split("\n"))
+            text = re.sub(r"\n{3,}", "\n\n", text).strip()
+        else:
+            text, early = "", False
+        link = re.search(r'data-modal-content-url="([^"]+)"', c)
+        out.append({
+            "id": link.group(1) if link else f"c{len(out)}",
+            "up": up, "text": text[:5000],
+            "helpful": _int((helpful.group(1) if helpful else "0").replace(",", "")),
+            "funny": _int((funny.group(1) if funny else "0").replace(",", "")),
+            "hours": float((hours.group(1) if hours else "0").replace(",", "") or 0),
+            "hours_at": 0, "date": _posted(strip_html(posted.group(1)) if posted else ""),
+            "date_text": strip_html(posted.group(1)).replace("Posted:", "").strip() if posted else "",
+            "updated": 0, "early": early, "free": "free" in c.lower() and "received this product for free" in c.lower(),
+            "author_reviews": 0,
+        })
+    if sort == "positive":
+        out = [r for r in out if r["up"]]
+    elif sort == "negative":
+        out = [r for r in out if not r["up"]]
+    return out
+
+
+def community_reviews(appid: int, sort: str = "helpful", page: int = 1, html: str | None = None) -> dict:
+    """A page of reviews from the Community hub. Pass `html` if it was fetched another way."""
+    if html is None:
+        html = _fetch(community_reviews_url(appid, sort, page), ttl=900, as_json=False)
+    if "apphub_Card" not in html and "<title>" in html[:2000]:
+        raise SteamDataError("Steam wouldn't send reviews right now")
+    items = parse_community_reviews(html, sort)
+    if not items and sort not in ("positive", "negative"):
+        from cinderlog import log
+        i = html.find("apphub_Card")
+        log.info("community reviews: no cards parsed (%d bytes); sample: %r", len(html), html[max(0, i - 50):i + 900])
+    more = html.count('class="apphub_Card') >= 8
+    return {"reviews": items, "cursor": f"p{page + 1}" if more else ""}
+
+
 def review_summary(appid: int, cc: str = "US") -> dict | None:
     """The overall rating ("Mostly Positive", 78% of 20,975) from Steam's store API, the same
     host Cinder uses for names and art (reliable, no web page detours)."""

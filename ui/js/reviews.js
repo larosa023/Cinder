@@ -30,7 +30,7 @@ function card(r) {
       <span class="rv-thumb">${THUMB}</span>
       <div><b>${r.up ? "Recommended" : "Not recommended"}</b>
         <small>${r.hours ? `${n(r.hours)} hrs on record` : "Under an hour"}${r.hours_at && r.hours_at !== r.hours ? ` (${n(r.hours_at)} at review)` : ""}</small></div>
-      <small class="rv-date">${C.fmtDate(r.date)}${r.updated > r.date + 86400 ? " · edited" : ""}</small>
+      <small class="rv-date">${r.date ? C.fmtDate(r.date) : esc(r.date_text || "")}${r.updated > r.date + 86400 ? " · edited" : ""}</small>
     </header>
     ${r.early || r.free ? `<div class="rv-tags">${r.early ? "<span>Early Access review</span>" : ""}${r.free ? "<span>Got it for free</span>" : ""}</div>` : ""}
     <div class="rv-text${long ? " clamp" : ""}">${esc(r.text) || "<i>No text</i>"}</div>

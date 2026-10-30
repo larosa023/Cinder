@@ -243,6 +243,56 @@ class Handler(BaseHTTPRequestHandler):
         c.steam.prefetch_art([g["appid"] for g in games])
         return games
 
+    # -- reviews -----------------------------------------------------------------
+    def _reviews(self, appid: int, sort: str, cur: str) -> dict:
+        """A page of Steam reviews, from whichever source answers.
+
+        1. The store's review API (best data, but Steam often answers Cinder with its home page).
+        2. The game's Steam Community hub (the same reviews, as a web page).
+        3. That page through a hidden browser window, if plain requests are turned away.
+        4. The store API through the Steam client, when it's connected."""
+        import steambridge
+        c = self.ctx
+        page = int(cur[1:]) if cur.startswith("p") and cur[1:].isdigit() else 0
+        if not page:
+            try:
+                return storeapi.reviews(appid, sort, cur)
+            except storeapi.SteamDataError:
+                storeapi.review_way_note("browser")  # don't keep asking the store API this session
+                page = 1
+        def gather(get_html):
+            # Positive / Negative are picked out of the most helpful, so read a few pages for enough.
+            p, out = page, {"reviews": [], "cursor": ""}
+            for _ in range(4 if sort in ("positive", "negative") else 1):
+                r = storeapi.community_reviews(appid, sort, p, html=get_html(storeapi.community_reviews_url(appid, sort, p)))
+                out["reviews"] += r["reviews"]
+                out["cursor"] = r["cursor"]
+                if not r["cursor"] or len(out["reviews"]) >= 6:
+                    break
+                p += 1
+            return out
+
+        try:
+            return gather(lambda url: storeapi._fetch(url, ttl=900, as_json=False))
+        except storeapi.SteamDataError as e:
+            log.info("community reviews (direct) failed: %s", e)
+        if c.browser:
+            try:
+                r = gather(c.browser.get_html)
+                log.info("reviews for %s came through a hidden browser", appid)
+                return r
+            except Exception as e:
+                log.info("community reviews (browser) failed: %r", e)
+        if self._bridge_state() == "on":
+            try:
+                data = c.steam.bridge.run(
+                    f"fetch({json.dumps(storeapi.review_url(appid, sort, '*'))}, {{credentials: 'include'}}).then((r) => r.json())", 20)
+                log.info("reviews for %s came through the Steam client", appid)
+                return storeapi.parse_reviews(data)
+            except (steambridge.BridgeError, storeapi.SteamDataError) as e:
+                log.info("reviews through Steam failed: %s", e)
+        raise storeapi.SteamDataError("Steam wouldn't send reviews right now")
+
     # -- launch options ----------------------------------------------------------
     def _launch_options(self, appid: int, options: str):
         """Live through Steam when connected; straight into Steam's file when it's closed; else on close."""
@@ -437,30 +487,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": True, "summary": storeapi.review_summary(appid, cc)})
             cur = q.get("cursor", "*")[:200]
             sort = q.get("sort", "helpful")
-            try:
-                return self._json({"ok": True, **storeapi.reviews(appid, sort, cur)})
-            except storeapi.SteamDataError:
-                url = storeapi.review_url(appid, sort, cur)
-                # Steam's firewall turns away programmatic requests for reviews; a real browser
-                # request (a hidden window of the same engine Cinder uses) gets through.
-                if c.browser:
-                    try:
-                        data = c.browser.get_json(url)
-                        storeapi.review_way_note("browser")
-                        return self._json({"ok": True, **storeapi.parse_reviews(data)})
-                    except Exception as e:
-                        log.info("reviews through a hidden browser failed: %r", e)
-                if self._bridge_state() != "on":
-                    raise
-                # Last resort: ask the Steam client itself (it's signed in to the store).
-                import steambridge
-                try:
-                    data = c.steam.bridge.run(f"fetch({json.dumps(url)}, {{credentials: 'include'}}).then((r) => r.json())", 20)
-                except steambridge.BridgeError as e:
-                    log.info("reviews through Steam failed: %s", e)
-                    raise storeapi.SteamDataError("Steam wouldn't send reviews right now") from e
-                log.info("reviews for %s came through the Steam client", appid)
-                return self._json({"ok": True, **storeapi.parse_reviews(data)})
+            return self._json({"ok": True, **self._reviews(appid, sort, cur)})
         m = re.fullmatch(r"/api/game/(\d+)/workshop_support", path)
         if m:
             return self._json({"ok": True, **self._workshop_support(int(m.group(1)), cc)})

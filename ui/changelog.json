@@ -1,5 +1,14 @@
 [
  {
+  "version": "0.17.5",
+  "date": "2026-10-30",
+  "title": "Steam reviews from the Community hub",
+  "items": [
+   "Reviews now load from the game's Steam Community page (the same reviews Steam shows), since Steam's review service sends Cinder its home page instead",
+   "Most helpful, Recent, Positive and Negative, with hours played, posted date and helpful/funny votes"
+  ]
+ },
+ {
   "version": "0.17.4",
   "date": "2026-10-30",
   "title": "Steam reviews, take three",

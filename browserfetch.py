@@ -25,12 +25,23 @@ class BrowserFetch:
         self._closer = None
 
     def get_json(self, url: str, timeout: float = 20) -> dict:
+        text = self._load(url, "document.body ? document.body.innerText : ''", timeout)
+        try:
+            return json.loads(text, strict=False)
+        except ValueError as e:
+            log.info("browser fetch got a page, not data: %r", text[:120])
+            raise ValueError("not JSON") from e
+
+    def get_html(self, url: str, timeout: float = 20) -> str:
+        return self._load(url, "document.documentElement ? document.documentElement.outerHTML : ''", timeout)
+
+    def _load(self, url: str, script: str, timeout: float) -> str:
         import webview  # pywebview: only available when Cinder runs as its own window
         with self._lock:
             self._loaded.clear()
             if self._win is None:
                 self._win = webview.create_window("Cinder helper", url, hidden=True, focus=False,
-                                                  width=480, height=360)
+                                                  width=1280, height=900)  # desktop layout, not mobile
                 self._win.events.loaded += self._on_loaded
             else:
                 self._win.load_url(url)
@@ -38,17 +49,13 @@ class BrowserFetch:
                 raise TimeoutError("page didn't load")
             text = ""
             for _ in range(20):  # the body can lag the load event slightly
-                text = self._win.evaluate_js("document.body ? document.body.innerText : ''") or ""
+                text = self._win.evaluate_js(script) or ""
                 if text.strip():
                     break
                 time.sleep(0.15)
             self._last = time.monotonic()
             self._schedule_close()
-        try:
-            return json.loads(text, strict=False)
-        except ValueError as e:
-            log.info("browser fetch got a page, not data: %r", text[:120])
-            raise ValueError("not JSON") from e
+        return text
 
     def _on_loaded(self):
         self._loaded.set()
