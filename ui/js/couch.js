@@ -19,7 +19,7 @@ const THEMES = [
   { id: "cart", name: "Cartridge", desc: "16-bit carts on a CRT", sw: ["#8d8f96", "#ffd34e", "#2b1b4d"] },
   { id: "modern", name: "Modern", desc: "Clean, rounded, glassy", sw: ["#ffffff", "#9aa4b8", "#1b1f29"] },
   { id: "neon", name: "Synthwave", desc: "Neon grid and chrome", sw: ["#ff2fd0", "#00e5ff", "#1a0633"] },
-  { id: "oled", name: "Midnight", desc: "Pure black, nothing extra", sw: ["#000000", "#ffffff", "#333333"] },
+  { id: "vhs", name: "VHS", desc: "Rental tapes on a worn-out VCR", sw: ["#0d0d0f", "#f2e8c9", "#d6262f"] },
 ];
 const themeOf = () => (THEMES.some((t) => t.id === S.config.couch_theme) ? S.config.couch_theme : "case");
 const CASE_W = () => Math.round(Math.min(window.innerWidth, window.innerHeight * 1.9) * 0.118);  // case width in px

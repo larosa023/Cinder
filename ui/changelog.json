@@ -1,5 +1,14 @@
 [
  {
+  "version": "0.19.1",
+  "date": "2026-10-30",
+  "title": "VHS theme",
+  "items": [
+   "New couch mode theme, VHS: games as black rental tape cases with a Cinder Video sticker, a VCR-style PLAY ▶ on-screen display, colour fringing and a tracking line that rolls by now and then",
+   "The Midnight theme is gone (if you had it picked, couch mode goes back to Retro case)"
+  ]
+ },
+ {
   "version": "0.19.0",
   "date": "2026-10-30",
   "title": "Couch mode themes",
