@@ -1,5 +1,15 @@
 [
  {
+  "version": "0.19.0",
+  "date": "2026-10-30",
+  "title": "Couch mode themes",
+  "items": [
+   "Five looks for couch mode: Retro case, Cartridge (16-bit carts on a pixelated CRT), Modern (clean and rounded), Synthwave (neon grid) and Midnight (pure black)",
+   "Switch while you're in couch mode: press the View button on your controller, T on the keyboard, or the palette at the top. Left/right previews each one live, A keeps it, B goes back",
+   "Your pick is remembered for next time"
+  ]
+ },
+ {
   "version": "0.18.4",
   "date": "2026-10-30",
   "title": "Drag shelves in couch mode",

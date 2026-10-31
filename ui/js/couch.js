@@ -13,6 +13,15 @@ const K = {
   open: false, rows: [], row: 0, col: [], sheet: null, sheetFocus: 0,
   raf: 0, prevButtons: [], hold: { dir: "", next: 0, count: 0 }, bgFront: 0, bgFor: 0, clock: 0, idle: 0,
 };
+// Looks you can switch between while in couch mode (View button, T, or the palette at the top).
+const THEMES = [
+  { id: "case", name: "Retro case", desc: "Game cases with a label band", sw: ["#16181d", "var(--accent)", "#f2f3f5"] },
+  { id: "cart", name: "Cartridge", desc: "16-bit carts on a CRT", sw: ["#8d8f96", "#ffd34e", "#2b1b4d"] },
+  { id: "modern", name: "Modern", desc: "Clean, rounded, glassy", sw: ["#ffffff", "#9aa4b8", "#1b1f29"] },
+  { id: "neon", name: "Synthwave", desc: "Neon grid and chrome", sw: ["#ff2fd0", "#00e5ff", "#1a0633"] },
+  { id: "oled", name: "Midnight", desc: "Pure black, nothing extra", sw: ["#000000", "#ffffff", "#333333"] },
+];
+const themeOf = () => (THEMES.some((t) => t.id === S.config.couch_theme) ? S.config.couch_theme : "case");
 const CASE_W = () => Math.round(Math.min(window.innerWidth, window.innerHeight * 1.9) * 0.118);  // case width in px
 const GAP = 26;
 
@@ -50,6 +59,7 @@ function caseHTML(g, i) {
       <div class="cc-spine"></div><div class="cc-gloss"></div>
       ${fav ? '<span class="cc-fav">★</span>' : ""}${m.status === "completed" ? '<span class="cc-done">100%</span>' : ""}
     </div>
+    <div class="cc-name">${esc(C.gname(g.name))}</div>
   </div>`;
 }
 
@@ -59,14 +69,16 @@ function shell() {
     <header class="ctop">
       <div class="cbrand"><span class="cdot"></span>Cinder</div>
       <div class="ctop-r"><span class="cpad" id="cpad"></span><span class="cclock" id="cclock"></span>
+        <button class="cx" id="couch-theme" title="Themes (T or the View button)"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-.9-.7-1.3-.7-2.2 0-.9.7-1.6 1.6-1.6H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3Z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg></button>
         <button class="cx" id="couch-exit" title="Leave couch mode (Esc)"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
     </header>
     <section class="cinfo" id="cinfo"></section>
     <section class="crows" id="crows"></section>
     <footer class="chints">
       <span><i class="bA">A</i>Open</span><span><i class="bY">Y</i>Play</span><span><i class="bX">X</i>Favorite</span>
-      <span><i class="bB">B</i>Leave</span>
+      <span><i class="bV">⧉</i>Theme</span><span><i class="bB">B</i>Leave</span>
     </footer>
+    <div class="cthemes" id="cthemes" hidden></div>
     <div class="csheet" id="csheet" hidden></div>`;
 }
 
@@ -272,10 +284,62 @@ function play(g) {
   if (K.sheet) closeSheet();
 }
 
+// ---------- themes ----------
+function applyTheme(id) {
+  const el = root();
+  el.dataset.theme = id;
+  // Some looks are a different shape; let everything settle without sliding.
+  requestAnimationFrame(() => place(true));
+}
+
+function openThemes() {
+  if (K.sheet) closeSheet();
+  K.themes = { was: themeOf(), i: Math.max(0, THEMES.findIndex((t) => t.id === themeOf())) };
+  paintThemes();
+  const p = $("#cthemes");
+  p.hidden = false;
+  requestAnimationFrame(() => p.classList.add("open"));
+}
+
+function paintThemes() {
+  const t = K.themes;
+  $("#cthemes").innerHTML = `<div class="ct-head"><b>Theme</b><small>◀ ▶ to try · A to keep · B to cancel</small></div>
+    <div class="ct-list">${THEMES.map((th, i) => `
+      <button class="ct${i === t.i ? " focus" : ""}${th.id === t.was ? " cur" : ""}" data-ct="${i}">
+        <span class="ct-sw">${th.sw.map((c) => `<i style="background:${c}"></i>`).join("")}</span>
+        <b>${esc(th.name)}</b><small>${esc(th.desc)}</small>
+      </button>`).join("")}</div>`;
+  applyTheme(THEMES[t.i].id);
+}
+
+function closeThemes(keep) {
+  const t = K.themes;
+  if (!t) return;
+  K.themes = null;
+  const id = keep ? THEMES[t.i].id : t.was;
+  applyTheme(id);
+  if (keep && id !== S.config.couch_theme) C.saveConfig({ couch_theme: id });
+  const p = $("#cthemes");
+  p.classList.remove("open");
+  setTimeout(() => { if (!K.themes) p.hidden = true; }, 200);
+}
+
+function themePress(btn) {
+  const t = K.themes;
+  if (btn === "left" || btn === "up" || btn === "lb") t.i = (t.i - 1 + THEMES.length) % THEMES.length;
+  else if (btn === "right" || btn === "down" || btn === "rb") t.i = (t.i + 1) % THEMES.length;
+  else if (btn === "a" || btn === "view") return closeThemes(true);
+  else if (btn === "b" || btn === "start") return closeThemes(false);
+  else return;
+  paintThemes();
+}
+
 // ---------- input ----------
 function press(btn) {
   K.idle = Date.now();
   root().classList.remove("idle");
+  if (K.themes) return themePress(btn);
+  if (btn === "view") return openThemes();
   if (K.sheet) {
     const n = $("#csheet").querySelectorAll("[data-sb]").length;
     if (btn === "left" || btn === "up") K.sheetFocus = Math.max(0, K.sheetFocus - 1);
@@ -302,7 +366,7 @@ function press(btn) {
 }
 
 const KEYS = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down", Enter: "a", " ": "y",
-  Escape: "b", Backspace: "b", f: "x", F: "x", PageUp: "lb", PageDown: "rb" };
+  Escape: "b", Backspace: "b", f: "x", F: "x", PageUp: "lb", PageDown: "rb", t: "view", T: "view" };
 
 function onKey(e) {
   if (!K.open) return;
@@ -317,7 +381,7 @@ function onKey(e) {
 }
 
 // Standard gamepad mapping.
-const PAD = { 0: "a", 1: "b", 2: "x", 3: "y", 4: "lb", 5: "rb", 9: "start", 12: "up", 13: "down", 14: "left", 15: "right" };
+const PAD = { 0: "a", 1: "b", 2: "x", 3: "y", 4: "lb", 5: "rb", 8: "view", 9: "start", 12: "up", 13: "down", 14: "left", 15: "right" };
 const DIRS = new Set(["up", "down", "left", "right"]);
 
 // Controllers to read: ones Windows reports with the standard layout (Xbox, Elite, PlayStation…).
@@ -397,6 +461,7 @@ async function open() {
   K.row = 0;
   K.col = K.rows.map(() => 0);
   const el = root();
+  el.dataset.theme = themeOf();
   el.innerHTML = shell();
   el.hidden = false;
   document.body.classList.add("couch-on");
@@ -419,6 +484,7 @@ async function open() {
 
 async function close() {
   if (!K.open) return;
+  if (K.themes) closeThemes(true);
   K.open = false;
   cancelAnimationFrame(K.raf);
   clearInterval(K.fgTimer);
@@ -449,6 +515,10 @@ function bind() {
   window.addEventListener("resize", () => { if (K.open) { root().style.setProperty("--cw", `${CASE_W()}px`); place(true); } });
   root().addEventListener("click", (e) => {
     if (e.target.closest("#couch-exit")) return close();
+    if (e.target.closest("#couch-theme")) return K.themes ? closeThemes(true) : openThemes();
+    const ct = e.target.closest("[data-ct]");
+    if (ct) { if (K.themes.i === +ct.dataset.ct) return closeThemes(true); K.themes.i = +ct.dataset.ct; return paintThemes(); }
+    if (K.themes && !e.target.closest("#cthemes")) return closeThemes(true);
     const sb = e.target.closest("[data-sb]");
     if (sb) return sheetAct(sb.dataset.sb);
     if (K.sheet && !e.target.closest(".cs-body, .cs-art")) return closeSheet();
@@ -464,7 +534,7 @@ function bind() {
   // Mouse wheel / trackpad moves along the shelf.
   let wheelAt = 0;
   root().addEventListener("wheel", (e) => {
-    if (!K.open || K.sheet) return;
+    if (!K.open || K.sheet || K.themes) return;
     e.preventDefault();
     const now = performance.now();
     if (now - wheelAt < 70) return;
@@ -480,7 +550,7 @@ function bindDrag() {
   let swallowClick = false;
   const el = root();
   el.addEventListener("pointerdown", (e) => {
-    if (!K.open || K.sheet || e.button !== 0 || e.pointerType === "touch" && false) return;
+    if (!K.open || K.sheet || K.themes || e.button !== 0) return;
     const rowEl = e.target.closest(".crow");
     if (!rowEl || e.target.closest("button:not(.cc), a, input")) return;
     const ri = +rowEl.dataset.r;
