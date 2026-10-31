@@ -61,7 +61,8 @@ function render() {
   const fresh = !d.sessions;
   el().innerHTML = `
     <div class="page-head"><h1>Stats</h1>
-      <span class="scan">${d.tracking_since ? `Cinder has tracked your sessions since ${C.fmtDate(d.tracking_since)}` : "Cinder starts tracking from your next game"}</span></div>
+      <span class="scan">${d.tracking_since ? `Cinder has tracked your sessions since ${C.fmtDate(d.tracking_since)}` : "Cinder starts tracking from your next game"}</span>
+      <div class="spacer"></div><button class="btn sm primary" data-year>✨ Year in review</button></div>
     <div class="pstats st-kpis">
       <div class="pstat"><span>This week</span><b>${hm(d.week)}</b><small>last 7 days</small></div>
       <div class="pstat"><span>Last 30 days</span><b>${hm(d.month)}</b><small>${d.days.filter((x) => x.minutes).length} days played</small></div>
@@ -103,6 +104,7 @@ function bind() {
     const a = e.target.closest("[data-app]");
     if (a) { const id = +a.dataset.app; C.go("library"); setTimeout(() => C.library.openDetail(id), 50); }
     if (e.target.closest("[data-retry]")) load();
+    if (e.target.closest("[data-year]")) C.review.open();
   });
   // Hover tips for the bars (bigger hit area than the bar itself).
   el().addEventListener("mousemove", (e) => {

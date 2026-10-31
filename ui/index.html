@@ -151,6 +151,7 @@
         <button data-dtab="specs">Specs</button>
         <button data-dtab="dlc">DLC</button>
         <button data-dtab="workshop" id="d-tab-workshop" hidden>Workshop</button>
+        <button data-dtab="setup">Setup</button>
       </nav>
       <div class="d-pane" id="d-pane" hidden></div>
       <div id="d-overview">
@@ -198,6 +199,16 @@
   <div class="panel guide-panel">
     <button class="icon-btn d-close" data-gclose title="Close (Esc)"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     <div class="guide-body" id="guide-body"></div>
+  </div>
+</div>
+
+<!-- Year in review -->
+<div class="overlay" id="review" hidden>
+  <div class="panel review-panel">
+    <div class="news-head"><div><h2>Year in review</h2></div><div class="spacer"></div>
+      <select id="review-period"></select>
+      <button class="icon-btn" data-close title="Close (Esc)"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="review-body" id="review-body"></div>
   </div>
 </div>
 
@@ -368,6 +379,12 @@
             <button class="btn sm" id="key-get">Get a key</button></div></div>
         <div class="row"><div><strong>Wishlist sale alerts</strong><small>Checks your wishlist every few hours and shows a Windows notification when something goes on sale, hits its lowest price, or drops to a price you set.</small></div>
           <label class="switch"><input type="checkbox" id="set-sales"><span></span></label></div>
+        <div class="row"><div><strong>Back up saves before updates</strong><small>Before a game updates, copy its Steam Cloud saves and any save folders you've added (game page → Setup). Keeps the last three.</small></div>
+          <label class="switch"><input type="checkbox" id="set-backup"><span></span></label></div>
+        <div class="row"><div><strong>Include Workshop mods in backups</strong><small>Up to 2 GB of mods per game.</small></div>
+          <label class="switch"><input type="checkbox" id="set-backup-ws"><span></span></label></div>
+        <div class="row"><div><strong>Couch mode sounds</strong><small>Soft sounds as you move around couch mode, matched to each theme. M mutes them while you're in it.</small></div>
+          <label class="switch"><input type="checkbox" id="set-csounds"><span></span></label></div>
         <div class="row"><div><strong>Session recap</strong><small>After you close a game, show how long you played, what you unlocked and your new total.</small></div>
           <label class="switch"><input type="checkbox" id="set-recap"><span></span></label></div>
         <p class="note">Cinder never asks for your Steam password. Buying, chat and wishlist changes open in the real Steam client.</p>
@@ -457,6 +474,7 @@
 <script src="/ui/js/activity.js"></script>
 <script src="/ui/js/gamepage.js"></script>
 <script src="/ui/js/extras.js"></script>
+<script src="/ui/js/setup.js"></script>
 <script src="/ui/js/main.js"></script>
 </body>
 </html>

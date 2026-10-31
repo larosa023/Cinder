@@ -403,6 +403,9 @@ function bind() {
   $("#set-restore").addEventListener("change", (e) => C.saveConfig({ restore_after_play: e.target.checked }));
   $("#set-sales").addEventListener("change", (e) => C.saveConfig({ sale_alerts: e.target.checked }));
   $("#set-recap").addEventListener("change", (e) => C.saveConfig({ session_recap: e.target.checked }));
+  $("#set-backup").addEventListener("change", (e) => C.saveConfig({ backup_before_updates: e.target.checked }));
+  $("#set-backup-ws").addEventListener("change", (e) => C.saveConfig({ backup_workshop: e.target.checked }));
+  $("#set-csounds").addEventListener("change", (e) => C.saveConfig({ couch_sounds: e.target.checked }));
 }
 
 function renderSteamUpdToggle() {
@@ -429,6 +432,9 @@ function fill() {
   $("#set-restore").checked = c.restore_after_play !== false;
   $("#set-sales").checked = c.sale_alerts !== false;
   $("#set-recap").checked = c.session_recap !== false;
+  $("#set-backup").checked = c.backup_before_updates !== false;
+  $("#set-backup-ws").checked = c.backup_workshop !== false;
+  $("#set-csounds").checked = c.couch_sounds !== false;
   const inst = S.install || {};
   $("#set-startup").checked = !!inst.startup;
   $("#set-startup").disabled = !inst.frozen;

@@ -1,5 +1,18 @@
 [
  {
+  "version": "0.21.0",
+  "date": "2026-10-31",
+  "title": "Couch shelves, sounds, backups and more",
+  "items": [
+   "Couch mode sounds: a sound pack for each theme (tape clunks for VHS, chiptune blips for Cartridge and Pocket, wood knocks for Bookshelf…). M mutes, or turn them off in Settings",
+   "Couch mode shelves: Downloads & updates (with progress), Friends online (Y to message), Your wishlist (prices, lowest-ever tags, set price alerts with the controller) and Store deals, top sellers and new releases",
+   "Year in review: Stats → Year in review shows any year or month: hours, top games, longest session, busiest day, streak, achievements and your rarest unlock",
+   "Before & after playing (game page → Setup): switch the power plan, close apps like Discord, or open programs when a game starts, and put it all back when it closes. Set it per game or for every game",
+   "Save backups: before a game updates, Cinder backs up its Steam Cloud saves, any save folders you add, and its Workshop mods. Restore or back up any time from game page → Setup",
+   "Custom art (game page → Setup): use your own cover, banner, background or logo for any game, including non-Steam games"
+  ]
+ },
+ {
   "version": "0.20.0",
   "date": "2026-10-31",
   "title": "Five more couch themes",

@@ -117,6 +117,18 @@ class WindowApi:
         self._window.toggle_fullscreen()
         return "max"
 
+    def pick_file(self, kind="any"):
+        """A file picker for launch extras and custom art. Returns a path or ''."""
+        import webview
+        types = {"image": ("Images (*.png;*.jpg;*.jpeg;*.webp;*.gif)",), "exe": ("Programs (*.exe;*.bat;*.cmd;*.lnk)", "All files (*.*)")}.get(kind, ("All files (*.*)",))
+        r = self._window.create_file_dialog(webview.OPEN_DIALOG, file_types=types)
+        return (r[0] if r else "") or ""
+
+    def pick_folder(self):
+        import webview
+        r = self._window.create_file_dialog(webview.FOLDER_DIALOG)
+        return (r[0] if r else "") or ""
+
     def foreground(self):
         """Couch mode asks this so controller presses only count while you're in Cinder."""
         return self._snap.foreground()
@@ -329,6 +341,7 @@ def main() -> None:
     def on_game_start(appid):
         if ctx.recaps:
             ctx.recaps.started(appid)
+        threading.Thread(target=ctx.hooks.before, args=(appid,), daemon=True).start()  # if launched outside Cinder
         how = cfg["when_playing"]
         if how == "minimize":
             window.minimize()
@@ -343,6 +356,7 @@ def main() -> None:
         ctx.sessions.record(appid, now - seconds, now)
         if ctx.recaps:
             ctx.recaps.stopped(appid, seconds)
+        threading.Thread(target=ctx.hooks.after, args=(appid,), daemon=True).start()
         if ctx.ach:
             later(60, ctx.ach.scan)  # pick up what you just unlocked
         if tucked["how"] and cfg["restore_after_play"]:

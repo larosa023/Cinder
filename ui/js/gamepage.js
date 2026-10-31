@@ -1,7 +1,7 @@
 /* Game page tabs: achievements, news, DLC. */
 (() => {
 "use strict";
-const { $, $$, esc } = C;
+const { $, $$, esc, S } = C;
 const G = { appid: 0, tab: "overview", cache: {}, ws: {} };
 const WS_ICON = '<svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg>';
 
@@ -37,6 +37,7 @@ function setTab(tab) {
 async function load(tab) {
   const pane = $("#d-pane");
   if (tab === "reviews") { C.reviews.mount(pane, G.appid); return; }
+  if (tab === "setup") { C.gameSetup.mount(pane, S.games.find((x) => x.appid === G.appid) || { appid: G.appid }); return; }
   const key = `${G.appid}:${tab}`;
   const appid = G.appid;
   if (!G.cache[key]) {
@@ -112,7 +113,8 @@ function renderWorkshop(d) {
 function open(g) {
   G.appid = g.appid;
   const nonSteam = !!g.shortcut;
-  $("#d-tabs").hidden = nonSteam;
+  // Non-Steam games only get the tabs that work for them.
+  $$("#d-tabs [data-dtab]").forEach((b) => { if (b.id !== "d-tab-workshop") b.hidden = nonSteam && !["overview", "setup"].includes(b.dataset.dtab); });
   $("#d-store").hidden = nonSteam;
   if (nonSteam) { $("#d-props").hidden = true; $("#d-uninstall").hidden = true; }
   setTab("overview");

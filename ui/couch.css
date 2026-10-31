@@ -509,3 +509,17 @@ body.no-motion #couch * { transition: none !important; animation: none !importan
 .ci-meta { align-items: center; }
 #couch[data-theme="comic"] .crow.on .cc.on::before { top: auto; bottom: 12%; right: -32px; }
 #couch[data-theme="shelf"] .crow.on .cc.on { transform: translateY(-12px) rotate(-2.5deg) scale(1.06); }
+
+/* ---------- Shelf extras: tags, download progress, friends ---------- */
+.cc-tag { position: absolute; z-index: 5; left: 50%; bottom: 6%; transform: translateX(-50%); max-width: 86%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: calc(var(--cw) * .07); font-weight: 800; padding: 3px 8px; border-radius: 6px; background: rgba(8,9,12,.85); color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.5); }
+.cc-tag.sale { background: #4c6b22; color: #beee11; }
+.cc-tag.low { bottom: auto; top: 14%; left: auto; right: 6%; transform: none; background: #f6c453; color: #2a1a00; }
+.cc-tag.dl { bottom: 9%; background: var(--accent); color: var(--accent-text, #fff); }
+.cc-tag.ig { background: #7fb441; color: #10200a; }
+.cc-tag.on { background: #57cbde; color: #062a30; }
+.cc-prog { position: absolute; z-index: 5; left: 8%; right: 8%; bottom: 4%; height: 5px; border-radius: 9px; background: rgba(0,0,0,.6); overflow: hidden; }
+.cc-prog i { display: block; height: 100%; background: var(--accent); }
+.cc-friend .cc-art img { object-fit: cover; }
+.cc-friend .cc-art { background: linear-gradient(160deg, #2a2d35, #121318); }
+.cc-friend.ig .cc-shell { box-shadow: 0 14px 30px rgba(0,0,0,.55), inset 0 0 0 2px #7fb441; }

@@ -429,6 +429,7 @@ class Steam:
                     "update_pending": bool(flags & 2) or bool(flags & 1024),
                     "size": _int(st.get("sizeondisk")),
                     "lastupdated": _int(st.get("lastupdated")),
+                    "buildid": str(st.get("buildid") or ""),
                     "lastplayed": _int(s.get("lastplayed")) if isinstance(s, dict) else 0,
                     "playtime": _int(s.get("playtime")) if isinstance(s, dict) else 0,
                     "playtime_2wks": _int(s.get("playtime2wks")) if isinstance(s, dict) else 0,

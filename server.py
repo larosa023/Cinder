@@ -53,6 +53,10 @@ class Context:
         import sales
         self.prices = sales.PriceBook(data_dir)
         self.recaps = None  # recap.Recaps, set by main
+        import hooks, backups
+        self.hooks = hooks.Hooks(data_dir)
+        self.backups = backups.Backups(steam, config, data_dir)
+        self.art_dir = data_dir / "customart"
         self.steam_updater = steam_updater
         self.restart = restart
         self.steam = steam
@@ -104,7 +108,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def _body(self) -> dict:
         n = int(self.headers.get("Content-Length") or 0)
-        if not n or n > 1 << 20:
+        limit = 28 << 20 if urlsplit(self.path).path == "/api/customart" else 1 << 20  # pictures can be big
+        if not n or n > limit:
             return {}
         try:
             return json.loads(self.rfile.read(n))
@@ -153,13 +158,19 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404, b"", "text/css")
         m = re.fullmatch(r"/art/(\d+)/(\w+)", path)
         if m and m.group(2) in ART:
-            found = c.steam.art(int(m.group(1)), m.group(2))
+            appid, which = int(m.group(1)), m.group(2)
+            custom = self._custom_art(appid, which)
+            if custom:  # your own picture wins
+                if query.get("v"):
+                    return self._file(custom, "max-age=31536000, immutable")
+                return self._send(302, b"", "text/plain", "no-store", {"Location": f"/art/{appid}/{which}?v=c{int(custom.stat().st_mtime)}"})
+            found = c.steam.art(appid, which)
             if not found:
-                return self._send(404, b"", "text/plain", "max-age=3600")
+                return self._send(404, b"", "text/plain", "max-age=60")
             kind, val = found
             if kind == "file":
-                return self._file(Path(val))
-            return self._send(302, b"", "text/plain", "max-age=3600", {"Location": val})
+                return self._file(Path(val), "max-age=600")
+            return self._send(302, b"", "text/plain", "max-age=600", {"Location": val})
         if path == "/avatar":
             p = c.steam.avatar_path()
             return self._file(p) if p else self._send(404, b"", "text/plain")
@@ -193,6 +204,27 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": True, **c.sessions.stats(c.steam.library(), playing)})
         if path == "/api/storage":
             return self._json({"ok": True, **self._storage()})
+        m = re.fullmatch(r"/api/hooks/(\*|\d+)", path)
+        if m:
+            return self._json({"ok": True, "hooks": c.hooks.get(m.group(1)), "global": c.hooks.get("*") if m.group(1) != "*" else []})
+        m = re.fullmatch(r"/api/backups/(\d+)", path)
+        if m:
+            return self._json({"ok": True, **c.backups.info(int(m.group(1)))})
+        if path == "/api/review":
+            import review
+            with c.sessions.lock:
+                sess = [list(x) for x in c.sessions.data]
+            ach = dict(c.ach.games) if c.ach else {}
+            times = [it.get("time") for g in ach.values() for it in g.get("items") or [] if it.get("unlocked") and it.get("time")]
+            per = query.get("period") or ""
+            plist = review.periods(sess, times)
+            if not per:
+                per = plist[0]["id"] if plist else time.strftime("%Y")
+            return self._json({"ok": True, "periods": plist, "review": review.build(per, sess, c.steam.library(), ach)})
+        m = re.fullmatch(r"/api/customart/(\d+)", path)
+        if m:
+            appid = int(m.group(1))
+            return self._json({"ok": True, "custom": [k for k in ART if self._custom_art(appid, k)]})
         m = re.fullmatch(r"/api/game/(\d+)/launch_options", path)
         if m:
             appid = int(m.group(1))
@@ -245,7 +277,67 @@ class Handler(BaseHTTPRequestHandler):
             except storeapi.SteamDataError:
                 pass  # keep the local library
         c.steam.prefetch_art([g["appid"] for g in games])
+        c.backups.before_update(games)
         return games
+
+    # -- custom art -----------------------------------------------------------------
+    def _custom_art(self, appid: int, which: str) -> Path | None:
+        d = self.ctx.art_dir
+        for ext in ("png", "jpg", "webp", "gif"):
+            p = d / f"{appid}-{which}.{ext}"
+            if p.is_file():
+                return p
+        return None
+
+    def _set_custom_art(self, body: dict):
+        import base64
+        appid, which = body.get("appid"), str(body.get("kind", ""))
+        if not str(appid).isdigit() or which not in ART:
+            return self._json({"ok": False, "error": "bad request"}, 400)
+        appid = int(appid)
+        old = self._custom_art(appid, which)
+        if body.get("reset"):
+            if old:
+                old.unlink()
+            return self._json({"ok": True})
+        m = re.match(r"^data:image/(png|jpeg|jpg|webp|gif);base64,(.+)$", str(body.get("data", "")), re.S)
+        if not m:
+            return self._json({"ok": False, "error": "Pick a PNG, JPG, WEBP or GIF image"})
+        raw = base64.b64decode(m.group(2), validate=False)
+        if len(raw) > 20 * 1024 * 1024:
+            return self._json({"ok": False, "error": "That image is over 20 MB"})
+        ext = {"jpeg": "jpg"}.get(m.group(1), m.group(1))
+        self.ctx.art_dir.mkdir(parents=True, exist_ok=True)
+        if old:
+            old.unlink()
+        (self.ctx.art_dir / f"{appid}-{which}.{ext}").write_bytes(raw)
+        return self._json({"ok": True})
+
+    # -- backups ----------------------------------------------------------------------
+    def _backup_op(self, body: dict):
+        b = self.ctx.backups
+        if not str(body.get("appid", "")).isdigit():
+            return self._json({"ok": False, "error": "bad appid"}, 400)
+        appid, op = int(body["appid"]), body.get("op")
+        playing = (getattr(self.ctx, "playing", lambda: None)() or {}).get("appid")
+        if op == "make":
+            r = b.make(appid, "manual")
+            if not r:
+                return self._json({"ok": False, "error": "Nothing to back up yet: add the game's save folder below"})
+        elif op == "restore":
+            if playing == appid:
+                return self._json({"ok": False, "error": "Close the game first"})
+            try:
+                r = b.restore(appid, str(body.get("id", "")))
+            except FileNotFoundError as e:
+                return self._json({"ok": False, "error": str(e)})
+        elif op == "delete":
+            b.delete(appid, str(body.get("id", "")))
+        elif op == "folders":
+            b.set_folders(appid, body.get("folders") or [])
+        else:
+            return self._json({"ok": False, "error": "unknown"}, 400)
+        return self._json({"ok": True, **b.info(appid)})
 
     # -- prices, how long to beat, guides, recommendations ---------------------------
     def _community_page(self, url: str, marker: str, ttl: float = 1800) -> str:
@@ -764,6 +856,15 @@ class Handler(BaseHTTPRequestHandler):
                 cents = int(cents) if isinstance(cents, (int, float)) and cents > 0 else None
                 self.ctx.prices.set_target(int(body["appid"]), cents)
                 return self._json({"ok": True, "target": cents})
+            if path == "/api/hooks":
+                scope = str(body.get("scope", ""))
+                if scope != "*" and not scope.isdigit():
+                    return self._json({"ok": False, "error": "bad scope"}, 400)
+                return self._json({"ok": True, "hooks": self.ctx.hooks.set(scope, body.get("hooks") or [])})
+            if path == "/api/backups":
+                return self._backup_op(body)
+            if path == "/api/customart":
+                return self._set_custom_art(body)
             if path == "/api/action":
                 return self._action(body)
             if path == "/api/theme":
@@ -1144,7 +1245,13 @@ class Handler(BaseHTTPRequestHandler):
             # Anything else that talks to Steam keeps it around a while (a launch long enough to start the game).
             c.idle.touch(hold=600 if action == "launch" else 180 if action == "steam_open" else 60)
         if action == "launch" and appid:
-            s.launch(appid)
+            if c.hooks.for_game(appid):
+                def go():
+                    c.hooks.before(appid)  # power plan, closing apps… first
+                    s.launch(appid)
+                threading.Thread(target=go, name="launch", daemon=True).start()
+            else:
+                s.launch(appid)
         elif action == "install" and appid:
             s.steam_url(f"steam://install/{appid}")
         elif action == "uninstall" and appid:

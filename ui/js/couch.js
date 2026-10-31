@@ -50,10 +50,77 @@ function buildRows() {
     rows.push([l.name, all.filter((g) => set.has(g.appid)).sort(byName)]);
   }
   rows.push(["Not installed", all.filter((g) => !g.installed).sort(byName)]);
-  return rows.filter(([, gs]) => gs.length).map(([title, games]) => ({ title, games }));
+  // Downloads & updates goes second, right after what you've been playing.
+  const dl = all.filter((g) => g.download || (g.installed && g.update_pending && !g.shortcut));
+  if (dl.length) rows.splice(1, 0, ["Downloads & updates", dl.sort((a, b) => (!!b.download - !!a.download) || byName(a, b))]);
+  const out = rows.filter(([, gs]) => gs.length).map(([title, games]) => ({ title, games, kind: "game" }));
+  // Shelves that come from Steam (filled in once they load).
+  const x = K.extra || {};
+  const at = Math.min(out.length, 3);
+  const more = [];
+  if (x.friends && x.friends.length) more.push({ title: "Friends online", games: x.friends, kind: "friend" });
+  if (x.wish && x.wish.length) more.push({ title: "Your wishlist", games: x.wish, kind: "wish" });
+  for (const sec of x.store || []) more.push({ title: `Store · ${sec.title}`, games: sec.items, kind: "store" });
+  out.splice(at, 0, ...more);
+  return out;
 }
 
+// Store, wishlist and friends shelves: fetched when couch mode opens, kept for a few minutes.
+async function loadExtras() {
+  if (K.extraAt && Date.now() - K.extraAt < 300000) return;
+  K.extraAt = Date.now();
+  const x = {};
+  await Promise.all([
+    C.api("/api/store/home").then((h) => {
+      const want = { specials: "Deals", top_sellers: "Top sellers", new_releases: "New releases" };
+      x.store = (h.sections || []).filter((s) => want[s.id]).map((s) => ({ title: want[s.id], items: s.items.slice(0, 20) }));
+    }).catch(() => {}),
+    C.api("/api/wishlist").then((w) => { x.wish = (w.items || []).slice().sort((a, b) => ((b.price && b.price.discount) || 0) - ((a.price && a.price.discount) || 0)); }).catch(() => {}),
+    C.api("/api/friends").then((f) => { x.friends = (f.friends || []).filter((p) => p.state === "ingame" || p.state === "online").sort((a, b) => (a.state !== "ingame") - (b.state !== "ingame")); }).catch(() => {}),
+  ]);
+  if (!K.open) return;
+  K.extra = x;
+  // Rebuild the shelves, staying on the same game.
+  const here = cur(), title = K.rows[K.row] && K.rows[K.row].title;
+  K.rows = buildRows();
+  K.col = K.rows.map((r) => (r.title === title && here ? Math.max(0, r.games.indexOf(r.games.find((g) => keyOf(g) === keyOf(here)))) : 0));
+  K.row = Math.max(0, K.rows.findIndex((r) => r.title === title));
+  renderRows();
+}
+const keyOf = (g) => g.steamid || g.appid;
+const kindOf = () => (K.rows[K.row] || {}).kind || "game";
+
 // ---------- markup ----------
+function itemHTML(kind, g, i) {
+  if (kind === "friend") {
+    return `<div class="cc cc-friend${g.state === "ingame" ? " ig" : ""}" data-i="${i}" data-sid="${esc(g.steamid)}">
+      <div class="cc-shell">
+        <div class="cc-band"><span class="cc-logo">CINDER</span><span class="cc-pc">${g.state === "ingame" ? "PLAY" : "ON"}</span></div>
+        <div class="cc-art" data-name="${esc(g.name)}"><img alt="" loading="lazy" src="${esc(g.avatar)}" data-fail="hide"></div>
+        <div class="cc-spine"></div><div class="cc-gloss"></div>
+        <span class="cc-tag ${g.state === "ingame" ? "ig" : "on"}">${esc(g.state === "ingame" ? (g.game || "In game") : g.status || "Online")}</span>
+      </div>
+      <div class="cc-name">${esc(g.name)}</div>
+    </div>`;
+  }
+  if (kind === "store" || kind === "wish") {
+    const p = g.price;
+    const tag = !p ? "" : p.free ? "Free" : `${p.discount > 0 ? `-${p.discount}% · ` : ""}${C.money(p.final, p.currency)}`;
+    const low = kind === "wish" && g.lows && g.lows.steam_low && p && !p.free && p.final <= g.lows.steam_low.cents;
+    return `<div class="cc" data-i="${i}" data-appid="${g.appid}">
+      <div class="cc-shell">
+        <div class="cc-band"><span class="cc-logo">CINDER</span><span class="cc-pc">PC</span></div>
+        <div class="cc-art" data-name="${esc(C.gname(g.name))}"><img alt="" loading="lazy" decoding="async" src="/art/${g.appid}/portrait" data-fallback="/art/${g.appid}/header"></div>
+        <div class="cc-spine"></div><div class="cc-gloss"></div>
+        ${tag ? `<span class="cc-tag${p && p.discount > 0 ? " sale" : ""}">${esc(tag)}</span>` : ""}
+        ${low ? '<span class="cc-tag low">Lowest ever</span>' : kind === "wish" && g.target ? '<span class="cc-tag low">🔔</span>' : ""}
+      </div>
+      <div class="cc-name">${esc(C.gname(g.name))}</div>
+    </div>`;
+  }
+  return caseHTML(g, i);
+}
+
 function caseHTML(g, i) {
   const fav = (S.config.favorites || []).includes(g.appid);
   const m = C.meta(g.appid);
@@ -63,10 +130,15 @@ function caseHTML(g, i) {
       <div class="cc-art" data-name="${esc(C.gname(g.name))}"><img alt="" loading="lazy" decoding="async" src="/art/${g.appid}/portrait" data-fallback="/art/${g.appid}/header"></div>
       <div class="cc-spine"></div><div class="cc-gloss"></div>
       ${fav ? '<span class="cc-fav">★</span>' : ""}${m.status === "completed" ? '<span class="cc-done">100%</span>' : ""}
+      ${g.download ? `<span class="cc-tag dl">${esc(dlText(g.download))}</span><span class="cc-prog"><i style="width:${dlPct(g.download)}%"></i></span>`
+        : g.installed && g.update_pending && !g.shortcut ? '<span class="cc-tag dl">Update ready</span>' : ""}
     </div>
     <div class="cc-name">${esc(C.gname(g.name))}</div>
   </div>`;
 }
+
+const dlPct = (d) => (d.total ? Math.round((100 * d.done) / d.total) : d.stage_total ? Math.round((100 * d.stage_done) / d.stage_total) : 0);
+const dlText = (d) => ({ paused: "Paused", verifying: "Verifying", installing: "Installing", queued: "Queued" }[d.state] || `Downloading ${dlPct(d)}%`);
 
 function shell() {
   return `
@@ -93,7 +165,7 @@ function renderRows() {
   $("#crows").innerHTML = K.rows.map((r, ri) => `
     <div class="crow" data-r="${ri}">
       <h3>${esc(r.title)} <span>${r.games.length}</span></h3>
-      <div class="ctrack">${r.games.map((g, i) => caseHTML(g, i)).join("")}</div>
+      <div class="ctrack">${r.games.map((g, i) => itemHTML(r.kind, g, i)).join("")}</div>
     </div>`).join("");
   C.markLoaded && C.markLoaded($("#crows"));
   place(true);
@@ -132,6 +204,7 @@ function move(dr, dc) {
     const n = Math.max(0, Math.min(K.rows.length - 1, K.row + dr));
     if (n === K.row) return bump();
     K.row = n;
+    sfx("move");
   }
   if (dc) {
     const len = K.rows[K.row].games.length;
@@ -139,21 +212,66 @@ function move(dr, dc) {
     const n = Math.max(0, Math.min(len - 1, c + dc));
     if (n === c) return bump();
     K.col[K.row] = n;
+    if (!dr) sfx("move");
   }
   place(false);
 }
 
 function bump() {
+  sfx("bump");
   const el = $("#crows .crow.on .cc.on");
   if (!el) return;
   el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump");
 }
 
 // ---------- the focused game ----------
+function paintOther(g, kind, info) {
+  if (kind === "friend") {
+    info.innerHTML = `
+      <div class="ci-logo"><h1>${esc(g.name)}</h1></div>
+      <div class="ci-meta"><span class="ci-tag">${esc(g.state === "ingame" ? "In game" : g.status || "Online")}</span>${g.game ? `<span>Playing ${esc(g.game)}</span>` : ""}</div>`;
+    clearTimeout(K.bgFor);
+    if (g.game_appid) K.bgFor = setTimeout(() => setBg(g.game_appid), 140);
+    return;
+  }
+  const p = g.price;
+  const lo = g.lows && g.lows.steam_low;
+  const owned = S.games.some((x) => x.appid === g.appid);
+  const bits = [
+    p ? (p.free ? "Free to play" : p.discount > 0 ? `-${p.discount}% · ${C.money(p.final, p.currency)} (was ${C.money(p.initial, p.currency)})` : C.money(p.final, p.currency)) : "",
+    lo ? (p && !p.free && p.final <= lo.cents ? "Lowest price ever" : `Lowest ever ${C.money(lo.cents, lo.currency)}`) : "",
+    g.target ? `Alert at ${C.money(g.target, p && p.currency)}` : "",
+    owned ? "In your library" : "",
+  ].filter(Boolean);
+  info.innerHTML = `
+    <div class="ci-logo"><img alt="" src="/art/${g.appid}/logo" data-fail="hide" onload="this.parentNode.classList.add('has')"><h1>${esc(C.gname(g.name))}</h1></div>
+    <div class="ci-meta">${bits.map((b) => `<span>${esc(b)}</span>`).join("")}${kind === "wish" ? '<span class="ci-tag">Wishlist</span>' : ""}</div>`;
+  C.markLoaded && C.markLoaded(info);
+  if (C.reviews) C.reviews.summary(g.appid).then((sm) => {
+    if (!sm || cur() !== g) return;
+    const meta = info.querySelector(".ci-meta");
+    if (meta) meta.insertAdjacentHTML("beforeend", `<span class="ci-rv">${C.reviews.badge(sm)}</span>`);
+  });
+  clearTimeout(K.bgFor);
+  K.bgFor = setTimeout(() => setBg(g.appid), 140);
+}
+
+// The button hints follow what's picked (a friend's Y is Message, a store game's Y is Buy…).
+function paintHints(kind) {
+  const h = root().querySelector(".chints");
+  if (!h || h.dataset.kind === kind) return;
+  h.dataset.kind = kind;
+  const y = { game: "Play", friend: "Message", store: "Buy", wish: "Buy" }[kind] || "Play";
+  h.innerHTML = `<span><i class="bA">A</i>Open</span><span><i class="bY">Y</i>${y}</span>${kind === "game" ? '<span><i class="bX">X</i>Favorite</span>' : ""}
+    <span><i class="bV">⧉</i>Theme</span><span><i class="bB">B</i>Leave</span>`;
+}
+
 function paintInfo() {
   const g = cur();
   const info = $("#cinfo");
   if (!g || !info) return;
+  paintHints(kindOf());
+  if (kindOf() !== "game") return paintOther(g, kindOf(), info);
   const m = C.meta(g.appid);
   const ach = C.library.achFor ? C.library.achFor(g) : null;
   const bits = [
@@ -208,9 +326,76 @@ function sheetButtons(g) {
   ].filter(Boolean);
 }
 
+function otherButtons(kind, g) {
+  if (kind === "friend") return [
+    { id: "msg", label: "Message", icon: ICON.chat, primary: true },
+    { id: "profile", label: "View profile", icon: ICON.user },
+    g.game_appid ? { id: "fgame", label: `Store page: ${g.game}` } : null,
+  ].filter(Boolean);
+  const lo = g.lows && g.lows.steam_low;
+  const p = g.price;
+  const owned = S.games.some((x) => x.appid === g.appid);
+  return [
+    owned ? { id: "oplay", label: "In your library: open it", icon: ICON.play, primary: true }
+      : { id: "buy", label: p && p.free ? "Get it free in Steam" : "Buy in Steam", icon: ICON.cart, primary: true },
+    kind === "store" && !owned ? { id: "wishadd", label: "Add to wishlist in Steam", icon: ICON.heart } : null,
+    kind === "wish" && lo && !(p && p.final <= lo.cents) ? { id: "alert-low", label: `Alert me at ${C.money(lo.cents, lo.currency)} (lowest ever)` } : null,
+    kind === "wish" && p && !p.free ? { id: "alert-half", label: `Alert me at ${C.money(Math.round((p.initial || p.final) / 2), p.currency)} (half off)` } : null,
+    kind === "wish" && g.target ? { id: "alert-off", label: `Remove alert (${C.money(g.target, p && p.currency)})`, on: true } : null,
+    { id: "spage", label: "Store page" },
+  ].filter(Boolean);
+}
+
+function openOther(g, kind) {
+  sfx("open");
+  K.sheet = { kind, g };
+  K.sheetFocus = 0;
+  paintOtherSheet();
+  const s = $("#csheet");
+  s.hidden = false;
+  requestAnimationFrame(() => s.classList.add("open"));
+}
+
+function paintOtherSheet() {
+  const { kind, g } = K.sheet;
+  const btns = otherButtons(kind, g);
+  K.sheetFocus = Math.min(K.sheetFocus, btns.length - 1);
+  const art = kind === "friend" ? (g.game_appid ? `/art/${g.game_appid}/header` : g.avatar) : `/art/${g.appid}/header`;
+  $("#csheet").innerHTML = `
+    <div class="cs-art"><img alt="" src="${esc(art)}" data-fail="hide"></div>
+    <div class="cs-body">
+      <h2>${esc(kind === "friend" ? g.name : C.gname(g.name))}</h2>
+      ${kind === "friend" ? `<p class="cs-note">${esc(g.state === "ingame" ? `Playing ${g.game || "a game"}` : g.status || "Online")}</p>` : ""}
+      <div class="cs-btns">${btns.map((b, i) => `<button data-sb="${b.id}" class="${b.primary ? "pri" : ""}${b.on ? " lit" : ""}${i === K.sheetFocus ? " focus" : ""}">${b.icon || ""}${esc(b.label)}</button>`).join("")}</div>
+    </div>`;
+}
+
+async function otherAct(id) {
+  const { kind, g } = K.sheet;
+  if (id === "msg") { C.act("message", { steamid: g.steamid }); return C.toast("Opened chat in Steam"); }
+  if (id === "profile") { const sid = g.steamid; close(); C.go(`profile/${sid}`); return; }
+  if (id === "fgame") { const a = g.game_appid; close(); C.go(`store/app/${a}`); return; }
+  if (id === "oplay") { const a = g.appid; closeSheet(); const r = K.rows.findIndex((x) => x.kind === "game" && x.games.some((y) => y.appid === a)); if (r >= 0) { K.row = r; K.col[r] = K.rows[r].games.findIndex((y) => y.appid === a); place(false); } return; }
+  if (id === "buy" || id === "wishadd") { C.act("store", { appid: g.appid }); return C.toast("Opened in Steam"); }
+  if (id === "spage") { const a = g.appid; close(); C.go(`store/app/${a}`); return; }
+  if (id.startsWith("alert-")) {
+    const p = g.price || {};
+    const cents = id === "alert-low" ? g.lows.steam_low.cents : id === "alert-half" ? Math.round((p.initial || p.final) / 2) : null;
+    await C.extras.setTarget(g.appid, cents);
+    g.target = cents;
+    paintOtherSheet();
+    const el = root().querySelector(`.crow.on .cc[data-i="${K.col[K.row] || 0}"]`);
+    if (el) el.outerHTML = itemHTML(kind, g, K.col[K.row] || 0);
+    place(true);
+    paintInfo();
+  }
+}
+
 function openSheet() {
   const g = cur();
   if (!g) return;
+  if (kindOf() !== "game") return openOther(g, kindOf());
+  sfx("open");
   K.sheet = g.appid;
   K.sheetFocus = 0;
   paintSheet();
@@ -242,6 +427,7 @@ function paintSheet() {
 }
 
 function closeSheet() {
+  if (K.sheet) sfx("back");
   K.sheet = null;
   const s = $("#csheet");
   s.classList.remove("open");
@@ -285,8 +471,125 @@ function play(g) {
   if (!g) return;
   const el = root().querySelector(`.crow.on .cc[data-appid="${g.appid}"]`);
   if (el) { el.classList.remove("go"); void el.offsetWidth; el.classList.add("go"); }
+  sfx("play");
   C.launch(g.appid);
   if (K.sheet) closeSheet();
+}
+
+// ---------- sounds ----------
+// Made on the fly with Web Audio (no sound files), with a small pack per theme.
+const SFX = { ctx: null, master: null, muted: false, last: 0 };
+function audio() {
+  if (SFX.ctx) return SFX.ctx;
+  try {
+    SFX.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    SFX.master = SFX.ctx.createGain();
+    SFX.master.gain.value = 0.16;
+    SFX.master.connect(SFX.ctx.destination);
+  } catch { SFX.ctx = null; }
+  return SFX.ctx;
+}
+function tone(f, dur, { type = "sine", vol = 1, to = 0, at = 0, attack = 0.004, lp = 0, detune = 0 } = {}) {
+  const c = SFX.ctx, t = c.currentTime + at;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t); o.detune.value = detune;
+  if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  let node = o;
+  if (lp) { const fl = c.createBiquadFilter(); fl.type = "lowpass"; fl.frequency.value = lp; o.connect(fl); node = fl; }
+  node.connect(g); g.connect(SFX.master);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function noise(dur, { vol = 1, at = 0, type = "bandpass", f = 2000, q = 1 } = {}) {
+  const c = SFX.ctx, t = c.currentTime + at;
+  const n = Math.max(1, Math.floor(c.sampleRate * dur));
+  const buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const src = c.createBufferSource(), fl = c.createBiquadFilter(), g = c.createGain();
+  src.buffer = buf; fl.type = type; fl.frequency.value = f; fl.Q.value = q; g.gain.value = vol;
+  src.connect(fl); fl.connect(g); g.connect(SFX.master);
+  src.start(t);
+}
+const PACKS = {
+  case: {
+    move: () => tone(740, 0.05, { vol: 0.35 }), bump: () => tone(150, 0.09, { vol: 0.5 }),
+    open: () => { tone(520, 0.07, { vol: 0.4 }); tone(780, 0.1, { vol: 0.4, at: 0.05 }); },
+    back: () => { tone(780, 0.07, { vol: 0.35 }); tone(520, 0.1, { vol: 0.35, at: 0.05 }); },
+    play: () => [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.22, { vol: 0.35, at: i * 0.06 })),
+  },
+  cart: {
+    move: () => tone(988, 0.04, { type: "square", vol: 0.18 }), bump: () => tone(110, 0.08, { type: "square", vol: 0.25 }),
+    open: () => { tone(659, 0.05, { type: "square", vol: 0.2 }); tone(988, 0.08, { type: "square", vol: 0.2, at: 0.05 }); },
+    back: () => { tone(988, 0.05, { type: "square", vol: 0.2 }); tone(494, 0.08, { type: "square", vol: 0.2, at: 0.05 }); },
+    play: () => [523, 659, 784, 1046, 1318].forEach((f, i) => tone(f, 0.09, { type: "square", vol: 0.2, at: i * 0.055 })),
+  },
+  pocket: {
+    move: () => tone(1318, 0.03, { type: "square", vol: 0.14 }), bump: () => tone(196, 0.06, { type: "square", vol: 0.2 }),
+    open: () => tone(880, 0.09, { type: "square", vol: 0.16, to: 1760 }),
+    back: () => tone(1760, 0.09, { type: "square", vol: 0.16, to: 880 }),
+    play: () => [1046, 1318, 1568, 2093].forEach((f, i) => tone(f, 0.07, { type: "square", vol: 0.15, at: i * 0.07 })),
+  },
+  modern: {
+    move: () => tone(1200, 0.03, { type: "triangle", vol: 0.22, lp: 3000 }), bump: () => tone(220, 0.07, { type: "triangle", vol: 0.3 }),
+    open: () => tone(600, 0.12, { type: "triangle", vol: 0.3, to: 900, lp: 2500 }),
+    back: () => tone(900, 0.12, { type: "triangle", vol: 0.3, to: 600, lp: 2500 }),
+    play: () => { tone(440, 0.4, { type: "triangle", vol: 0.3, lp: 2200 }); tone(660, 0.4, { type: "triangle", vol: 0.22, at: 0.05, lp: 2200 }); tone(880, 0.5, { type: "triangle", vol: 0.18, at: 0.1, lp: 2200 }); },
+  },
+  neon: {
+    move: () => { tone(880, 0.07, { type: "sawtooth", vol: 0.12, lp: 1800, detune: 8 }); tone(880, 0.07, { type: "sawtooth", vol: 0.06, lp: 1200, at: 0.09 }); },
+    bump: () => tone(110, 0.12, { type: "sawtooth", vol: 0.2, lp: 600 }),
+    open: () => tone(330, 0.25, { type: "sawtooth", vol: 0.18, to: 990, lp: 2400 }),
+    back: () => tone(990, 0.25, { type: "sawtooth", vol: 0.16, to: 330, lp: 2000 }),
+    play: () => [220, 277, 330, 440, 554, 659].forEach((f, i) => tone(f, 0.3, { type: "sawtooth", vol: 0.1, at: i * 0.05, lp: 2600, detune: 10 })),
+  },
+  vhs: {
+    move: () => noise(0.035, { vol: 0.5, f: 1500, q: 0.7 }), bump: () => { tone(70, 0.12, { vol: 0.6 }); noise(0.05, { vol: 0.4, f: 400 }); },
+    open: () => { tone(90, 0.14, { vol: 0.6, to: 60 }); noise(0.08, { vol: 0.5, f: 900, at: 0.02 }); },
+    back: () => { noise(0.12, { vol: 0.5, f: 2500 }); tone(80, 0.1, { vol: 0.5, at: 0.06 }); },
+    play: () => { tone(100, 0.2, { vol: 0.6, to: 55 }); noise(0.25, { vol: 0.3, f: 3000, at: 0.1, type: "highpass" }); tone(440, 0.3, { vol: 0.15, at: 0.25, to: 452 }); },
+  },
+  jewel: {
+    move: () => { tone(1568, 0.25, { vol: 0.16 }); tone(1568 * 2.76, 0.12, { vol: 0.05 }); },
+    bump: () => tone(392, 0.15, { vol: 0.25 }),
+    open: () => { tone(1046, 0.5, { vol: 0.2 }); tone(1046 * 2.76, 0.3, { vol: 0.06 }); tone(1568, 0.5, { vol: 0.15, at: 0.07 }); },
+    back: () => { tone(1568, 0.35, { vol: 0.15 }); tone(1046, 0.4, { vol: 0.15, at: 0.07 }); },
+    play: () => [1046, 1318, 1568, 2093, 2637].forEach((f, i) => { tone(f, 0.6, { vol: 0.13, at: i * 0.07 }); tone(f * 2.76, 0.25, { vol: 0.04, at: i * 0.07 }); }),
+  },
+  comic: {
+    move: () => tone(900, 0.06, { vol: 0.35, to: 380 }), bump: () => { tone(200, 0.1, { vol: 0.45, to: 90 }); },
+    open: () => tone(300, 0.14, { vol: 0.35, to: 1200 }),
+    back: () => tone(1200, 0.14, { vol: 0.3, to: 300 }),
+    play: () => { tone(250, 0.35, { vol: 0.35, to: 1600 }); noise(0.15, { vol: 0.5, f: 1200, at: 0.3 }); },
+  },
+  blueprint: {
+    move: () => noise(0.02, { vol: 0.6, f: 4500, type: "highpass" }), bump: () => noise(0.06, { vol: 0.5, f: 700 }),
+    open: () => { noise(0.02, { vol: 0.6, f: 4500, type: "highpass" }); noise(0.02, { vol: 0.5, f: 4500, type: "highpass", at: 0.06 }); },
+    back: () => noise(0.09, { vol: 0.4, f: 3000, type: "highpass" }),
+    play: () => { for (let i = 0; i < 5; i++) noise(0.03, { vol: 0.45, f: 4000 + i * 300, type: "highpass", at: i * 0.05 }); tone(660, 0.3, { vol: 0.12, at: 0.28 }); },
+  },
+  shelf: {
+    move: () => { tone(260, 0.06, { vol: 0.4, to: 200 }); noise(0.015, { vol: 0.3, f: 900 }); },
+    bump: () => tone(120, 0.12, { vol: 0.5, to: 90 }),
+    open: () => { tone(220, 0.08, { vol: 0.4 }); noise(0.18, { vol: 0.12, f: 5000, type: "highpass", at: 0.04 }); },
+    back: () => { noise(0.14, { vol: 0.12, f: 5000, type: "highpass" }); tone(180, 0.08, { vol: 0.35, at: 0.08 }); },
+    play: () => [392, 494, 587].forEach((f, i) => { tone(f, 0.5, { vol: 0.22, at: i * 0.09, type: "triangle", lp: 1800 }); }),
+  },
+};
+function sfx(kind) {
+  if (S.config.couch_sounds === false || SFX.muted || !K.open) return;
+  const now = performance.now();
+  if (kind === "move" && now - SFX.last < 45) return;  // held direction: don't machine-gun
+  SFX.last = now;
+  if (!audio()) return;
+  if (SFX.ctx.state === "suspended") SFX.ctx.resume().catch(() => {});
+  const pack = PACKS[root().dataset.theme] || PACKS.case;
+  try { (pack[kind] || PACKS.case[kind] || (() => {}))(); } catch { /* audio hiccup */ }
+}
+function toggleMute() {
+  SFX.muted = !SFX.muted;
+  C.toast(SFX.muted ? "Couch sounds off (M to turn back on)" : "Couch sounds on");
 }
 
 // ---------- themes ----------
@@ -333,27 +636,30 @@ function themePress(btn) {
   const t = K.themes;
   if (btn === "left" || btn === "up" || btn === "lb") t.i = (t.i - 1 + THEMES.length) % THEMES.length;
   else if (btn === "right" || btn === "down" || btn === "rb") t.i = (t.i + 1) % THEMES.length;
-  else if (btn === "a" || btn === "view") return closeThemes(true);
-  else if (btn === "b" || btn === "start") return closeThemes(false);
+  else if (btn === "a" || btn === "view") { closeThemes(true); return sfx("open"); }
+  else if (btn === "b" || btn === "start") { closeThemes(false); return sfx("back"); }
   else return;
   paintThemes();
+  sfx("move");
 }
 
 // ---------- input ----------
 function press(btn) {
   K.idle = Date.now();
   root().classList.remove("idle");
+  if (btn === "mute") return toggleMute();
   if (K.themes) return themePress(btn);
-  if (btn === "view") return openThemes();
+  if (btn === "view") { sfx("open"); return openThemes(); }
   if (K.sheet) {
     const n = $("#csheet").querySelectorAll("[data-sb]").length;
     if (btn === "left" || btn === "up") K.sheetFocus = Math.max(0, K.sheetFocus - 1);
     else if (btn === "right" || btn === "down") K.sheetFocus = Math.min(n - 1, K.sheetFocus + 1);
-    else if (btn === "a") { const b = $("#csheet").querySelectorAll("[data-sb]")[K.sheetFocus]; if (b) sheetAct(b.dataset.sb); return; }
+    else if (btn === "a") { const b = $("#csheet").querySelectorAll("[data-sb]")[K.sheetFocus]; if (b) (typeof K.sheet === "object" ? otherAct : sheetAct)(b.dataset.sb); return; }
     else if (btn === "b") return closeSheet();
-    else if (btn === "y") return play(S.games.find((x) => x.appid === K.sheet));
+    else if (btn === "y") return typeof K.sheet === "object" ? null : play(S.games.find((x) => x.appid === K.sheet));
     else if (btn === "start") return close();
     $("#csheet").querySelectorAll("[data-sb]").forEach((b, i) => b.classList.toggle("focus", i === K.sheetFocus));
+    sfx("move");
     return;
   }
   switch (btn) {
@@ -364,14 +670,20 @@ function press(btn) {
     case "lb": return move(0, -6);
     case "rb": return move(0, 6);
     case "a": return openSheet();
-    case "y": return play(cur());
-    case "x": { const g = cur(); if (g) toggleFav(g.appid); return; }
+    case "y": {
+      const k = kindOf(), g = cur();
+      if (k === "game") return play(g);
+      if (k === "friend" && g) { C.act("message", { steamid: g.steamid }); return C.toast("Opened chat in Steam"); }
+      if (g) { C.act("store", { appid: g.appid }); return C.toast("Opened in Steam"); }
+      return;
+    }
+    case "x": { const g = cur(); if (g && kindOf() === "game") toggleFav(g.appid); return; }
     case "b": case "start": return close();
   }
 }
 
 const KEYS = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down", Enter: "a", " ": "y",
-  Escape: "b", Backspace: "b", f: "x", F: "x", PageUp: "lb", PageDown: "rb", t: "view", T: "view" };
+  Escape: "b", Backspace: "b", f: "x", F: "x", PageUp: "lb", PageDown: "rb", t: "view", T: "view", m: "mute", M: "mute" };
 
 function onKey(e) {
   if (!K.open) return;
@@ -475,6 +787,7 @@ async function open() {
   K.clock = setInterval(tick, 15000);
   K.prevButtons = ["start", "a"];  // the press that opened couch mode doesn't also act
   K.raf = requestAnimationFrame(pollPad);
+  loadExtras();
   K.loggedPads = false;
   watchForeground();
   setTimeout(() => { if (K.open && !K.loggedPads) logPads(); }, 4000);
@@ -525,7 +838,7 @@ function bind() {
     if (ct) { if (K.themes.i === +ct.dataset.ct) return closeThemes(true); K.themes.i = +ct.dataset.ct; return paintThemes(); }
     if (K.themes && !e.target.closest("#cthemes")) return closeThemes(true);
     const sb = e.target.closest("[data-sb]");
-    if (sb) return sheetAct(sb.dataset.sb);
+    if (sb) return (typeof K.sheet === "object" ? otherAct : sheetAct)(sb.dataset.sb);
     if (K.sheet && !e.target.closest(".cs-body, .cs-art")) return closeSheet();
     const cc = e.target.closest(".cc");
     if (cc) {
@@ -535,7 +848,7 @@ function bind() {
     }
   });
   bindDrag();
-  root().addEventListener("dblclick", (e) => { const cc = e.target.closest(".cc"); if (cc) play(cur()); });
+  root().addEventListener("dblclick", (e) => { const cc = e.target.closest(".cc"); if (cc && kindOf() === "game") play(cur()); });
   // Mouse wheel / trackpad moves along the shelf.
   let wheelAt = 0;
   root().addEventListener("wheel", (e) => {
@@ -606,6 +919,7 @@ function bindDrag() {
     K.row = g.ri;
     K.col[g.ri] = c;
     K.idle = Date.now();
+    sfx("move");
     place(false);
   };
   el.addEventListener("pointerup", end);

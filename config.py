@@ -29,6 +29,9 @@ DEFAULTS = {
     "hidden": [],
     "sale_alerts": True,
     "session_recap": True,
+    "backup_before_updates": True,  # copy saves (and Workshop mods) before a game updates
+    "backup_workshop": True,
+    "couch_sounds": True,
     "couch_theme": "case",  # couch mode look: case, cart, modern, neon, vhs, pocket, jewel, comic, blueprint, shelf
     "lists": [],          # [{"id", "name", "appids"}] - your Cinder game lists
     "profile_style": {},  # background appid, showcase appids, sections
@@ -42,7 +45,8 @@ EDITABLE = {"theme", "sort", "card_size", "freeze_updates", "autostart_steam", "
             "hide_steam_on_launch", "persona", "close_to_tray", "tray_hint_shown",
             "when_playing", "restore_after_play", "favorites", "hidden", "sale_alerts",
             "lists", "profile_style", "steam_bridge",
-            "steam_on_demand", "steam_idle_minutes", "seen_version", "session_recap", "couch_theme"}
+            "steam_on_demand", "steam_idle_minutes", "seen_version", "session_recap", "couch_theme",
+            "backup_before_updates", "backup_workshop", "couch_sounds"}
 
 
 def data_dir() -> Path:
