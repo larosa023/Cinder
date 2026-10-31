@@ -29,7 +29,7 @@ DEFAULTS = {
     "hidden": [],
     "sale_alerts": True,
     "session_recap": True,
-    "couch_theme": "case",  # couch mode look: case, cart, modern, neon, vhs
+    "couch_theme": "case",  # couch mode look: case, cart, modern, neon, vhs, pocket, jewel, comic, blueprint, shelf
     "lists": [],          # [{"id", "name", "appids"}] - your Cinder game lists
     "profile_style": {},  # background appid, showcase appids, sections
     "steam_bridge": True,

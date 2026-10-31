@@ -1,5 +1,18 @@
 [
  {
+  "version": "0.20.0",
+  "date": "2026-10-31",
+  "title": "Five more couch themes",
+  "items": [
+   "Pocket: everything in four shades of handheld green, dot-matrix screen and all",
+   "Jewel case: clear CD cases with a hinge, and the disc slides out of the one you pick",
+   "Comic: halftone yellow page, inked panels, speech-bubble shelf titles and a POW! on your pick",
+   "Blueprint: drafting grid, outlined lettering, games as drawings with a dimension line and drawing number",
+   "Bookshelf: games standing on wooden shelves under a warm lamp, with brass shelf plaques",
+   "The theme picker now shows two rows (ten looks)"
+  ]
+ },
+ {
   "version": "0.19.1",
   "date": "2026-10-30",
   "title": "VHS theme",

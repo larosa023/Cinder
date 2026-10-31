@@ -20,6 +20,11 @@ const THEMES = [
   { id: "modern", name: "Modern", desc: "Clean, rounded, glassy", sw: ["#ffffff", "#9aa4b8", "#1b1f29"] },
   { id: "neon", name: "Synthwave", desc: "Neon grid and chrome", sw: ["#ff2fd0", "#00e5ff", "#1a0633"] },
   { id: "vhs", name: "VHS", desc: "Rental tapes on a worn-out VCR", sw: ["#0d0d0f", "#f2e8c9", "#d6262f"] },
+  { id: "pocket", name: "Pocket", desc: "Four shades of handheld green", sw: ["#0f380f", "#306230", "#9bbc0f"] },
+  { id: "jewel", name: "Jewel case", desc: "CD cases, disc slides out", sw: ["#0c1424", "#c9d6ea", "#8f7cff"] },
+  { id: "comic", name: "Comic", desc: "Halftone, ink and POW!", sw: ["#ffd400", "#e4202a", "#111111"] },
+  { id: "blueprint", name: "Blueprint", desc: "Drafted on the drawing board", sw: ["#0b3a75", "#e8f1ff", "#7fb2ff"] },
+  { id: "shelf", name: "Bookshelf", desc: "Wood shelves, warm lamp light", sw: ["#2a170c", "#a8703a", "#f3c77a"] },
 ];
 const themeOf = () => (THEMES.some((t) => t.id === S.config.couch_theme) ? S.config.couch_theme : "case");
 const CASE_W = () => Math.round(Math.min(window.innerWidth, window.innerHeight * 1.9) * 0.118);  // case width in px
