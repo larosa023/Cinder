@@ -239,6 +239,7 @@
       <button data-pane="general">General</button>
       <button data-pane="steam">Steam</button>
       <button data-pane="account">Account</button>
+      <button data-pane="remote">Remote &amp; backup</button>
       <button data-pane="updates">Updates</button>
       <p class="about">Cinder <span id="version"></span><br>Not affiliated with Valve</p>
     </nav>
@@ -383,6 +384,10 @@
           <label class="switch"><input type="checkbox" id="set-backup"><span></span></label></div>
         <div class="row"><div><strong>Include Workshop mods in backups</strong><small>Up to 2 GB of mods per game.</small></div>
           <label class="switch"><input type="checkbox" id="set-backup-ws"><span></span></label></div>
+        <div class="row"><div><strong>Couch mode trailers</strong><small>Rest on a game for a moment and its trailer plays quietly behind it (muted).</small></div>
+          <label class="switch"><input type="checkbox" id="set-trailers"><span></span></label></div>
+        <div class="row"><div><strong>Controller everywhere</strong><small>Use a controller in the whole app: D-pad or left stick moves, A selects, B goes back, LB/RB switch tabs, right stick scrolls, Start opens couch mode.</small></div>
+          <label class="switch"><input type="checkbox" id="set-padnav"><span></span></label></div>
         <div class="row"><div><strong>Couch mode sounds</strong><small>Soft sounds as you move around couch mode, matched to each theme. M mutes them while you're in it.</small></div>
           <label class="switch"><input type="checkbox" id="set-csounds"><span></span></label></div>
         <div class="row"><div><strong>Session recap</strong><small>After you close a game, show how long you played, what you unlocked and your new total.</small></div>
@@ -391,6 +396,29 @@
       </div>
 
       <!-- Updates -->
+      <div class="pane" data-pane="remote" hidden>
+        <h3>Phone remote</h3>
+        <div class="row"><div><strong>Use your phone as a remote</strong><small>Open a page on your phone (same Wi-Fi) to start games, install and update them, and watch downloads. Windows asks once whether to allow Cinder on your network: allow it for private networks.</small></div>
+          <label class="switch"><input type="checkbox" id="rm-on"><span></span></label></div>
+        <div class="rm-box" id="rm-box" hidden>
+          <div class="rm-qr" id="rm-qr"></div>
+          <div class="rm-info">
+            <small>On your phone, open</small><b class="rm-url" id="rm-url"></b>
+            <small>then enter this code</small><b class="rm-pin" id="rm-pin"></b>
+            <div class="btns"><button class="btn sm" id="rm-newpin">New code</button><button class="btn sm" id="rm-forget">Forget paired phones</button></div>
+            <small id="rm-devs"></small>
+          </div>
+        </div>
+        <p class="note warn" id="rm-err" hidden></p>
+        <h3>Back up Cinder</h3>
+        <p class="note">Your settings, notes, ratings, lists, play history, price alerts, before &amp; after hooks, custom art and themes in one file. Restore it after a reinstall or on another PC. (Game saves are backed up separately, on each game's Setup tab.)</p>
+        <div class="row"><div><strong>Save a backup now</strong><small>Pick where to save it.</small></div>
+          <div class="btns"><button class="btn sm" id="cb-export">Save backup…</button></div></div>
+        <div class="row"><div><strong>Restore from a backup</strong><small>Replaces Cinder's data with the backup's, then restarts Cinder. What's there now is kept as a backup too.</small></div>
+          <div class="btns"><button class="btn sm" id="cb-restore">Restore…</button></div></div>
+        <div class="row"><div><strong>Weekly copy to a folder</strong><small id="cb-sync-state">Pick a folder in OneDrive, Dropbox or Google Drive and your Cinder setup follows you to other PCs. Keeps the last four.</small></div>
+          <div class="btns"><button class="btn sm" id="cb-folder">Choose folder…</button><button class="btn sm" id="cb-sync" hidden>Copy now</button><button class="btn sm" id="cb-unsync" hidden>Turn off</button></div></div>
+      </div>
       <div class="pane" data-pane="updates" hidden>
         <h3>Updates</h3>
         <div class="row">
@@ -475,6 +503,8 @@
 <script src="/ui/js/gamepage.js"></script>
 <script src="/ui/js/extras.js"></script>
 <script src="/ui/js/setup.js"></script>
+<script src="/ui/js/remotecfg.js"></script>
+<script src="/ui/js/padnav.js"></script>
 <script src="/ui/js/main.js"></script>
 </body>
 </html>

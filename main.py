@@ -120,9 +120,17 @@ class WindowApi:
     def pick_file(self, kind="any"):
         """A file picker for launch extras and custom art. Returns a path or ''."""
         import webview
-        types = {"image": ("Images (*.png;*.jpg;*.jpeg;*.webp;*.gif)",), "exe": ("Programs (*.exe;*.bat;*.cmd;*.lnk)", "All files (*.*)")}.get(kind, ("All files (*.*)",))
+        types = {"image": ("Images (*.png;*.jpg;*.jpeg;*.webp;*.gif)",), "exe": ("Programs (*.exe;*.bat;*.cmd;*.lnk)", "All files (*.*)"),
+                 "backup": ("Cinder backup (*.cinderbackup;*.zip)",)}.get(kind, ("All files (*.*)",))
         r = self._window.create_file_dialog(webview.OPEN_DIALOG, file_types=types)
         return (r[0] if r else "") or ""
+
+    def save_file(self, name="Cinder.cinderbackup"):
+        import webview
+        r = self._window.create_file_dialog(webview.SAVE_DIALOG, save_filename=name, file_types=("Cinder backup (*.cinderbackup)",))
+        if isinstance(r, (list, tuple)):
+            r = r[0] if r else ""
+        return r or ""
 
     def pick_folder(self):
         import webview
@@ -279,6 +287,12 @@ def main() -> None:
         from browserfetch import BrowserFetch
         ctx.browser = BrowserFetch()
     srv = make_server(ctx, args.port)
+    import databackup
+    ctx.sync = databackup.Sync(cfg, ddir)
+    ctx.sync.start()
+    from remote import Remote
+    ctx.remote = Remote(ctx, srv.server_address[1])
+    ctx.remote.apply()
     url = f"http://127.0.0.1:{srv.server_address[1]}/"
 
     if args.browser:

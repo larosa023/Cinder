@@ -168,6 +168,7 @@ async function setStatus(status) {
 function showPane(name) {
   $$("#set-nav [data-pane]").forEach((b) => b.classList.toggle("on", b.dataset.pane === name));
   $$(".pane").forEach((p) => (p.hidden = p.dataset.pane !== name));
+  if (name === "remote" && C.remoteCfg) C.remoteCfg.show();
 }
 
 C.openSettings = (pane) => {
@@ -406,6 +407,8 @@ function bind() {
   $("#set-backup").addEventListener("change", (e) => C.saveConfig({ backup_before_updates: e.target.checked }));
   $("#set-backup-ws").addEventListener("change", (e) => C.saveConfig({ backup_workshop: e.target.checked }));
   $("#set-csounds").addEventListener("change", (e) => C.saveConfig({ couch_sounds: e.target.checked }));
+  $("#set-trailers").addEventListener("change", (e) => C.saveConfig({ couch_trailers: e.target.checked }));
+  $("#set-padnav").addEventListener("change", (e) => C.saveConfig({ controller_nav: e.target.checked }));
 }
 
 function renderSteamUpdToggle() {
@@ -435,6 +438,8 @@ function fill() {
   $("#set-backup").checked = c.backup_before_updates !== false;
   $("#set-backup-ws").checked = c.backup_workshop !== false;
   $("#set-csounds").checked = c.couch_sounds !== false;
+  $("#set-trailers").checked = c.couch_trailers !== false;
+  $("#set-padnav").checked = c.controller_nav !== false;
   const inst = S.install || {};
   $("#set-startup").checked = !!inst.startup;
   $("#set-startup").disabled = !inst.frozen;

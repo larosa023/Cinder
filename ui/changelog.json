@@ -1,5 +1,16 @@
 [
  {
+  "version": "0.22.0",
+  "date": "2026-11-03",
+  "title": "Trailers, controller everywhere, phone remote, Cinder backup",
+  "items": [
+   "Couch mode trailers: rest on a game for a moment and its Steam trailer plays muted behind it, styled to match your theme (turn off in Settings → Account)",
+   "Controller everywhere: use your controller in the whole app. D-pad/left stick moves, A selects, B goes back, LB/RB switch tabs, Y searches, right stick scrolls, Start opens couch mode",
+   "Phone remote (Settings → Remote & backup): scan the QR code, enter the 6-digit code, and start, install or update games and watch downloads from your phone on the same Wi-Fi. Off until you turn it on",
+   "Back up Cinder: save all your settings, notes, ratings, lists, play history, price alerts, hooks, custom art and themes to one file, restore it on a new PC, or keep a weekly copy in a OneDrive/Dropbox folder"
+  ]
+ },
+ {
   "version": "0.21.0",
   "date": "2026-10-31",
   "title": "Couch shelves, sounds, backups and more",

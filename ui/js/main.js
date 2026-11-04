@@ -67,6 +67,8 @@ async function init() {
   C.mine.init();
   C.extras.init();
   C.review.init();
+  C.remoteCfg.init();
+  C.padnav.init();
   const libraryLoad = C.library.load(true);  // start reading the library right away
   C.library.paintCached();  // and show last session's library while it loads
   try {

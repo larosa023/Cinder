@@ -57,6 +57,8 @@ class Context:
         self.hooks = hooks.Hooks(data_dir)
         self.backups = backups.Backups(steam, config, data_dir)
         self.art_dir = data_dir / "customart"
+        self.remote = None  # remote.Remote, set by main
+        self.sync = None    # databackup.Sync, set by main
         self.steam_updater = steam_updater
         self.restart = restart
         self.steam = steam
@@ -204,6 +206,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": True, **c.sessions.stats(c.steam.library(), playing)})
         if path == "/api/storage":
             return self._json({"ok": True, **self._storage()})
+        if path == "/api/remote":
+            return self._json({"ok": True, **(c.remote.status() if c.remote else {"on": False, "error": "Not available"})})
+        if path == "/api/cinder_backup":
+            return self._json({"ok": True, "folder": c.config["sync_folder"], "latest": c.sync.latest() if c.sync else None})
         m = re.fullmatch(r"/api/hooks/(\*|\d+)", path)
         if m:
             return self._json({"ok": True, "hooks": c.hooks.get(m.group(1)), "global": c.hooks.get("*") if m.group(1) != "*" else []})
@@ -312,6 +318,59 @@ class Handler(BaseHTTPRequestHandler):
             old.unlink()
         (self.ctx.art_dir / f"{appid}-{which}.{ext}").write_bytes(raw)
         return self._json({"ok": True})
+
+    # -- phone remote and Cinder's own backup ---------------------------------------------
+    def _remote_op(self, body: dict):
+        c = self.ctx
+        if not c.remote:
+            return self._json({"ok": False, "error": "Not available"})
+        op = body.get("op")
+        if op in ("on", "off"):
+            c.config.update({"remote_enabled": op == "on"})
+            c.remote.apply()
+        elif op == "new_pin":
+            c.remote.new_pin()
+        elif op == "forget":
+            c.remote.forget_all()
+        return self._json({"ok": True, **c.remote.status()})
+
+    def _cinder_backup(self, body: dict):
+        import databackup
+        c = self.ctx
+        op = body.get("op")
+        try:
+            if op == "export":
+                dest = Path(str(body.get("path", "")))
+                if not dest.is_absolute():
+                    return self._json({"ok": False, "error": "Pick where to save it"})
+                if dest.suffix.lower() not in (".cinderbackup", ".zip"):
+                    dest = dest.with_suffix(".cinderbackup")
+                return self._json({"ok": True, **databackup.export(c.data_dir, dest)})
+            if op == "folder":
+                f = str(body.get("folder", "")).strip()
+                if f and not Path(f).is_dir():
+                    return self._json({"ok": False, "error": "That folder doesn't exist"})
+                c.config.update({"sync_folder": f})
+                r = c.sync.maybe(force=True) if (f and c.sync) else None
+                return self._json({"ok": True, "folder": f, "latest": c.sync.latest() if c.sync else None, "made": r})
+            if op == "sync_now":
+                r = c.sync.maybe(force=True) if c.sync else None
+                if not r:
+                    return self._json({"ok": False, "error": "Pick a folder first"})
+                return self._json({"ok": True, "latest": c.sync.latest()})
+            if op == "inspect":
+                return self._json({"ok": True, **databackup.inspect(Path(str(body.get("path", ""))))})
+            if op == "restore":
+                src = Path(str(body.get("path", "")))
+                if not src.is_file():
+                    return self._json({"ok": False, "error": "File not found"})
+                r = databackup.restore(c.data_dir, src)
+                threading.Thread(target=lambda: (time.sleep(1.2), c.restart()), daemon=True).start()
+                return self._json({"ok": True, **r, "restarting": True})
+        except (OSError, ValueError, KeyError) as e:
+            import zipfile
+            return self._json({"ok": False, "error": "That isn't a Cinder backup" if isinstance(e, (KeyError, zipfile.BadZipFile)) else str(e)})
+        return self._json({"ok": False, "error": "unknown"}, 400)
 
     # -- backups ----------------------------------------------------------------------
     def _backup_op(self, body: dict):
@@ -460,6 +519,13 @@ class Handler(BaseHTTPRequestHandler):
             appid = int(m.group(1))
             lows = augmented.price_lows([appid], cc).get(appid) or {}
             return self._json({"ok": True, **c.prices.view(appid), **lows})
+        m = re.fullmatch(r"/api/trailer/(\d+)", path)
+        if m:
+            try:
+                t = storeapi.app_details(int(m.group(1)), cc).get("trailer")
+            except storeapi.SteamDataError:
+                t = None
+            return self._json({"ok": True, "trailer": t})
         if path == "/api/recommend":
             return self._json({"ok": True, **self._recommend(cc)})
         m = re.fullmatch(r"/api/guides/(\d+)", path)
@@ -863,6 +929,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": True, "hooks": self.ctx.hooks.set(scope, body.get("hooks") or [])})
             if path == "/api/backups":
                 return self._backup_op(body)
+            if path == "/api/remote":
+                return self._remote_op(body)
+            if path == "/api/cinder_backup":
+                return self._cinder_backup(body)
             if path == "/api/customart":
                 return self._set_custom_art(body)
             if path == "/api/action":

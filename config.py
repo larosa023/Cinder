@@ -32,6 +32,12 @@ DEFAULTS = {
     "backup_before_updates": True,  # copy saves (and Workshop mods) before a game updates
     "backup_workshop": True,
     "couch_sounds": True,
+    "couch_trailers": True,  # play a game's trailer behind couch mode after you rest on it
+    "controller_nav": True,  # drive the whole app with a controller
+    "remote_enabled": False,  # phone remote over your home Wi-Fi
+    "remote_port": 47630,
+    "remote_devices": [],
+    "sync_folder": "",  # a weekly Cinder backup goes here (e.g. a OneDrive folder)
     "couch_theme": "case",  # couch mode look: case, cart, modern, neon, vhs, pocket, jewel, comic, blueprint, shelf
     "lists": [],          # [{"id", "name", "appids"}] - your Cinder game lists
     "profile_style": {},  # background appid, showcase appids, sections
@@ -46,7 +52,8 @@ EDITABLE = {"theme", "sort", "card_size", "freeze_updates", "autostart_steam", "
             "when_playing", "restore_after_play", "favorites", "hidden", "sale_alerts",
             "lists", "profile_style", "steam_bridge",
             "steam_on_demand", "steam_idle_minutes", "seen_version", "session_recap", "couch_theme",
-            "backup_before_updates", "backup_workshop", "couch_sounds"}
+            "backup_before_updates", "backup_workshop", "couch_sounds",
+            "couch_trailers", "controller_nav", "remote_enabled", "remote_port", "remote_devices", "sync_folder"}
 
 
 def data_dir() -> Path:
@@ -70,6 +77,7 @@ class Config:
         """Config safe to send to the UI (the API key is never sent back)."""
         d = dict(self.data)
         d["api_key_set"] = bool(d.pop("api_key", ""))
+        d.pop("remote_devices", None)  # paired phones' keys stay on this side
         return d
 
     def __getitem__(self, key):

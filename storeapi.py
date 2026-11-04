@@ -225,7 +225,23 @@ def app_details(appid: int, cc: str) -> dict:
         "website": d.get("website") or "",
         "workshop": any(_int(c.get("id")) == 30 for c in d.get("categories") or []),  # Steam Workshop
         "requirements": _requirements(d.get("pc_requirements")),
+        "trailer": _trailer(d.get("movies")),
     }
+
+
+def _trailer(movies) -> dict | None:
+    """The game's main trailer, in whatever forms Steam offers (older mp4/webm, newer HLS/DASH)."""
+    ms = [m for m in movies or [] if isinstance(m, dict)]
+    if not ms:
+        return None
+    m = next((x for x in ms if x.get("highlight")), ms[0])
+    pick = lambda d: (d or {}).get("480") or (d or {}).get("max") if isinstance(d, dict) else None
+    out = {"mp4": pick(m.get("mp4")) or "", "webm": pick(m.get("webm")) or "",
+           "hls": m.get("hls_h264") or "", "dash": m.get("dash_h264") or "", "thumb": m.get("thumbnail") or "", "name": m.get("name") or ""}
+    for k in ("mp4", "webm", "hls", "dash", "thumb"):
+        if out[k] and not str(out[k]).startswith("https://"):
+            out[k] = str(out[k]).replace("http://", "https://", 1) if str(out[k]).startswith("http://") else ""
+    return out if (out["mp4"] or out["webm"] or out["hls"]) else None
 
 
 def _req_list(html: str | None) -> list[list[str]]:

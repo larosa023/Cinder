@@ -232,6 +232,7 @@ function paintOther(g, kind, info) {
       <div class="ci-meta"><span class="ci-tag">${esc(g.state === "ingame" ? "In game" : g.status || "Online")}</span>${g.game ? `<span>Playing ${esc(g.game)}</span>` : ""}</div>`;
     clearTimeout(K.bgFor);
     if (g.game_appid) K.bgFor = setTimeout(() => setBg(g.game_appid), 140);
+    queueTrailer(0);
     return;
   }
   const p = g.price;
@@ -254,6 +255,7 @@ function paintOther(g, kind, info) {
   });
   clearTimeout(K.bgFor);
   K.bgFor = setTimeout(() => setBg(g.appid), 140);
+  queueTrailer(g.appid);
 }
 
 // The button hints follow what's picked (a friend's Y is Message, a store game's Y is Buy…).
@@ -293,6 +295,60 @@ function paintInfo() {
   // Background: crossfade to this game's hero art once you settle on it.
   clearTimeout(K.bgFor);
   K.bgFor = setTimeout(() => setBg(g.appid), 140);
+  queueTrailer(g.shortcut ? 0 : g.appid);
+}
+
+// ---------- trailers ----------
+// Rest on a game and its trailer fades in behind everything (muted). Moving on stops it.
+const TR = { cache: {}, timer: 0, for: 0, hls: null, hlsLib: null };
+function stopTrailer() {
+  clearTimeout(TR.timer);
+  TR.for = 0;
+  const v = root().querySelector(".cbg-v");
+  if (TR.hls) { try { TR.hls.destroy(); } catch { /* gone */ } TR.hls = null; }
+  if (v) { v.classList.remove("on"); v.classList.add("bye"); setTimeout(() => { v.pause(); v.removeAttribute("src"); v.load(); v.remove(); }, 450); }
+}
+function loadHls() {
+  if (window.Hls) return Promise.resolve(window.Hls);
+  if (!TR.hlsLib) TR.hlsLib = new Promise((res, rej) => {
+    const sc = document.createElement("script");
+    sc.src = "/ui/vendor/hls.light.min.js"; sc.onload = () => res(window.Hls); sc.onerror = rej;
+    document.head.appendChild(sc);
+  });
+  return TR.hlsLib;
+}
+function queueTrailer(appid) {
+  stopTrailer();
+  if (!appid || S.config.couch_trailers === false || (S.steam && S.steam.playing)) return;
+  TR.timer = setTimeout(() => playTrailer(appid), 1800);
+}
+async function playTrailer(appid) {
+  if (!K.open || document.hidden) return;
+  TR.for = appid;
+  let t = TR.cache[appid];
+  if (t === undefined) {
+    try { t = (await C.api(`/api/trailer/${appid}`)).trailer || null; } catch { t = null; }
+    TR.cache[appid] = t;
+  }
+  if (!t || TR.for !== appid || !K.open) return;
+  const v = document.createElement("video");
+  v.className = "cbg-v";
+  v.muted = true; v.loop = true; v.playsInline = true; v.preload = "auto";
+  root().querySelector(".cbg").appendChild(v);
+  const go = () => v.play().then(() => { if (TR.for === appid) v.classList.add("on"); }).catch(() => {});
+  if (t.webm && v.canPlayType("video/webm")) { v.src = t.webm; go(); }
+  else if (t.mp4) { v.src = t.mp4; go(); }
+  else if (t.hls) {
+    if (v.canPlayType("application/vnd.apple.mpegurl")) { v.src = t.hls; go(); return; }
+    try {
+      const Hls = await loadHls();
+      if (TR.for !== appid || !Hls || !Hls.isSupported()) return;
+      TR.hls = new Hls({ capLevelToPlayerSize: true, maxBufferLength: 20 });
+      TR.hls.loadSource(t.hls);
+      TR.hls.attachMedia(v);
+      TR.hls.on(Hls.Events.MANIFEST_PARSED, go);
+    } catch { /* no trailer then */ }
+  }
 }
 
 function setBg(appid) {
@@ -472,6 +528,7 @@ function play(g) {
   const el = root().querySelector(`.crow.on .cc[data-appid="${g.appid}"]`);
   if (el) { el.classList.remove("go"); void el.offsetWidth; el.classList.add("go"); }
   sfx("play");
+  stopTrailer();
   C.launch(g.appid);
   if (K.sheet) closeSheet();
 }
@@ -803,6 +860,7 @@ async function open() {
 async function close() {
   if (!K.open) return;
   if (K.themes) closeThemes(true);
+  stopTrailer();
   K.open = false;
   cancelAnimationFrame(K.raf);
   clearInterval(K.fgTimer);
