@@ -1,5 +1,14 @@
 [
  {
+  "version": "0.22.1",
+  "date": "2026-11-10",
+  "title": "Share your year in review",
+  "items": [
+   "Year in review now has Save image and Copy image: a portrait card (1080×1350, sized for Instagram, Discord and texts) with your hours, most played game, longest session, busiest day, streak, achievements, top games and rarest unlock, over your top game's art",
+   "Works for any year or month you pick"
+  ]
+ },
+ {
   "version": "0.22.0",
   "date": "2026-11-03",
   "title": "Trailers, controller everywhere, phone remote, Cinder backup",

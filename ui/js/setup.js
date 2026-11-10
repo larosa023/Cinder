@@ -178,6 +178,7 @@ async function openReview(period) {
   catch (e) { body.innerHTML = C.failed(e.message, false); return; }
   const v = r.review;
   RV.period = v.period;
+  RV.data = v;
   $("#review-period").innerHTML = (r.periods.length ? r.periods : [{ id: v.period, label: v.label }])
     .map((p) => `<option value="${p.id}"${p.id === v.period ? " selected" : ""}>${p.id.length === 4 ? `${esc(p.label)} — whole year` : `&nbsp;&nbsp;${esc(p.label)}`}</option>`).join("");
   const top = v.top[0];
@@ -207,8 +208,164 @@ async function openReview(period) {
     <p class="yr-foot">Hours come from the sessions Cinder has seen${v.since ? ` (since ${C.fmtDate(v.since)})` : ""}; achievements come from Steam.</p>`;
 }
 
+// ---- The shareable card: a 1080×1350 picture of the review, drawn on a canvas ----
+const loadImg = (src) => new Promise((res) => {
+  if (!src) return res(null);
+  const i = new Image();
+  i.onload = () => res(i); i.onerror = () => res(null);
+  i.src = src;
+});
+function cover(ctx, img, x, y, w, h) {  // draw like object-fit: cover
+  const r = Math.max(w / img.width, h / img.height);
+  const sw = w / r, sh = h / r;
+  ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, x, y, w, h);
+}
+function rrect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+function fit(ctx, text, max) {
+  if (ctx.measureText(text).width <= max) return text;
+  while (text.length > 1 && ctx.measureText(text + "…").width > max) text = text.slice(0, -1);
+  return text + "…";
+}
+
+async function drawCard(v) {
+  const W = 1080, H = 1350, pad = 72;
+  const cv = document.createElement("canvas");
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext("2d");
+  const css = getComputedStyle(document.documentElement);
+  const accent = (css.getPropertyValue("--accent") || "#ff6a3d").trim() || "#ff6a3d";
+  const font = (w, px) => `${w} ${px}px "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif`;
+  const top = v.top[0];
+  const [hero, port, rare, ...heads] = await Promise.all([
+    top ? loadImg(`/art/${top.appid}/hero`) : null, top ? loadImg(`/art/${top.appid}/portrait`) : null,
+    v.rarest ? loadImg(v.rarest.icon) : null, ...v.top.slice(0, 5).map((g) => loadImg(`/art/${g.appid}/header`)),
+  ]);
+
+  // Background: the top game's art, darkened, fading into the page colour.
+  ctx.fillStyle = "#0b0d12"; ctx.fillRect(0, 0, W, H);
+  if (hero) { ctx.save(); ctx.filter = "blur(18px) saturate(1.2) brightness(.55)"; cover(ctx, hero, -40, -40, W + 80, 760); ctx.restore(); }
+  let g = ctx.createLinearGradient(0, 0, 0, 780);
+  g.addColorStop(0, "rgba(11,13,18,.15)"); g.addColorStop(.7, "rgba(11,13,18,.75)"); g.addColorStop(1, "#0b0d12");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, 780);
+  g = ctx.createRadialGradient(W * .85, 120, 0, W * .85, 120, 520);
+  g.addColorStop(0, accent + "55"); g.addColorStop(1, "transparent");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, 700);
+
+  // Heading
+  ctx.fillStyle = accent; ctx.font = font(800, 30);
+  ctx.fillText(`MY ${v.label.toUpperCase()} IN GAMES`, pad, 120);
+  ctx.fillStyle = "#fff"; ctx.font = font(800, 150);
+  const hoursTxt = (v.hours >= 10 ? Math.round(v.hours) : v.hours).toLocaleString();
+  ctx.fillText(hoursTxt, pad - 6, 270);
+  const hw = ctx.measureText(hoursTxt).width;
+  ctx.font = font(700, 56); ctx.fillText(v.hours === 1 ? "hour" : "hours", pad + hw + 18, 270);
+  ctx.fillStyle = "rgba(255,255,255,.75)"; ctx.font = font(500, 32);
+  ctx.fillText(`${v.sessions.toLocaleString()} sessions · ${v.games} game${v.games === 1 ? "" : "s"} · ${v.days} day${v.days === 1 ? "" : "s"} of play`, pad, 330);
+
+  // Most played
+  let y = 390;
+  if (top) {
+    rrect(ctx, pad, y, W - pad * 2, 260, 28); ctx.fillStyle = "rgba(255,255,255,.07)"; ctx.fill();
+    if (port) { ctx.save(); rrect(ctx, pad + 22, y + 22, 144, 216, 14); ctx.clip(); cover(ctx, port, pad + 22, y + 22, 144, 216); ctx.restore(); }
+    const tx = pad + (port ? 196 : 32);
+    ctx.fillStyle = "rgba(255,255,255,.6)"; ctx.font = font(700, 24); ctx.fillText("MOST PLAYED", tx, y + 66);
+    ctx.fillStyle = "#fff"; ctx.font = font(800, 50); ctx.fillText(fit(ctx, top.name, W - pad - tx - 32), tx, y + 128);
+    ctx.fillStyle = accent; ctx.font = font(800, 38); ctx.fillText(`${(top.hours >= 10 ? Math.round(top.hours) : top.hours).toLocaleString()} h`, tx, y + 184);
+    ctx.fillStyle = "rgba(255,255,255,.65)"; ctx.font = font(500, 26); ctx.fillText(`${top.share}% of your time`, tx, y + 224);
+    y += 284;
+  }
+
+  // Stat tiles
+  const tiles = [
+    v.longest && ["Longest", `${v.longest.hours} h`, v.longest.name],
+    v.busiest && ["Busiest day", `${v.busiest.hours} h`, new Date(v.busiest.day + "T12:00").toLocaleDateString([], { month: "short", day: "numeric" })],
+    v.streak && ["Streak", `${v.streak} day${v.streak === 1 ? "" : "s"}`, "in a row"],
+    ["Trophies", v.achievements.toLocaleString(), v.perfect.length ? `${v.perfect.length} game${v.perfect.length > 1 ? "s" : ""} at 100%` : "achievements"],
+  ].filter(Boolean).slice(0, 4);
+  const tw = (W - pad * 2 - 24 * (tiles.length - 1)) / tiles.length;
+  tiles.forEach(([l, big, small], i) => {
+    const x = pad + i * (tw + 24);
+    rrect(ctx, x, y, tw, 156, 22); ctx.fillStyle = "rgba(255,255,255,.07)"; ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.6)"; ctx.font = font(700, 22); ctx.fillText(fit(ctx, l.toUpperCase(), tw - 40), x + 22, y + 46);
+    ctx.fillStyle = "#fff"; ctx.font = font(800, 44); ctx.fillText(fit(ctx, big, tw - 40), x + 22, y + 100);
+    ctx.fillStyle = "rgba(255,255,255,.6)"; ctx.font = font(500, 22); ctx.fillText(fit(ctx, small || "", tw - 40), x + 22, y + 134);
+  });
+  y += 190;
+
+  // Top games
+  const room = Math.floor((H - 130 - (y + 34)) / 62);  // rows that fit above the footer
+  const rest = v.top.slice(0, Math.max(0, Math.min(5, room - (v.rarest && room >= 5 ? 2 : 0))));
+  if (rest.length > 1) {
+    ctx.fillStyle = "rgba(255,255,255,.6)"; ctx.font = font(700, 24); ctx.fillText("TOP GAMES", pad, y + 10);
+    y += 34;
+    const max = rest[0].hours || 1;
+    rest.forEach((gm, i) => {
+      const ry = y + i * 62;
+      ctx.fillStyle = "rgba(255,255,255,.45)"; ctx.font = font(800, 26); ctx.fillText(String(i + 1), pad, ry + 36);
+      if (heads[i]) { ctx.save(); rrect(ctx, pad + 40, ry + 6, 96, 45, 8); ctx.clip(); cover(ctx, heads[i], pad + 40, ry + 6, 96, 45); ctx.restore(); }
+      ctx.fillStyle = "#fff"; ctx.font = font(600, 28); ctx.fillText(fit(ctx, gm.name, 380), pad + 156, ry + 38);
+      const bx = pad + 560, bw = W - pad - bx - 110;
+      rrect(ctx, bx, ry + 22, bw, 12, 6); ctx.fillStyle = "rgba(255,255,255,.1)"; ctx.fill();
+      rrect(ctx, bx, ry + 22, Math.max(12, (bw * gm.hours) / max), 12, 6); ctx.fillStyle = accent; ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,.8)"; ctx.font = font(700, 26); ctx.textAlign = "right";
+      ctx.fillText(`${(gm.hours >= 10 ? Math.round(gm.hours) : gm.hours).toLocaleString()} h`, W - pad, ry + 38); ctx.textAlign = "left";
+    });
+    y += rest.length * 62 + 20;
+  }
+
+  // Rarest unlock
+  if (v.rarest && y + 104 < H - 110) {
+    rrect(ctx, pad, y, W - pad * 2, 104, 22); ctx.fillStyle = "rgba(255,255,255,.07)"; ctx.fill();
+    if (rare) { ctx.save(); rrect(ctx, pad + 20, y + 16, 72, 72, 12); ctx.clip(); ctx.drawImage(rare, pad + 20, y + 16, 72, 72); ctx.restore(); }
+    const tx = pad + (rare ? 112 : 24);
+    ctx.fillStyle = "rgba(255,255,255,.6)"; ctx.font = font(700, 22); ctx.fillText(`RAREST UNLOCK · ${v.rarest.percent}% OF PLAYERS`, tx, y + 42);
+    ctx.fillStyle = "#fff"; ctx.font = font(700, 32); ctx.fillText(fit(ctx, `${v.rarest.name} — ${v.rarest.game}`, W - pad - tx - 24), tx, y + 82);
+  }
+
+  // Footer
+  ctx.fillStyle = accent; ctx.beginPath(); ctx.arc(pad + 9, H - 62, 9, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,.7)"; ctx.font = font(700, 26); ctx.fillText("Cinder", pad + 30, H - 52);
+  ctx.textAlign = "right"; ctx.fillStyle = "rgba(255,255,255,.4)"; ctx.font = font(500, 22);
+  ctx.fillText(S.user ? S.user.name || "" : "", W - pad, H - 54); ctx.textAlign = "left";
+  return cv;
+}
+
+async function saveCard() {
+  if (!RV.data) return;
+  const btn = $("#review-save");
+  btn.disabled = true;
+  try {
+    const cv = await drawCard(RV.data);
+    const data = cv.toDataURL("image/png");
+    const name = `Cinder ${RV.data.label} in review.png`;
+    const a = api();
+    if (a && a.save_file) {
+      const path = await a.save_file(name, "png");
+      if (!path) return;
+      const r = await C.api("/api/save_image", { path, data });
+      if (!r.ok) return C.toast(r.error, true);
+      C.toast("Saved");
+    } else {
+      Object.assign(document.createElement("a"), { href: data, download: name }).click();
+    }
+  } catch (e) { C.toast(e.message, true); }
+  finally { btn.disabled = false; }
+}
+
+async function copyCard() {
+  if (!RV.data) return;
+  try {
+    const cv = await drawCard(RV.data);
+    const blob = await new Promise((res) => cv.toBlob(res, "image/png"));
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    C.toast("Copied. Paste it anywhere");
+  } catch { C.toast("Couldn't copy here: use Save image instead", true); }
+}
+
 function bindReview() {
   const ov = $("#review");
+  $("#review-save").addEventListener("click", saveCard);
+  $("#review-copy").addEventListener("click", copyCard);
   ov.addEventListener("change", (e) => { if (e.target.id === "review-period") openReview(e.target.value); });
   ov.addEventListener("click", (e) => {
     const a = e.target.closest("[data-app]");
@@ -217,5 +374,5 @@ function bindReview() {
 }
 
 C.gameSetup = { mount, bustArt };
-C.review = { open: openReview, init: bindReview };
+C.review = { open: openReview, init: bindReview, drawCard };
 })();

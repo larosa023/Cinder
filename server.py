@@ -110,7 +110,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _body(self) -> dict:
         n = int(self.headers.get("Content-Length") or 0)
-        limit = 28 << 20 if urlsplit(self.path).path == "/api/customart" else 1 << 20  # pictures can be big
+        limit = 28 << 20 if urlsplit(self.path).path in ("/api/customart", "/api/save_image") else 1 << 20  # pictures can be big
         if not n or n > limit:
             return {}
         try:
@@ -285,6 +285,19 @@ class Handler(BaseHTTPRequestHandler):
         c.steam.prefetch_art([g["appid"] for g in games])
         c.backups.before_update(games)
         return games
+
+    def _save_image(self, body: dict):
+        """Write a PNG the page drew (Year in review card) to where you chose."""
+        import base64
+        dest = Path(str(body.get("path", "")))
+        m = re.match(r"^data:image/png;base64,(.+)$", str(body.get("data", "")), re.S)
+        if not dest.is_absolute() or not m:
+            return self._json({"ok": False, "error": "Pick where to save it"})
+        if dest.suffix.lower() != ".png":
+            dest = dest.with_suffix(".png")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(base64.b64decode(m.group(1)))
+        return self._json({"ok": True, "path": str(dest)})
 
     # -- custom art -----------------------------------------------------------------
     def _custom_art(self, appid: int, which: str) -> Path | None:
@@ -935,6 +948,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._cinder_backup(body)
             if path == "/api/customart":
                 return self._set_custom_art(body)
+            if path == "/api/save_image":
+                return self._save_image(body)
             if path == "/api/action":
                 return self._action(body)
             if path == "/api/theme":

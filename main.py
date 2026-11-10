@@ -125,9 +125,10 @@ class WindowApi:
         r = self._window.create_file_dialog(webview.OPEN_DIALOG, file_types=types)
         return (r[0] if r else "") or ""
 
-    def save_file(self, name="Cinder.cinderbackup"):
+    def save_file(self, name="Cinder.cinderbackup", kind="backup"):
         import webview
-        r = self._window.create_file_dialog(webview.SAVE_DIALOG, save_filename=name, file_types=("Cinder backup (*.cinderbackup)",))
+        types = {"png": ("PNG image (*.png)",)}.get(kind, ("Cinder backup (*.cinderbackup)",))
+        r = self._window.create_file_dialog(webview.SAVE_DIALOG, save_filename=name, file_types=types)
         if isinstance(r, (list, tuple)):
             r = r[0] if r else ""
         return r or ""
