@@ -94,9 +94,15 @@ function press(b) {
       el.dispatchEvent(new Event("change", { bubbles: true }));
       return;
     }
+    // On the Showcase shelf, left/right walk the shelf until you move up or down into the buttons.
+    if (C.showcase && C.showcase.active() && (b === "left" || b === "right") && (!P.cur || !P.cur.isConnected || !P.cur.closest(".sc-acts, .lib-head, .sc-top"))) {
+      if (P.cur) { P.cur.classList.remove("pad-focus"); P.cur = null; }
+      return C.showcase.step(b === "right" ? 1 : -1);
+    }
     return moveFocus(b);
   }
   if (b === "a") {
+    if ((!P.cur || !P.cur.isConnected) && C.showcase && C.showcase.active()) return C.showcase.act("details");
     if (!P.cur || !P.cur.isConnected) return moveFocus("down");
     if (P.cur.matches("input[type=checkbox], input[type=radio]")) { P.cur.click(); return; }
     if (P.cur.matches("input, textarea")) { P.cur.focus(); return; }

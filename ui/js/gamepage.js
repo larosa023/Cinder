@@ -132,6 +132,7 @@ function open(g) {
 
 function bind() {
   $("#d-workshop").addEventListener("click", () => setTab("workshop"));
+  $("#d-3d").addEventListener("click", () => C.showcase.openViewer(G.appid));
   $("#d-hltb").addEventListener("click", (e) => {
     const u = e.target.closest("[data-url]");
     if (u) { e.preventDefault(); C.act("steam_url_open", { url: u.dataset.url }); }

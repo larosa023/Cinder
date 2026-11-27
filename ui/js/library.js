@@ -152,6 +152,8 @@ const LAYOUTS = {
     cls: "lib-list", item: listRow, head: listHead, noZoom: true },
   shelves: { label: "Shelves", icon: V('<path d="M3 8h18M3 16h18"/><rect x="4" y="3" width="3" height="5"/><rect x="9" y="4" width="3" height="4"/><rect x="5" y="11" width="3" height="5"/><rect x="10" y="12" width="3" height="4"/><rect x="15" y="11" width="3" height="5"/>'),
     cls: "shelves", render: shelvesHTML },
+  showcase: { label: "Showcase", icon: V('<path d="M3 20h18"/><path d="M5 18V8l2-1v11M9 18V6l2 1v11"/><rect x="13" y="5" width="7" height="13" rx="1"/>'),
+    cls: "showcase", mount: (grid, list) => C.showcase.mount(grid, list), noZoom: true },
 };
 
 function layoutId() {
@@ -286,6 +288,7 @@ function renderNow() {
   const grid = $("#grid");
   if (grid.className !== lay.cls) grid.className = lay.cls;
   if (lay.item) patchGrid(grid, lay, layId, list);
+  else if (lay.mount) { poolLayout = ""; pool.clear(); lay.mount(grid, list); }
   else { poolLayout = ""; pool.clear(); grid.innerHTML = lay.render(list); C.markLoaded(grid); }
   renderViews();
   $("#count").textContent = list.length === S.games.length ? S.games.length : `${list.length} of ${S.games.length}`;
@@ -300,7 +303,7 @@ function renderNow() {
 
   const hid = hiddenSet();
   const recent = S.games.filter((g) => g.lastplayed && g.installed && !hid.has(g.appid)).sort(SORTS.recent).slice(0, 6);
-  const showRecent = !L.q && L.filter === "all" && recent.length > 0 && layoutId() !== "shelves";
+  const showRecent = !L.q && L.filter === "all" && recent.length > 0 && !["shelves", "showcase"].includes(layoutId());
   $("#recent").hidden = !showRecent;
   if (showRecent) {
     const html = recent.map(tileHTML).join("");

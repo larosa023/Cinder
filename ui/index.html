@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="/ui/app.css">
 <link rel="stylesheet" href="/ui/views.css">
 <link rel="stylesheet" href="/ui/couch.css">
+<link rel="stylesheet" href="/ui/showcase.css">
 <link rel="stylesheet" id="theme-css" href="/themes/midnight.css">
 <style id="style-vars"></style>
 <script>window.CINDER_TOKEN = "{{TOKEN}}";</script>
@@ -140,6 +141,7 @@
         <button class="btn" id="d-fav" title="Keep it at the top of your library"></button>
         <button class="btn" id="d-hide" title="Hide it from your library"></button>
         <button class="btn" id="d-lists" title="Add to one of your lists">Add to list</button>
+        <button class="btn" id="d-3d" title="See it as a game case you can spin, flip and open">3D case</button>
         <button class="btn" id="d-workshop" title="Mods, maps and more from the Steam Workshop" hidden></button>
         <button class="btn danger" id="d-uninstall">Uninstall</button>
       </div>
@@ -199,6 +201,21 @@
   <div class="panel guide-panel">
     <button class="icon-btn d-close" data-gclose title="Close (Esc)"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     <div class="guide-body" id="guide-body"></div>
+  </div>
+</div>
+
+<!-- 3D case viewer -->
+<div class="overlay b3v" id="b3v" hidden>
+  <div class="b3v-bg"></div>
+  <button class="icon-btn b3v-x" data-b3close title="Close (Esc)"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  <div class="b3v-name" id="b3v-name"></div>
+  <div class="b3v-hint">Drag to turn it · scroll to spin</div>
+  <div class="b3v-stage" id="b3v-stage"></div>
+  <div class="b3v-bar">
+    <button data-b3="play" class="pri"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Play</button>
+    <button data-b3="front">Front</button><button data-b3="back">Back</button><button data-b3="spine">Spine</button>
+    <button data-b3="open">Open</button><button data-b3="disc">Disc</button><button data-b3="spin">Spin</button>
+    <button data-b3="details">Details</button>
   </div>
 </div>
 
@@ -507,6 +524,7 @@
 <script src="/ui/js/setup.js"></script>
 <script src="/ui/js/remotecfg.js"></script>
 <script src="/ui/js/padnav.js"></script>
+<script src="/ui/js/showcase.js"></script>
 <script src="/ui/js/main.js"></script>
 </body>
 </html>

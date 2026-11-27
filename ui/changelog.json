@@ -1,5 +1,17 @@
 [
  {
+  "version": "0.23.0",
+  "date": "2026-11-27",
+  "title": "Showcase",
+  "items": [
+   "New library layout, Showcase: every game is a 3D game case on a shelf, spines out, and the one you pick turns to face you. Spines take their colour from each cover",
+   "Scroll with the wheel, arrow keys, your controller, or click and drag (flick to fly along). Hover the case and it tilts in the light",
+   "Flip a case to read its back (art, your play time, barcode), open it to see the disc spinning inside, or press Random to spin the shelf to a game",
+   "Collections: your lists and Steam collections as a wall of tiles with fanned-out covers. Pick one to put it on the shelf",
+   "3D case viewer: on the shelf or any game page (3D case button). Drag to turn it with momentum, or jump to the front, back, spine, open case or disc, or let it spin"
+  ]
+ },
+ {
   "version": "0.22.1",
   "date": "2026-11-10",
   "title": "Share your year in review",
