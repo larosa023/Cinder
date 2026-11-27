@@ -1,5 +1,18 @@
 [
  {
+  "version": "0.23.1",
+  "date": "2026-11-27",
+  "title": "Showcase, reworked",
+  "items": [
+   "The shelf is now a proper cover-flow: the picked case stands big in front, and the others turn their covers toward it, overlapping, with spines showing on the left and case edges on the right",
+   "Fixed: on wide screens the cases on the right showed their backs; cases were stuck at one small size instead of filling the space",
+   "Cases fade into shadow the further they are from the middle, lift when you hover them, and cast soft shadows",
+   "Your library filters now sit as tabs inside the panel, with the game count beside them",
+   "The panel fits around the shelf, with the title and buttons right under the picked case",
+   "The line under the title no longer says \"Not played yet\" next to \"Last played\""
+  ]
+ },
+ {
   "version": "0.23.0",
   "date": "2026-11-27",
   "title": "Showcase",

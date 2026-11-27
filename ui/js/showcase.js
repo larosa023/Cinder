@@ -10,7 +10,7 @@
 (() => {
 "use strict";
 const { $, esc, S, ICON } = C;
-const WINDOW = 18;                 // cases kept on each side of the picked one
+const WINDOW = 16;                 // cases kept on each side of the picked one
 const SC = { list: [], sel: 0, els: new Map(), root: null, view: "shelf", flipped: false, open: false, key: "", bgFor: 0, tilt: null };
 const tint = new Map();            // appid -> spine colour, from the cover's average
 
@@ -108,35 +108,50 @@ function mount(grid, list) {
 function shellHTML() {
   return `<div class="sc">
     <div class="sc-bg"><i></i><i></i></div>
-    <div class="sc-top">
-      <div class="seg sc-views"><button data-scv="shelf">Shelf</button><button data-scv="bento">Collections</button></div>
-      <span class="sc-pos" id="sc-pos"></span>
+    <div class="sc-panel">
+      <div class="sc-top">
+        <div class="seg sc-views"><button data-scv="shelf">Shelf</button><button data-scv="bento">Collections</button></div>
+        <div class="sc-tabs" id="sc-tabs"></div><span class="sc-pos" id="sc-pos"></span>
+      </div>
+      <div class="sc-mid">
+        <div class="sc-stage" id="sc-stage"><div class="sc-spot"></div><div class="sc-track" id="sc-track"></div></div>
+        <div class="sc-info" id="sc-info"></div>
+      </div>
+      <div class="sc-bento" id="sc-bento" hidden></div>
     </div>
-    <div class="sc-stage" id="sc-stage"><div class="sc-floor"></div><div class="sc-track" id="sc-track"></div></div>
-    <div class="sc-info" id="sc-info"></div>
-    <div class="sc-bento" id="sc-bento" hidden></div>
-    <div class="sc-keys"><span><kbd>←</kbd><kbd>→</kbd> browse</span><span><kbd>Enter</kbd> details</span><span><kbd>Space</kbd> play</span>
-      <span><kbd>F</kbd> flip</span><span><kbd>O</kbd> open</span><span><kbd>R</kbd> random</span></div>
+    <div class="sc-keys"><span><kbd>←</kbd><kbd>→</kbd> Browse</span><span><kbd>PgUp</kbd><kbd>PgDn</kbd> Fast</span><span><kbd>Enter</kbd> Details</span>
+      <span><kbd>Space</kbd> Play</span><span><kbd>F</kbd> Flip</span><span><kbd>O</kbd> Open</span><span><kbd>R</kbd> Random</span></div>
   </div>`;
 }
 
-function dims() {
-  const st = $("#sc-stage");
-  const h = st ? st.clientHeight : 500;
-  const w = Math.round(Math.max(150, Math.min(310, h * 0.58)));
-  return { w, h: Math.round(w * 1.4), d: Math.round(w * 0.105) };
+// The library's own filters, as tabs inside the panel (like platform tabs on a console shelf).
+function paintTabs() {
+  const box = $("#sc-tabs");
+  if (!box) return;
+  const on = document.querySelector("#filters .on");
+  box.innerHTML = [...document.querySelectorAll("#filters [data-filter]")].filter((b) => !b.hidden)
+    .map((b) => `<button data-sctab="${b.dataset.filter}" class="${b === on ? "on" : ""}">${esc(b.textContent.trim())}</button>`).join("");
 }
 
-// Where each case stands: the picked one in front, the rest spine-out to each side.
+// Case size comes from the room there is: as big as fits, like the video's hero case.
+function dims() {
+  const sc = SC.root;
+  const W = sc ? sc.clientWidth : 1400;
+  const roomH = innerHeight - 176 - 64 - 160 - 60;   // header, tabs, title + buttons, hints
+  const w = Math.round(Math.max(150, Math.min(roomH / 1.4 / 1.45, W * 0.125, 360)));
+  return { w, h: Math.round(w * 1.4), d: Math.round(w * 0.1) };
+}
+
+// Cover-flow: the picked case faces you; the others turn their covers toward it, overlapping,
+// so you see the spine on the left side and the case's edge on the right.
 function place(i, sel, D) {
   const off = i - sel;
-  if (off === 0) return { x: 0, z: D.w * 0.18, ry: SC.flipped ? 180 : 0, s: 1 };
-  const step = D.w * 0.215;
-  const gap = D.w * 0.6;
+  if (off === 0) return { x: 0, z: D.w * 0.42, ry: SC.flipped ? 180 : 0, s: 1, lit: 1 };
   const side = Math.sign(off);
   const k = Math.abs(off) - 1;
-  // Spines face you: turned a little past side-on on the left, a little short of it on the right.
-  return { x: side * (gap + k * step), z: -k * 2, ry: side < 0 ? 98 : 82, s: 0.94 };
+  const gap = D.w * 0.66, step = D.w * 0.3;
+  const ry = k === 0 ? 58 : 66;
+  return { x: side * (gap + k * step + (k ? D.w * 0.06 : 0)), z: -D.w * 0.12 - k * 4, ry: -side * ry, s: 1, lit: Math.max(0.4, 0.8 - k * 0.055) };
 }
 
 function layout(instant) {
@@ -146,6 +161,7 @@ function layout(instant) {
   SC.root.style.setProperty("--bw", D.w + "px");
   SC.root.style.setProperty("--bh", D.h + "px");
   SC.root.style.setProperty("--bd", D.d + "px");
+  paintTabs();
   const lo = Math.max(0, SC.sel - WINDOW), hi = Math.min(SC.list.length - 1, SC.sel + WINDOW);
   const keep = new Set();
   for (let i = lo; i <= hi; i++) {
@@ -160,9 +176,9 @@ function layout(instant) {
       if (el) {  // upgrade to the full case in place, keeping its spot
         fresh.style.cssText = el.style.cssText;
         el.replaceWith(fresh);
-      } else {
+      } else {   // new ones slide in from the edge they come from
         const p0 = place(i, SC.sel, D);
-        fresh.style.transform = `translate3d(${p0.x + Math.sign(i - SC.sel || 1) * D.w * 0.5}px,0,${p0.z}px) rotateY(${p0.ry}deg)`;
+        fresh.style.transform = `translate3d(${p0.x + Math.sign(i - SC.sel || 1) * D.w * 0.6}px,0,${p0.z}px) rotateY(${p0.ry}deg)`;
         fresh.style.opacity = "0";
         track.appendChild(fresh);
       }
@@ -176,10 +192,12 @@ function layout(instant) {
     const p = place(i, SC.sel, D);
     el.classList.toggle("on", picked);
     el.classList.toggle("open", picked && SC.open);
-    el.style.zIndex = String(1000 - Math.abs(i - SC.sel));
+    el.classList.toggle("lft", i < SC.sel);
+    el.style.setProperty("--lit", p.lit);
     el.style.opacity = "1";
     el.style.transition = instant ? "none" : "";
-    el.style.transform = `translate3d(${p.x}px,0,${p.z}px) rotateY(${p.ry}deg) scale(${p.s})` + (picked ? " rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg))" : "");
+    el.style.transform = `translate3d(${p.x}px,var(--hy, 0px),${p.z}px) rotateY(${p.ry}deg)`
+      + (picked ? " rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg))" : "");
   }
   for (const [id, el] of SC.els) if (!keep.has(id)) { el.remove(); SC.els.delete(id); }
   if (instant) requestAnimationFrame(() => SC.els.forEach((el) => { el.style.transition = ""; }));
@@ -195,11 +213,15 @@ function paintInfo() {
   $("#sc-pos").textContent = SC.list.length ? `${SC.sel + 1} / ${SC.list.length}` : "";
   if (!g) { info.innerHTML = ""; return; }
   const m = C.meta(g.appid);
-  const bits = [g.installed ? (g.playtime ? C.fmtPlay(g.playtime) : "Not played yet") : "Not installed",
-    g.lastplayed ? `Last played ${C.fmtAgo(g.lastplayed)}` : "", m.status ? C.statusLabel(m.status) : "",
-    g.update_pending && g.installed ? "Update ready" : ""].filter(Boolean);
+  const bits = [g.shortcut ? "Non-Steam" : "Steam",
+    g.lastplayed ? `played ${C.fmtAgo(g.lastplayed)}` : "never played",
+    g.playtime ? C.fmtPlay(g.playtime) : "",
+    !g.installed ? "not installed" : g.update_pending ? "update ready" : "",
+    m.status ? C.statusLabel(m.status) : ""].filter(Boolean);
+  const same = info.dataset.appid === String(g.appid);
+  info.dataset.appid = g.appid;
   info.innerHTML = `
-    <h2>${esc(C.gname(g.name))}</h2>
+    <h2${same ? ' class="still"' : ""}>${esc(C.gname(g.name))}</h2>
     <p>${bits.map(esc).join(" · ")}${m.rating ? ` · ${C.stars(m.rating)}` : ""}</p>
     <div class="sc-acts">
       <button class="sc-a pri" data-sca="play">${g.installed ? ICON.play : ICON.down}${g.installed ? "Play" : "Install"}</button>
@@ -332,6 +354,8 @@ function bind() {
     if (b) return pickBento(b.dataset.bento);
     const a = e.target.closest("[data-sca]");
     if (a) return act(a.dataset.sca);
+    const t = e.target.closest("[data-sctab]");
+    if (t) { SC.sel = 0; document.querySelector(`#filters [data-filter="${t.dataset.sctab}"]`)?.click(); return; }
     const box = e.target.closest(".b3");
     if (box) {
       const i = SC.list.findIndex((g) => g.appid === +box.dataset.appid);
@@ -362,7 +386,7 @@ function bind() {
     if (!d.moved) return;
     d.pts.push([e.clientX, performance.now()]);
     if (d.pts.length > 6) d.pts.shift();
-    const step = dims().w * 0.215;
+    const step = dims().w * 0.3;
     const n = d.start - Math.round(dx / step);
     if (n !== SC.sel) go(n);
   });
