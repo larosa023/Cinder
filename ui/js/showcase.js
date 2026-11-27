@@ -78,6 +78,7 @@ function caseHTML(g, full) {
         <small>${g.appid}</small></div>` : ""}</div>
     <div class="b3-s"><b>${plat(g)}</b><span class="b3-sname">${name}</span><img alt="" class="b3-slogo" src="/art/${g.appid}/logo" data-fail="hide" onload="this.parentNode.classList.add('has-logo')"><i class="b3-smark"></i></div>
     <div class="b3-r"></div><div class="b3-t"></div><div class="b3-u"></div>
+    <div class="b3-ref"><img alt="" decoding="async" src="/art/${g.appid}/portrait" data-fail="hide"></div>
   </div>`;
 }
 
@@ -137,8 +138,10 @@ function paintTabs() {
 function dims() {
   const sc = SC.root;
   const W = sc ? sc.clientWidth : 1400;
-  const roomH = innerHeight - 176 - 64 - 160 - 60;   // header, tabs, title + buttons, hints
-  const w = Math.round(Math.max(150, Math.min(roomH / 1.4 / 1.45, W * 0.125, 360)));
+  const panel = sc && sc.querySelector(".sc-panel");
+  const roomH = (panel ? panel.clientHeight : innerHeight - 220) - 60 - 170;   // tabs, title + buttons
+  // Case + its floor reflection need about 1.75 × the case height.
+  const w = Math.round(Math.max(150, Math.min(roomH / 1.4 / 1.75, W * 0.15, 440)));
   return { w, h: Math.round(w * 1.4), d: Math.round(w * 0.1) };
 }
 
@@ -154,8 +157,16 @@ function place(i, sel, D) {
   return { x: side * (gap + k * step + (k ? D.w * 0.06 : 0)), z: -D.w * 0.12 - k * 4, ry: -side * ry, s: 1, lit: Math.max(0.4, 0.8 - k * 0.055) };
 }
 
+// The panel fills the window below the library header, whatever the screen size.
+function fit() {
+  if (!SC.root || !SC.root.isConnected) return;
+  const top = SC.root.getBoundingClientRect().top + (document.getElementById("main")?.scrollTop || 0);
+  SC.root.style.height = `${Math.max(520, innerHeight - top - 14)}px`;
+}
+
 function layout(instant) {
   const track = $("#sc-track");
+  fit();
   if (!track || SC.view !== "shelf") return;
   const D = dims();
   SC.root.style.setProperty("--bw", D.w + "px");

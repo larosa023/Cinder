@@ -1,5 +1,15 @@
 [
  {
+  "version": "0.23.2",
+  "date": "2026-11-27",
+  "title": "Showcase fills the screen",
+  "items": [
+   "The Showcase panel now fills the window on any screen size, with no empty space underneath",
+   "Cases size themselves to the room there is, so they're bigger on tall screens",
+   "Glossy floor: every case's cover is reflected below it, and the reflection turns with the case"
+  ]
+ },
+ {
   "version": "0.23.1",
   "date": "2026-11-27",
   "title": "Showcase, reworked",
