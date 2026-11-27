@@ -11,7 +11,8 @@
 "use strict";
 const { $, esc, S, ICON } = C;
 const WINDOW = 16;                 // cases kept on each side of the picked one
-const SC = { list: [], sel: 0, els: new Map(), root: null, view: "shelf", flipped: false, open: false, key: "", bgFor: 0, tilt: null };
+const SC = { list: [], sel: 0, pos: 0, flipA: 0, raf: 0, last: 0, D: null, span: WINDOW, dragEnd: 0,
+  els: new Map(), root: null, view: "shelf", flipped: false, open: false, key: "", bgFor: 0, titleAt: 0 };
 const tint = new Map();            // appid -> spine colour, from the cover's average
 
 // ---------- spine colours: the cover's average colour, darkened ----------
@@ -53,33 +54,54 @@ function barcode(appid) {
 
 const plat = (g) => (g.shortcut ? "PC" : "STEAM");
 
-/** One game case. `full` adds the back cover and the inside (for the picked case and the viewer). */
-function caseHTML(g, full) {
+// The parts only the picked case needs: inside cover, tray and disc, back cover.
+function fiHTML(g) { return `<img alt="" src="/art/${g.appid}/hero" data-fail="hide"><span class="b3-clip"></span>`; }
+function inHTML(g) {
   const name = esc(C.gname(g.name));
-  const col = tint.get(g.appid);
-  return `<div class="b3${g.installed ? "" : " ni"}" data-appid="${g.appid}"${col ? ` style="--tint:${col}"` : ""}>
-    <div class="b3-door">
-      <div class="b3-f">
-        <div class="b3-band"><b>${plat(g)}</b><span>${g.shortcut ? "Non-Steam" : "DVD-ROM"}</span></div>
-        <div class="b3-art"><img alt="" decoding="async" src="/art/${g.appid}/portrait" data-fallback="/art/${g.appid}/header" data-tintfor="${g.appid}"><span class="b3-ph">${name}</span></div>
-        <i class="b3-sheen"></i>
-      </div>
-      <div class="b3-fi">${full ? `<img alt="" src="/art/${g.appid}/hero" data-fail="hide"><span class="b3-clip"></span>` : ""}</div>
-    </div>
-    <div class="b3-in">${full ? `<div class="b3-tray"><div class="b3-disc"><img alt="" src="/art/${g.appid}/portrait" data-fail="hide"><i></i></div></div>
-      <div class="b3-booklet"><small>Includes</small><b>${name}</b><span>Installation guide · Steam key inside</span></div>` : ""}</div>
-    <div class="b3-b">${full ? `
+  return `<div class="b3-tray"><div class="b3-disc"><img alt="" src="/art/${g.appid}/portrait" data-fail="hide"><i></i></div></div>
+      <div class="b3-booklet"><small>Includes</small><b>${name}</b><span>Installation guide · Steam key inside</span></div>`;
+}
+function backHTML(g) {
+  const name = esc(C.gname(g.name));
+  return `
       <div class="b3-bhero"><img alt="" src="/art/${g.appid}/hero" data-fail="hide"></div>
       <div class="b3-btxt"><b>${name}</b>
         <p>${g.playtime ? `You've played ${esc(C.fmtPlay(g.playtime))}${g.lastplayed ? `, last ${esc(C.fmtAgo(g.lastplayed))}` : ""}.` : "A game waiting to be played."}</p>
         <div class="b3-shots"><img alt="" src="/art/${g.appid}/header" data-fail="hide"><img alt="" src="/art/${g.appid}/logo" data-fail="hide" class="lg"></div>
         <i></i><i></i><i class="short"></i></div>
       <div class="b3-bfoot"><span class="b3-rate">${g.installed ? "INSTALLED" : "STEAM"}</span><span class="b3-bar" style="background:${barcode(g.appid)}"></span>
-        <small>${g.appid}</small></div>` : ""}</div>
+        <small>${g.appid}</small></div>`;
+}
+
+/** One game case. `full` adds the back cover and the inside (for the picked case and the viewer). */
+function caseHTML(g, full) {
+  const name = esc(C.gname(g.name));
+  const col = tint.get(g.appid);
+  return `<div class="b3${g.installed ? "" : " ni"}" data-appid="${g.appid}"${full ? ' data-full="1"' : ""}${col ? ` style="--tint:${col}"` : ""}>
+    <div class="b3-door">
+      <div class="b3-f">
+        <div class="b3-band"><b>${plat(g)}</b><span>${g.shortcut ? "Non-Steam" : "DVD-ROM"}</span></div>
+        <div class="b3-art"><img alt="" decoding="async" src="/art/${g.appid}/portrait" data-fallback="/art/${g.appid}/header" data-tintfor="${g.appid}"><span class="b3-ph">${name}</span></div>
+        <i class="b3-sheen"></i>
+      </div>
+      <div class="b3-fi">${full ? fiHTML(g) : ""}</div>
+    </div>
+    <div class="b3-in">${full ? inHTML(g) : ""}</div>
+    <div class="b3-b">${full ? backHTML(g) : ""}</div>
     <div class="b3-s"><b>${plat(g)}</b><span class="b3-sname">${name}</span><img alt="" class="b3-slogo" src="/art/${g.appid}/logo" data-fail="hide" onload="this.parentNode.classList.add('has-logo')"><i class="b3-smark"></i></div>
     <div class="b3-r"></div><div class="b3-t"></div><div class="b3-u"></div>
     <div class="b3-ref"><img alt="" decoding="async" src="/art/${g.appid}/portrait" data-fail="hide"></div>
   </div>`;
+}
+
+/** Give a shelf case its back and inside, in place (no new element, so nothing jumps or reloads). */
+function fill(el, g) {
+  if (el.dataset.full) return;
+  el.dataset.full = "1";
+  el.querySelector(".b3-fi").innerHTML = fiHTML(g);
+  el.querySelector(".b3-in").innerHTML = inHTML(g);
+  el.querySelector(".b3-b").innerHTML = backHTML(g);
+  C.markLoaded && C.markLoaded(el);
 }
 
 // ---------- the shelf ----------
@@ -93,7 +115,8 @@ function mount(grid, list) {
     SC.els.clear();
     bind();
   }
-  if (key !== SC.key || fresh) {
+  const changed = key !== SC.key || fresh;
+  if (changed) {
     const cur = SC.list[SC.sel];
     SC.list = list;
     SC.key = key;
@@ -102,8 +125,10 @@ function mount(grid, list) {
     for (const [id, el] of SC.els) if (!list.some((g) => g.appid === id)) { el.remove(); SC.els.delete(id); }
     SC.flipped = SC.open = false;
   }
+  SC.list = list;   // same games, fresh details
   setView(SC.view);
-  layout(true);
+  // A library refresh with the same games (playtime, downloads) must not snap a shelf that's moving.
+  layout(changed);
 }
 
 function shellHTML() {
@@ -145,16 +170,19 @@ function dims() {
   return { w, h: Math.round(w * 1.4), d: Math.round(w * 0.1) };
 }
 
-// Cover-flow: the picked case faces you; the others turn their covers toward it, overlapping,
-// so you see the spine on the left side and the case's edge on the right.
-function place(i, sel, D) {
-  const off = i - sel;
-  if (off === 0) return { x: 0, z: D.w * 0.42, ry: SC.flipped ? 180 : 0, s: 1, lit: 1 };
-  const side = Math.sign(off);
-  const k = Math.abs(off) - 1;
-  const gap = D.w * 0.66, step = D.w * 0.3;
-  const ry = k === 0 ? 58 : 66;
-  return { x: side * (gap + k * step + (k ? D.w * 0.06 : 0)), z: -D.w * 0.12 - k * 4, ry: -side * ry, s: 1, lit: Math.max(0.4, 0.8 - k * 0.055) };
+// Cover-flow, as one smooth function of how far a case is from the middle. While the shelf moves
+// that distance is a fraction, so every case follows the same path at the same speed, whichever
+// way you go and however fast. The cases turning in and out turn early, so they clear each other.
+const ANGLE = 62;
+function place(off, D) {
+  const a = Math.abs(off), side = off < 0 ? -1 : 1;
+  const gap = D.w * 0.74, step = D.w * 0.3, zc = D.w * 0.42, zn = -D.w * 0.12;
+  if (a <= 1) {
+    const turn = Math.sin(Math.min(1, a * 1.6) * Math.PI / 2);
+    return { x: side * gap * a, z: zc + (zn - zc) * a, ry: -side * ANGLE * turn, lit: 1 - 0.2 * a };
+  }
+  const k = a - 1;
+  return { x: side * (gap + k * step), z: zn - k * 4, ry: -side * ANGLE, lit: Math.max(0.4, 0.8 - k * 0.055) };
 }
 
 // The panel fills the window below the library header, whatever the screen size.
@@ -164,86 +192,134 @@ function fit() {
   SC.root.style.height = `${Math.max(520, innerHeight - top - 14)}px`;
 }
 
+/** Size everything for the room there is, then draw. `instant` jumps straight to the picked case. */
 function layout(instant) {
-  const track = $("#sc-track");
   fit();
-  if (!track || SC.view !== "shelf") return;
-  const D = dims();
+  if (!$("#sc-track") || SC.view !== "shelf") return;
+  const D = SC.D = dims();
   SC.root.style.setProperty("--bw", D.w + "px");
   SC.root.style.setProperty("--bh", D.h + "px");
   SC.root.style.setProperty("--bd", D.d + "px");
+  // Enough cases to run past both edges of the panel, so none ever pops in where you can see it.
+  const half = (SC.root.clientWidth || 1400) / 2;
+  SC.span = Math.max(5, Math.min(40, Math.ceil((half + D.w - D.w * 0.74) / (D.w * 0.3)) + 3));
   paintTabs();
-  const lo = Math.max(0, SC.sel - WINDOW), hi = Math.min(SC.list.length - 1, SC.sel + WINDOW);
+  if (instant) { stop(); SC.pos = SC.sel; SC.flipA = SC.flipped ? 1 : 0; render(); }
+  else kick();
+  paintInfo();
+}
+
+/** Put every case where it belongs for the shelf's current (possibly in-between) position. */
+function render() {
+  const track = $("#sc-track");
+  if (!track || !SC.D) return;
+  const D = SC.D, n = SC.list.length, span = SC.span || WINDOW;
+  const lo = Math.max(0, Math.floor(SC.pos - span)), hi = Math.min(n - 1, Math.ceil(SC.pos + span));
   const keep = new Set();
+  const settled = Math.abs(SC.pos - SC.sel) < 0.35;
   for (let i = lo; i <= hi; i++) {
     const g = SC.list[i];
     keep.add(g.appid);
     let el = SC.els.get(g.appid);
-    const picked = i === SC.sel;
-    if (!el || (picked && !el.dataset.full)) {
+    if (!el) {
       const tmp = document.createElement("div");
-      tmp.innerHTML = caseHTML(g, picked);
-      const fresh = tmp.firstElementChild;
-      if (el) {  // upgrade to the full case in place, keeping its spot
-        fresh.style.cssText = el.style.cssText;
-        el.replaceWith(fresh);
-      } else {   // new ones slide in from the edge they come from
-        const p0 = place(i, SC.sel, D);
-        fresh.style.transform = `translate3d(${p0.x + Math.sign(i - SC.sel || 1) * D.w * 0.6}px,0,${p0.z}px) rotateY(${p0.ry}deg)`;
-        fresh.style.opacity = "0";
-        track.appendChild(fresh);
-      }
-      el = fresh;
-      if (picked) el.dataset.full = "1";
+      tmp.innerHTML = caseHTML(g, false);
+      el = tmp.firstElementChild;
+      track.appendChild(el);
       SC.els.set(g.appid, el);
       C.markLoaded && C.markLoaded(el);
       const img = el.querySelector("[data-tintfor]");
       if (img) (img.complete ? measureTint(g.appid, img) : img.addEventListener("load", () => measureTint(g.appid, img), { once: true }));
     }
-    const p = place(i, SC.sel, D);
+    const picked = i === SC.sel;
+    if (picked && settled) fill(el, g);
+    const off = i - SC.pos;
+    const p = place(off, D);
+    let ry = p.ry;
+    if (picked && SC.flipA) ry += 180 * SC.flipA * Math.max(0, 1 - Math.abs(off) * 2);
+    if (!picked && el.style.getPropertyValue("--tx")) { el.style.removeProperty("--tx"); el.style.removeProperty("--ty"); el.style.removeProperty("--gx"); }
     el.classList.toggle("on", picked);
     el.classList.toggle("open", picked && SC.open);
     el.classList.toggle("lft", i < SC.sel);
-    el.style.setProperty("--lit", p.lit);
-    el.style.opacity = "1";
-    el.style.transition = instant ? "none" : "";
-    el.style.transform = `translate3d(${p.x}px,var(--hy, 0px),${p.z}px) rotateY(${p.ry}deg)`
-      + (picked ? " rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg))" : "");
+    el.style.setProperty("--lit", p.lit.toFixed(3));
+    el.style.transform = `translate3d(${p.x.toFixed(1)}px,var(--hy),${p.z.toFixed(1)}px) rotateY(${ry.toFixed(2)}deg) rotateX(var(--tx)) rotateY(var(--ty))`;
   }
   for (const [id, el] of SC.els) if (!keep.has(id)) { el.remove(); SC.els.delete(id); }
-  if (instant) requestAnimationFrame(() => SC.els.forEach((el) => { el.style.transition = ""; }));
-  paintInfo();
 }
+
+// One animation loop drives the whole shelf: the position eases toward the picked case
+// (or follows the pointer while you drag), and the flip eases the same way.
+function frame(now) {
+  SC.raf = 0;
+  const dt = Math.min(0.1, Math.max(0, (now - SC.last) / 1000));
+  SC.last = now;
+  const dragging = SC.drag && SC.drag.moved;
+  const tgt = dragging ? SC.drag.pos : SC.sel;
+  SC.pos += (tgt - SC.pos) * (1 - Math.exp(-(dragging ? 28 : 9) * dt));
+  if (Math.abs(tgt - SC.pos) < 0.002) SC.pos = tgt;
+  const ft = SC.flipped ? 1 : 0;
+  SC.flipA += (ft - SC.flipA) * (1 - Math.exp(-8 * dt));
+  if (Math.abs(ft - SC.flipA) < 0.003) SC.flipA = ft;
+  render();
+  if (dragging || SC.pos !== tgt || SC.flipA !== ft) SC.raf = requestAnimationFrame(frame);
+}
+function kick() {
+  if (SC.raf || !SC.root || !SC.root.isConnected) return;
+  SC.last = performance.now();
+  SC.raf = requestAnimationFrame(frame);
+}
+function stop() { if (SC.raf) cancelAnimationFrame(SC.raf); SC.raf = 0; }
 
 function cur() { return SC.list[SC.sel]; }
 
+const ICO = {
+  details: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>',
+  flip: '<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/></svg>',
+  open: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/></svg>',
+  random: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2" class="fill"/><circle cx="15" cy="15" r="1.2" class="fill"/><circle cx="15" cy="9" r="1.2" class="fill"/><circle cx="9" cy="15" r="1.2" class="fill"/></svg>',
+  view3d: '<svg viewBox="0 0 24 24"><path d="M12 3 4 7.5v9L12 21l8-4.5v-9z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/></svg>',
+};
+
+// The title and buttons under the shelf. Built once and updated in place, so the buttons keep
+// focus and the title only fades in when you stop on a game, not on every case you pass.
 function paintInfo() {
   const g = cur();
   const info = $("#sc-info");
   if (!info) return;
   $("#sc-pos").textContent = SC.list.length ? `${SC.sel + 1} / ${SC.list.length}` : "";
-  if (!g) { info.innerHTML = ""; return; }
+  if (!g) { info.innerHTML = ""; delete info.dataset.appid; return; }
+  if (!info.querySelector(".sc-acts")) {
+    info.innerHTML = `<h2></h2><p></p><div class="sc-acts">
+      <button class="sc-a pri" data-sca="play"></button>
+      <button class="sc-a" data-sca="details">${ICO.details}Details</button>
+      <button class="sc-a" data-sca="flip"></button>
+      <button class="sc-a" data-sca="open"></button>
+      <button class="sc-a" data-sca="random">${ICO.random}Random</button>
+      <button class="sc-a" data-sca="view3d">${ICO.view3d}3D view</button></div>`;
+  }
   const m = C.meta(g.appid);
   const bits = [g.shortcut ? "Non-Steam" : "Steam",
     g.lastplayed ? `played ${C.fmtAgo(g.lastplayed)}` : "never played",
     g.playtime ? C.fmtPlay(g.playtime) : "",
     !g.installed ? "not installed" : g.update_pending ? "update ready" : "",
     m.status ? C.statusLabel(m.status) : ""].filter(Boolean);
-  const same = info.dataset.appid === String(g.appid);
-  info.dataset.appid = g.appid;
-  info.innerHTML = `
-    <h2${same ? ' class="still"' : ""}>${esc(C.gname(g.name))}</h2>
-    <p>${bits.map(esc).join(" · ")}${m.rating ? ` · ${C.stars(m.rating)}` : ""}</p>
-    <div class="sc-acts">
-      <button class="sc-a pri" data-sca="play">${g.installed ? ICON.play : ICON.down}${g.installed ? "Play" : "Install"}</button>
-      <button class="sc-a" data-sca="details"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>Details</button>
-      <button class="sc-a${SC.flipped ? " on" : ""}" data-sca="flip"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/></svg>${SC.flipped ? "Front" : "Back"}</button>
-      <button class="sc-a${SC.open ? " on" : ""}" data-sca="open"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/></svg>${SC.open ? "Close case" : "Open case"}</button>
-      <button class="sc-a" data-sca="random"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2" class="fill"/><circle cx="15" cy="15" r="1.2" class="fill"/><circle cx="15" cy="9" r="1.2" class="fill"/><circle cx="9" cy="15" r="1.2" class="fill"/></svg>Random</button>
-      <button class="sc-a" data-sca="view3d"><svg viewBox="0 0 24 24"><path d="M12 3 4 7.5v9L12 21l8-4.5v-9z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/></svg>3D view</button>
-    </div>`;
+  const h2 = info.querySelector("h2");
+  if (info.dataset.appid !== String(g.appid)) {
+    info.dataset.appid = g.appid;
+    h2.textContent = C.gname(g.name);
+    // A single step fades the title in; while you run along the shelf it just swaps.
+    const now = performance.now(), calm = now - SC.titleAt > 350;
+    SC.titleAt = now;
+    h2.classList.remove("fx");
+    if (calm) { void h2.offsetWidth; h2.classList.add("fx"); }
+  }
+  info.querySelector("p").innerHTML = `${bits.map(esc).join(" · ")}${m.rating ? ` · ${C.stars(m.rating)}` : ""}`;
+  const set = (k, html, on) => { const b = info.querySelector(`[data-sca="${k}"]`); if (b.innerHTML !== html) b.innerHTML = html; b.classList.toggle("on", !!on); };
+  set("play", `${g.installed ? ICON.play : ICON.down}${g.installed ? "Play" : "Install"}`);
+  set("flip", `${ICO.flip}${SC.flipped ? "Front" : "Back"}`, SC.flipped);
+  set("open", `${ICO.open}${SC.open ? "Close case" : "Open case"}`, SC.open);
   clearTimeout(SC.bgFor);
-  SC.bgFor = setTimeout(() => setBg(g.appid), 160);
+  SC.bgFor = setTimeout(() => setBg(g.appid), 260);
 }
 
 function setBg(appid) {
@@ -260,13 +336,18 @@ function setBg(appid) {
   img.src = `/art/${appid}/hero`;
 }
 
-function go(n, instant) {
+/** Pick case n. A long jump starts the glide a short way out, so it doesn't race past hundreds of cases. */
+function go(n, instant, lead = 14) {
   const max = SC.list.length - 1;
+  if (max < 0) return;
   n = Math.max(0, Math.min(max, n));
   if (n === SC.sel) { if (!instant) bump(); return; }
   SC.sel = n;
   SC.flipped = SC.open = false;
-  layout(instant);
+  if (instant) return layout(true);
+  if (Math.abs(n - SC.pos) > lead + 6) SC.pos = n - Math.sign(n - SC.pos) * lead;
+  paintInfo();
+  kick();
 }
 
 function bump() {
@@ -277,21 +358,14 @@ function bump() {
   el.classList.add("bump");
 }
 
-async function randomSpin() {
-  const pool = SC.list.map((g, i) => [g, i]).filter(([g]) => g.installed);
-  const pick = (pool.length ? pool : SC.list.map((g, i) => [g, i]))[Math.floor(Math.random() * (pool.length || SC.list.length))];
+// Random: one long glide along the shelf that slows down onto the game it lands on.
+function randomSpin() {
+  const all = SC.list.map((g, i) => [g, i]);
+  const pool = all.filter(([g, i]) => g.installed && i !== SC.sel);
+  const from = pool.length ? pool : all.filter(([, i]) => i !== SC.sel);
+  const pick = from[Math.floor(Math.random() * from.length)];
   if (!pick) return;
-  const target = pick[1];
-  // Run along the shelf, slowing down as it gets there.
-  const start = SC.sel, dist = target - start, steps = Math.min(Math.abs(dist), 22);
-  for (let k = 1; k <= steps; k++) {
-    const t = k / steps;
-    const e = 1 - Math.pow(1 - t, 3);
-    go(Math.round(start + dist * e));
-    await new Promise((r) => setTimeout(r, 30 + 140 * t * t));
-  }
-  go(target);
-  bump();
+  go(pick[1], false, 24);
 }
 
 function act(a) {
@@ -299,8 +373,14 @@ function act(a) {
   if (!g) return;
   if (a === "play") return C.launch(g.appid);
   if (a === "details") return C.library.openDetail(g.appid);
-  if (a === "flip") { SC.flipped = !SC.flipped; if (SC.flipped) SC.open = false; return layout(); }
-  if (a === "open") { SC.open = !SC.open; if (SC.open) SC.flipped = false; return layout(); }
+  if (a === "flip" || a === "open") {
+    if (a === "flip") { SC.flipped = !SC.flipped; if (SC.flipped) SC.open = false; }
+    else { SC.open = !SC.open; if (SC.open) SC.flipped = false; }
+    const el = SC.els.get(g.appid);
+    if (el) fill(el, g);
+    paintInfo();
+    return kick() || render();
+  }
   if (a === "random") return randomSpin();
   if (a === "view3d") return openViewer(g.appid);
 }
@@ -358,7 +438,7 @@ function bind() {
   const root = SC.root;
   const stage = $("#sc-stage");
   root.addEventListener("click", (e) => {
-    if (SC.drag && SC.drag.moved) return;
+    if (performance.now() - SC.dragEnd < 80) return;   // the end of a drag, not a click
     const v = e.target.closest("[data-scv]");
     if (v) return setView(v.dataset.scv), layout(true);
     const b = e.target.closest("[data-bento]");
@@ -377,40 +457,58 @@ function bind() {
   stage.addEventListener("wheel", (e) => {
     if (SC.view !== "shelf") return;
     e.preventDefault();
-    SC.wheel = (SC.wheel || 0) + (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY);
-    const n = Math.trunc(SC.wheel / 60);
-    if (n) { SC.wheel -= n * 60; go(SC.sel + n); }
+    const dl = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    const now = performance.now();
+    // A mouse wheel notch is always exactly one case; a touchpad's small deltas add up.
+    if (Math.abs(dl) >= 40) { SC.wheel = 0; SC.wheelAt = now; return go(SC.sel + Math.sign(dl)); }
+    if (now - (SC.wheelAt || 0) > 250) SC.wheel = 0;
+    SC.wheelAt = now;
+    SC.wheel = (SC.wheel || 0) + dl;
+    if (Math.abs(SC.wheel) >= 60) { const n = Math.sign(SC.wheel); SC.wheel -= n * 60; go(SC.sel + n); }
   }, { passive: false });
-  // Click and drag to slide the shelf; flick to keep going.
+  // Click and drag: the shelf follows the pointer, and a flick keeps it gliding.
+  const perCase = () => (SC.D ? SC.D.w : 240) * 0.45;
   stage.addEventListener("pointerdown", (e) => {
     if (e.button !== 0 || SC.view !== "shelf") return;
-    SC.drag = { x: e.clientX, start: SC.sel, moved: false, id: e.pointerId, pts: [[e.clientX, performance.now()]] };
+    SC.drag = { x: e.clientX, start: SC.pos, pos: SC.pos, moved: false, id: e.pointerId, pts: [[e.clientX, performance.now()]] };
   });
   stage.addEventListener("pointermove", (e) => {
     const d = SC.drag;
-    if (!d || e.pointerId !== d.id) {
-      tiltTo(e);
-      return;
-    }
+    if (!d || e.pointerId !== d.id) { tiltTo(e); return; }
     const dx = e.clientX - d.x;
-    if (!d.moved && Math.abs(dx) > 6) { d.moved = true; try { stage.setPointerCapture(d.id); } catch { /* fine */ } stage.classList.add("dragging"); }
+    if (!d.moved && Math.abs(dx) > 6) {
+      d.moved = true;
+      try { stage.setPointerCapture(d.id); } catch { /* fine */ }
+      stage.classList.add("dragging");
+      tiltTo(null);
+    }
     if (!d.moved) return;
     d.pts.push([e.clientX, performance.now()]);
     if (d.pts.length > 6) d.pts.shift();
-    const step = dims().w * 0.3;
-    const n = d.start - Math.round(dx / step);
-    if (n !== SC.sel) go(n);
+    const max = SC.list.length - 1;
+    let pos = d.start - dx / perCase();
+    if (pos < 0) pos = -0.4 * (1 - Math.exp(pos));                 // a little give past the ends
+    else if (pos > max) pos = max + 0.4 * (1 - Math.exp(max - pos));
+    d.pos = pos;
+    const n = Math.max(0, Math.min(max, Math.round(pos)));
+    if (n !== SC.sel) { SC.sel = n; SC.flipped = SC.open = false; paintInfo(); }
+    kick();
   });
   const end = (e) => {
     const d = SC.drag;
     if (!d || e.pointerId !== d.id) return;
+    SC.drag = null;
     stage.classList.remove("dragging");
-    if (d.moved) {
-      const [x0, t0] = d.pts[0], [x1, t1] = d.pts[d.pts.length - 1];
-      const v = t1 > t0 ? (x1 - x0) / (t1 - t0) : 0;
-      if (Math.abs(v) > 0.5) go(SC.sel - Math.round(v * 6));
-      setTimeout(() => { SC.drag = null; }, 0);
-    } else SC.drag = null;
+    if (!d.moved) return;
+    SC.dragEnd = performance.now();
+    const [x0, t0] = d.pts[0], [x1, t1] = d.pts[d.pts.length - 1];
+    const v = t1 > t0 && performance.now() - t1 < 90 ? (x1 - x0) / (t1 - t0) : 0;   // px per ms
+    const n = Math.round(d.pos - (v * 260) / perCase());
+    const max = SC.list.length - 1;
+    SC.sel = Math.max(0, Math.min(max, n));
+    SC.flipped = SC.open = false;
+    paintInfo();
+    kick();
   };
   stage.addEventListener("pointerup", end);
   stage.addEventListener("pointercancel", end);
@@ -434,7 +532,7 @@ function tiltTo(e) {
 
 function onKey(e) {
   if (C.route.tab !== "library" || !SC.root || !SC.root.isConnected || SC.view !== "shelf") return false;
-  if (document.querySelector(".overlay:not([hidden])") || e.target.matches("input, textarea, select")) return false;
+  if (document.querySelector(".overlay:not([hidden])") || (e.target.matches && e.target.matches("input, textarea, select"))) return false;
   const k = e.key;
   if (k === "ArrowRight") go(SC.sel + 1);
   else if (k === "ArrowLeft") go(SC.sel - 1);

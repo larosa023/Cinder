@@ -1,6 +1,12 @@
 /* Showcase: game cases on a shelf, collections wall, and the 3D case viewer. */
 
 /* ================= the 3D case ================= */
+/* Registered so the hover lift, the tilt toward the mouse and the hover glow ease on their own,
+   while the shelf itself is moved frame by frame from JS. */
+@property --tx { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+@property --ty { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+@property --hy { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --hl { syntax: "<number>"; inherits: true; initial-value: 0; }
 .b3 {
   /* --bw/--bh/--bd (size) come from the shelf or the viewer around it */
   --tint: #1b1e26; --tx: 0deg; --ty: 0deg; --gx: 42%;
@@ -129,9 +135,9 @@
 
 /* Lighting: cases further from the middle sit in shadow. (Filters go on the faces: one on the
    case itself would flatten it.) */
-.sc-track .b3 :is(.b3-f, .b3-s, .b3-b, .b3-r, .b3-t, .b3-u) { filter: brightness(var(--lit, 1)); transition: filter .4s ease; }
-.sc-track .b3:not(.on):hover { --hy: -10px; }
-.sc-track .b3:not(.on):hover :is(.b3-f, .b3-s, .b3-r) { filter: brightness(calc(var(--lit, 1) + .25)); }
+.sc-track .b3 { transition: --tx .35s ease-out, --ty .35s ease-out, --hy .25s ease, --hl .25s ease; will-change: transform; }
+.sc-track .b3 :is(.b3-f, .b3-s, .b3-b, .b3-r, .b3-t, .b3-u) { filter: brightness(calc(var(--lit, 1) + var(--hl))); }
+.sc-stage:not(.dragging) .b3:not(.on):hover { --hy: -10px; --hl: .25; }
 .b3:not(.open) .b3-in, .b3:not(.open) .b3-fi { visibility: hidden; transition: visibility 0s .8s; }
 .sc-track .b3.on .b3-f { box-shadow: inset 0 0 0 1px rgba(255,255,255,.22); }
 /* Contact shadow on the "floor" */
@@ -141,8 +147,8 @@
 @keyframes b3-bump { 30% { margin-left: calc(var(--bw) / -2 - 10px); } 65% { margin-left: calc(var(--bw) / -2 + 6px); } }
 
 .sc-info { position: relative; z-index: 2; text-align: center; padding: 10px 20px 0; min-height: 132px; }
-.sc-info h2 { margin: 0; font-size: clamp(22px, 2vw, 34px); font-weight: 800; letter-spacing: -.01em; text-shadow: 0 2px 20px rgba(0,0,0,.6); animation: sc-in .3s ease; }
-.sc-info h2.still { animation: none; }
+.sc-info h2 { margin: 0; font-size: clamp(22px, 2vw, 34px); font-weight: 800; letter-spacing: -.01em; text-shadow: 0 2px 20px rgba(0,0,0,.6); }
+.sc-info h2.fx { animation: sc-in .3s ease; }
 .sc-info p { margin: 4px 0 14px; color: rgba(255,255,255,.5); font-size: 13px; font-weight: 500; }
 @keyframes sc-in { from { opacity: 0; transform: translateY(5px); } }
 .sc-acts { display: inline-flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
@@ -214,6 +220,6 @@
   -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,.32), transparent 78%); mask-image: linear-gradient(180deg, rgba(0,0,0,.32), transparent 78%); }
 /* The art is taller than the reflection strip; flipped in place, the strip shows the art's bottom edge first, like a mirror. */
 .b3-ref img { width: 100%; height: calc(100% / .46 * .925); object-fit: cover; display: block; transform: scaleY(-1); transform-origin: 50% 50%;
-  filter: blur(1px) brightness(var(--lit, 1)); }
+  filter: blur(1px) brightness(calc(var(--lit, 1) + var(--hl))); }
 .b3v-stage .b3-ref { display: none; }
 .sc-track .b3::before { display: none; }

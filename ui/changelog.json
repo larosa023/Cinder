@@ -1,430 +1,444 @@
 [
- {
-  "version": "0.23.2",
-  "date": "2026-11-27",
-  "title": "Showcase fills the screen",
-  "items": [
-   "The Showcase panel now fills the window on any screen size, with no empty space underneath",
-   "Cases size themselves to the room there is, so they're bigger on tall screens",
-   "Glossy floor: every case's cover is reflected below it, and the reflection turns with the case"
-  ]
- },
- {
-  "version": "0.23.1",
-  "date": "2026-11-27",
-  "title": "Showcase, reworked",
-  "items": [
-   "The shelf is now a proper cover-flow: the picked case stands big in front, and the others turn their covers toward it, overlapping, with spines showing on the left and case edges on the right",
-   "Fixed: on wide screens the cases on the right showed their backs; cases were stuck at one small size instead of filling the space",
-   "Cases fade into shadow the further they are from the middle, lift when you hover them, and cast soft shadows",
-   "Your library filters now sit as tabs inside the panel, with the game count beside them",
-   "The panel fits around the shelf, with the title and buttons right under the picked case",
-   "The line under the title no longer says \"Not played yet\" next to \"Last played\""
-  ]
- },
- {
-  "version": "0.23.0",
-  "date": "2026-11-27",
-  "title": "Showcase",
-  "items": [
-   "New library layout, Showcase: every game is a 3D game case on a shelf, spines out, and the one you pick turns to face you. Spines take their colour from each cover",
-   "Scroll with the wheel, arrow keys, your controller, or click and drag (flick to fly along). Hover the case and it tilts in the light",
-   "Flip a case to read its back (art, your play time, barcode), open it to see the disc spinning inside, or press Random to spin the shelf to a game",
-   "Collections: your lists and Steam collections as a wall of tiles with fanned-out covers. Pick one to put it on the shelf",
-   "3D case viewer: on the shelf or any game page (3D case button). Drag to turn it with momentum, or jump to the front, back, spine, open case or disc, or let it spin"
-  ]
- },
- {
-  "version": "0.22.1",
-  "date": "2026-11-10",
-  "title": "Share your year in review",
-  "items": [
-   "Year in review now has Save image and Copy image: a portrait card (1080×1350, sized for Instagram, Discord and texts) with your hours, most played game, longest session, busiest day, streak, achievements, top games and rarest unlock, over your top game's art",
-   "Works for any year or month you pick"
-  ]
- },
- {
-  "version": "0.22.0",
-  "date": "2026-11-03",
-  "title": "Trailers, controller everywhere, phone remote, Cinder backup",
-  "items": [
-   "Couch mode trailers: rest on a game for a moment and its Steam trailer plays muted behind it, styled to match your theme (turn off in Settings → Account)",
-   "Controller everywhere: use your controller in the whole app. D-pad/left stick moves, A selects, B goes back, LB/RB switch tabs, Y searches, right stick scrolls, Start opens couch mode",
-   "Phone remote (Settings → Remote & backup): scan the QR code, enter the 6-digit code, and start, install or update games and watch downloads from your phone on the same Wi-Fi. Off until you turn it on",
-   "Back up Cinder: save all your settings, notes, ratings, lists, play history, price alerts, hooks, custom art and themes to one file, restore it on a new PC, or keep a weekly copy in a OneDrive/Dropbox folder"
-  ]
- },
- {
-  "version": "0.21.0",
-  "date": "2026-10-31",
-  "title": "Couch shelves, sounds, backups and more",
-  "items": [
-   "Couch mode sounds: a sound pack for each theme (tape clunks for VHS, chiptune blips for Cartridge and Pocket, wood knocks for Bookshelf…). M mutes, or turn them off in Settings",
-   "Couch mode shelves: Downloads & updates (with progress), Friends online (Y to message), Your wishlist (prices, lowest-ever tags, set price alerts with the controller) and Store deals, top sellers and new releases",
-   "Year in review: Stats → Year in review shows any year or month: hours, top games, longest session, busiest day, streak, achievements and your rarest unlock",
-   "Before & after playing (game page → Setup): switch the power plan, close apps like Discord, or open programs when a game starts, and put it all back when it closes. Set it per game or for every game",
-   "Save backups: before a game updates, Cinder backs up its Steam Cloud saves, any save folders you add, and its Workshop mods. Restore or back up any time from game page → Setup",
-   "Custom art (game page → Setup): use your own cover, banner, background or logo for any game, including non-Steam games"
-  ]
- },
- {
-  "version": "0.20.0",
-  "date": "2026-10-31",
-  "title": "Five more couch themes",
-  "items": [
-   "Pocket: everything in four shades of handheld green, dot-matrix screen and all",
-   "Jewel case: clear CD cases with a hinge, and the disc slides out of the one you pick",
-   "Comic: halftone yellow page, inked panels, speech-bubble shelf titles and a POW! on your pick",
-   "Blueprint: drafting grid, outlined lettering, games as drawings with a dimension line and drawing number",
-   "Bookshelf: games standing on wooden shelves under a warm lamp, with brass shelf plaques",
-   "The theme picker now shows two rows (ten looks)"
-  ]
- },
- {
-  "version": "0.19.1",
-  "date": "2026-10-30",
-  "title": "VHS theme",
-  "items": [
-   "New couch mode theme, VHS: games as black rental tape cases with a Cinder Video sticker, a VCR-style PLAY ▶ on-screen display, colour fringing and a tracking line that rolls by now and then",
-   "The Midnight theme is gone (if you had it picked, couch mode goes back to Retro case)"
-  ]
- },
- {
-  "version": "0.19.0",
-  "date": "2026-10-30",
-  "title": "Couch mode themes",
-  "items": [
-   "Five looks for couch mode: Retro case, Cartridge (16-bit carts on a pixelated CRT), Modern (clean and rounded), Synthwave (neon grid) and Midnight (pure black)",
-   "Switch while you're in couch mode: press the View button on your controller, T on the keyboard, or the palette at the top. Left/right previews each one live, A keeps it, B goes back",
-   "Your pick is remembered for next time"
-  ]
- },
- {
-  "version": "0.18.4",
-  "date": "2026-10-30",
-  "title": "Drag shelves in couch mode",
-  "items": [
-   "Couch mode: click and drag a shelf left or right to scroll through it (flick to go further); drag up or down to switch shelves",
-   "Letting go after a drag never opens the game under the mouse"
-  ]
- },
- {
-  "version": "0.18.3",
-  "date": "2026-10-30",
-  "title": "Controllers in couch mode",
-  "items": [
-   "Fixed: couch mode could ignore your controller after going full screen, because the page didn't think it had focus. Cinder now hands focus to the page and checks with Windows that it's the window in front",
-   "Reads every connected controller with a standard layout (Xbox, Elite, PlayStation), so a keyboard knob or other device that shows up first no longer hides your controller",
-   "A press that Steam's desktop controller layout also turns into a key press only counts once"
-  ]
- },
- {
-  "version": "0.18.2",
-  "date": "2026-10-30",
-  "title": "Even wider search",
-  "items": [
-   "The search bar now takes all the spare room in the top bar (up to about twice its old size), with just a sliver left to drag the window"
-  ]
- },
- {
-  "version": "0.18.1",
-  "date": "2026-10-30",
-  "title": "Wider search",
-  "items": [
-   "The search bar grows to fill the empty space in the top bar (up to a comfortable width), leaving a little room to drag the window"
-  ]
- },
- {
-  "version": "0.18.0",
-  "date": "2026-10-30",
-  "title": "Deals, guides, recaps and more",
-  "items": [
-   "Price tracker: wishlist games show their lowest-ever Steam price, with a Lowest price ever tag when it's that low now. Store pages show the lowest price anywhere, cheaper stores right now, and a chart of prices Cinder has seen",
-   "Price alerts: click the bell on a wishlist game (or set it on its store page) and get a notification when it drops to your price",
-   "How long to beat: main story, extras and completionist times from HowLongToBeat on game pages and store pages, with how far your play time gets you",
-   "Achievement help: hidden achievements show their description blurred (click to reveal), Tips under each locked achievement pull the matching part of top Steam guides, and guides open in a reader right in Cinder",
-   "Session recap: when you close a game, a card shows how long you played, achievements you unlocked and your new total (turn it off in Settings → Account)",
-   "Recommendations: Because you played … rows on the Store tab, built from the games you play most"
-  ]
- },
- {
-  "version": "0.17.8",
-  "date": "2026-10-30",
-  "title": "Reviewer profiles in Cinder",
-  "items": [
-   "Fixed: every reviewer showed the same picture (Steam's thumbs-up icon) instead of their own avatar",
-   "Clicking a reviewer now opens their profile right in Cinder instead of Steam"
-  ]
- },
- {
-  "version": "0.17.7",
-  "date": "2026-10-30",
-  "title": "See who wrote each review",
-  "items": [
-   "Reviews show the reviewer's Steam name, profile picture and how many games they own",
-   "Click a reviewer to open their Steam profile in Steam"
-  ]
- },
- {
-  "version": "0.17.6",
-  "date": "2026-10-30",
-  "title": "Reviews show up",
-  "items": [
-   "Fixed: the Reviews tab said \"No reviews here yet\" because Steam's review cards are laid out slightly differently than expected"
-  ]
- },
- {
-  "version": "0.17.5",
-  "date": "2026-10-30",
-  "title": "Steam reviews from the Community hub",
-  "items": [
-   "Reviews now load from the game's Steam Community page (the same reviews Steam shows), since Steam's review service sends Cinder its home page instead",
-   "Most helpful, Recent, Positive and Negative, with hours played, posted date and helpful/funny votes"
-  ]
- },
- {
-  "version": "0.17.4",
-  "date": "2026-10-30",
-  "title": "Steam reviews, take three",
-  "items": [
-   "Steam's firewall turns away reviews requests that don't come from a real browser. Cinder now fetches them through a hidden browser window (the same engine its own window uses), which closes itself after a minute"
-  ]
- },
- {
-  "version": "0.17.3",
-  "date": "2026-10-30",
-  "title": "Steam reviews, take two",
-  "items": [
-   "The overall Steam rating (like Mostly Positive) now comes from Steam's store service, the same one Cinder already uses for game names and art",
-   "Reviews: when Steam answers with its home page instead of reviews, Cinder asks again a different way, then through your Steam client if it's connected",
-   "If reviews still can't load, a Read them in Steam button opens the game's reviews in Steam"
-  ]
- },
- {
-  "version": "0.17.2",
-  "date": "2026-10-30",
-  "title": "Reviews fixed, specs, edge-to-edge couch mode",
-  "items": [
-   "Fixed: reviews and the Steam rating failed to load (\"Steam sent something unexpected\")",
-   "The overall Steam rating (like Mostly Positive) now shows right under the game's name on game pages and store pages, and in couch mode",
-   "New Specs tab on game pages and a System requirements section on store pages: minimum and recommended",
-   "Couch mode: true full screen with no thin border (Windows 11's window outline and rounded corners are switched off while it's open)"
-  ]
- },
- {
-  "version": "0.17.1",
-  "date": "2026-10-30",
-  "title": "Steam reviews",
-  "items": [
-   "Steam review scores (like \"Very Positive · 91% of 45,123\") on game pages and store pages",
-   "A Reviews tab on game pages and a Reviews section on store pages: most helpful, recent, positive or negative, with hours played and helpful votes; load more as you scroll",
-   "Couch mode now fills the screen edge to edge, with no thin border around it"
-  ]
- },
- {
-  "version": "0.17.0",
-  "date": "2026-10-30",
-  "title": "Couch mode, Stats, Storage and more",
-  "items": [
-   "Couch mode: a full-screen, controller-friendly view with your games as retro game cases. Open it with the controller button in the top bar, F11, or your controller's Start button; B or Esc leaves",
-   "Stats tab: hours this week and month, a 30-day chart, streaks, most played, play by weekday and time of day, recent sessions",
-   "Storage tab: every drive with what games take up, biggest and unplayed games, move a game to another drive, uninstall",
-   "Rate games 1–5 stars, set a status (Playing, Backlog, Beaten, 100%, Dropped) and keep notes on each game page; filter and sort by them",
-   "Edit a game's Steam launch options from its game page",
-   "Library redraws are now about 10× faster again on big libraries"
-  ]
- },
- {
-  "version": "0.16.0",
-  "date": "2026-10-29",
-  "title": "Smoother and lighter",
-  "items": [
-   "Library redraws about 3–4× faster on big libraries; searching, filtering and favoriting no longer rebuild every cover",
-   "Covers don't fade in again when the library refreshes, and the page doesn't jump while scrolling",
-   "Coming back to Cinder no longer reloads everything twice; Downloads and achievement checks pause while Cinder is hidden",
-   "Steam's large settings file is re-read in the background instead of holding things up",
-   "Cover art never stalls the app while art lookups run",
-   "Fixes: workshop browse could get stuck loading, store pages could show stale results, friends list no longer flashes, settings saved quickly in a row no longer undo each other",
-   "Security: Cinder only answers requests made to your own PC"
-  ]
- },
- {
-  "version": "0.15.0",
-  "date": "2026-10-29",
-  "title": "What's new",
-  "items": [
-   "New What's new button in the top bar: every Cinder update in one place, with a dot when there's something you haven't seen"
-  ]
- },
- {
-  "version": "0.14.1",
-  "date": "2026-10-29",
-  "title": "Download speed in Mbps",
-  "items": [
-   "Show download speed in MB/s, Mbps or both: click the speed on the Downloads tab, or pick in Settings → Appearance",
-   "Speeds show one decimal place"
-  ]
- },
- {
-  "version": "0.14.0",
-  "date": "2026-10-29",
-  "title": "Only run Steam when needed",
-  "items": [
-   "New setting (Settings → Steam): Steam stays closed while you browse in Cinder and starts in the background when you play, update or change status",
-   "Closes Steam after a few idle minutes: no game running, nothing downloading, no Steam window open",
-   "Steam status shows whether it's closed, running, or about to close"
-  ]
- },
- {
-  "version": "0.13.1",
-  "date": "2026-10-29",
-  "title": "Workshop on game pages",
-  "items": [
-   "Games with a Steam Workshop get a Workshop button and tab on their game page, with your item count and updates",
-   "Store pages get a Workshop button for games that have one"
-  ]
- },
- {
-  "version": "0.13.0",
-  "date": "2026-10-29",
-  "title": "Library layouts",
-  "items": [
-   "Switch the library between Covers, Banners, Tiles, List and Shelves",
-   "Cover-size slider right in the library header",
-   "List view with sortable columns: play time, last played, achievements, size",
-   "New sort: Achievements"
-  ]
- },
- {
-  "version": "0.12.0",
-  "date": "2026-10-28",
-  "title": "Steam Workshop",
-  "items": [
-   "Workshop tab: your mods per game, size on disk and updates waiting",
-   "Browse any game's workshop: trending, popular, top rated, newest, search",
-   "Item pages with preview, stats and description; subscribe in Steam, open folder, update"
-  ]
- },
- {
-  "version": "0.11.3",
-  "date": "2026-10-28",
-  "title": "Updates that start",
-  "items": [
-   "Update buttons now call Steam the same way Steam's own Update button does",
-   "Cinder checks Steam's download log to confirm an update really started"
-  ]
- },
- {
-  "version": "0.11.0",
-  "date": "2026-10-28",
-  "title": "Downloads tab",
-  "items": [
-   "Full Downloads tab: live progress, speed graph, time left, queue, finished list",
-   "Start now, pause, resume, remove, Pause all / Resume all",
-   "Updates available list with Update all"
-  ]
- },
- {
-  "version": "0.10.0",
-  "date": "2026-10-28",
-  "title": "Update without launching",
-  "items": [
-   "Update button on covers, game pages, the right-click menu and Downloads",
-   "Downloads badge counts updates waiting"
-  ]
- },
- {
-  "version": "0.9.1",
-  "date": "2026-10-28",
-  "title": "Achievements on covers",
-  "items": [
-   "Trophy badge and progress bar on covers while viewing a list (gold at 100%)",
-   "Game card options: what shows under covers, play time and date formats, two-line names, hide ™/®"
-  ]
- },
- {
-  "version": "0.9.0",
-  "date": "2026-10-28",
-  "title": "Achievements, lists and profile",
-  "items": [
-   "Achievements tab across all your games: recent, rarest, almost done",
-   "Game lists: your Steam collections plus Cinder lists",
-   "Customize your Cinder profile, with Edit on Steam shortcuts"
-  ]
- },
- {
-  "version": "0.8.0",
-  "date": "2026-10-28",
-  "title": "Game pages and alerts",
-  "items": [
-   "Game page tabs for achievements, news and DLC",
-   "Non-Steam games show up and launch",
-   "Wishlist sale alerts"
-  ]
- },
- {
-  "version": "0.7.0",
-  "date": "2026-10-28",
-  "title": "While you play",
-  "items": [
-   "Now playing pill with a session timer; Cinder tucks away while you play",
-   "Downloads panel, favorites, hidden games and Pick for me"
-  ]
- },
- {
-  "version": "0.6.0",
-  "date": "2026-10-28",
-  "title": "Instant start",
-  "items": [
-   "Installed version that opens instantly, with Start menu and Desktop shortcuts",
-   "Lives in the tray and can start with Windows"
-  ]
- },
- {
-  "version": "0.5.0",
-  "date": "2026-10-28",
-  "title": "Status and quiet launching",
-  "items": [
-   "Set your status: Online, Away, Invisible, Offline (checked against what friends see)",
-   "Games launch without Steam's window or its Starting game popup"
-  ]
- },
- {
-  "version": "0.4.0",
-  "date": "2026-10-28",
-  "title": "Faster, with art for every game",
-  "items": [
-   "Art for every game from Steam's newer image cache",
-   "Collapsible icon-only sidebar",
-   "Scrollbars match your theme; click and drag to scroll rows"
-  ]
- },
- {
-  "version": "0.3.0",
-  "date": "2026-10-28",
-  "title": "Tabs like Steam",
-  "items": [
-   "Store, Wishlist, Friends and Profile tabs",
-   "Quick style options on top of any theme",
-   "Drag the window to the top of the screen to maximize; snap to the sides"
-  ]
- },
- {
-  "version": "0.2.0",
-  "date": "2026-10-28",
-  "title": "Built-in updaters",
-  "items": [
-   "Cinder updates itself from GitHub releases",
-   "Update Steam on demand while it otherwise stays frozen"
-  ]
- },
- {
-  "version": "0.1.0",
-  "date": "2026-10-28",
-  "title": "Cinder",
-  "items": [
-   "A fast, themeable front end for your Steam library",
-   "Keeps Steam on its current build so Steamidra keeps working"
-  ]
- }
+  {
+    "version": "0.23.3",
+    "date": "2026-11-27",
+    "title": "Smoother Showcase shelf",
+    "items": [
+      "The shelf now moves as one smooth motion: every case follows the same path at the same speed, whichever way you go and however fast",
+      "The case you land on no longer jumps into place or flashes while its back and inside load",
+      "Neighbouring cases all sit at the same angle, and the cases swapping places in the middle no longer pass through each other",
+      "Dragging follows your mouse exactly, and a flick glides and slows down onto a case",
+      "One mouse-wheel notch always moves exactly one case",
+      "Random glides along the shelf and slows down onto its pick",
+      "Hover lift and tilt ease in and out instead of snapping, and the title only fades in when you stop on a game"
+    ]
+  },
+  {
+    "version": "0.23.2",
+    "date": "2026-11-27",
+    "title": "Showcase fills the screen",
+    "items": [
+      "The Showcase panel now fills the window on any screen size, with no empty space underneath",
+      "Cases size themselves to the room there is, so they're bigger on tall screens",
+      "Glossy floor: every case's cover is reflected below it, and the reflection turns with the case"
+    ]
+  },
+  {
+    "version": "0.23.1",
+    "date": "2026-11-27",
+    "title": "Showcase, reworked",
+    "items": [
+      "The shelf is now a proper cover-flow: the picked case stands big in front, and the others turn their covers toward it, overlapping, with spines showing on the left and case edges on the right",
+      "Fixed: on wide screens the cases on the right showed their backs; cases were stuck at one small size instead of filling the space",
+      "Cases fade into shadow the further they are from the middle, lift when you hover them, and cast soft shadows",
+      "Your library filters now sit as tabs inside the panel, with the game count beside them",
+      "The panel fits around the shelf, with the title and buttons right under the picked case",
+      "The line under the title no longer says \"Not played yet\" next to \"Last played\""
+    ]
+  },
+  {
+    "version": "0.23.0",
+    "date": "2026-11-27",
+    "title": "Showcase",
+    "items": [
+      "New library layout, Showcase: every game is a 3D game case on a shelf, spines out, and the one you pick turns to face you. Spines take their colour from each cover",
+      "Scroll with the wheel, arrow keys, your controller, or click and drag (flick to fly along). Hover the case and it tilts in the light",
+      "Flip a case to read its back (art, your play time, barcode), open it to see the disc spinning inside, or press Random to spin the shelf to a game",
+      "Collections: your lists and Steam collections as a wall of tiles with fanned-out covers. Pick one to put it on the shelf",
+      "3D case viewer: on the shelf or any game page (3D case button). Drag to turn it with momentum, or jump to the front, back, spine, open case or disc, or let it spin"
+    ]
+  },
+  {
+    "version": "0.22.1",
+    "date": "2026-11-10",
+    "title": "Share your year in review",
+    "items": [
+      "Year in review now has Save image and Copy image: a portrait card (1080×1350, sized for Instagram, Discord and texts) with your hours, most played game, longest session, busiest day, streak, achievements, top games and rarest unlock, over your top game's art",
+      "Works for any year or month you pick"
+    ]
+  },
+  {
+    "version": "0.22.0",
+    "date": "2026-11-03",
+    "title": "Trailers, controller everywhere, phone remote, Cinder backup",
+    "items": [
+      "Couch mode trailers: rest on a game for a moment and its Steam trailer plays muted behind it, styled to match your theme (turn off in Settings → Account)",
+      "Controller everywhere: use your controller in the whole app. D-pad/left stick moves, A selects, B goes back, LB/RB switch tabs, Y searches, right stick scrolls, Start opens couch mode",
+      "Phone remote (Settings → Remote & backup): scan the QR code, enter the 6-digit code, and start, install or update games and watch downloads from your phone on the same Wi-Fi. Off until you turn it on",
+      "Back up Cinder: save all your settings, notes, ratings, lists, play history, price alerts, hooks, custom art and themes to one file, restore it on a new PC, or keep a weekly copy in a OneDrive/Dropbox folder"
+    ]
+  },
+  {
+    "version": "0.21.0",
+    "date": "2026-10-31",
+    "title": "Couch shelves, sounds, backups and more",
+    "items": [
+      "Couch mode sounds: a sound pack for each theme (tape clunks for VHS, chiptune blips for Cartridge and Pocket, wood knocks for Bookshelf…). M mutes, or turn them off in Settings",
+      "Couch mode shelves: Downloads & updates (with progress), Friends online (Y to message), Your wishlist (prices, lowest-ever tags, set price alerts with the controller) and Store deals, top sellers and new releases",
+      "Year in review: Stats → Year in review shows any year or month: hours, top games, longest session, busiest day, streak, achievements and your rarest unlock",
+      "Before & after playing (game page → Setup): switch the power plan, close apps like Discord, or open programs when a game starts, and put it all back when it closes. Set it per game or for every game",
+      "Save backups: before a game updates, Cinder backs up its Steam Cloud saves, any save folders you add, and its Workshop mods. Restore or back up any time from game page → Setup",
+      "Custom art (game page → Setup): use your own cover, banner, background or logo for any game, including non-Steam games"
+    ]
+  },
+  {
+    "version": "0.20.0",
+    "date": "2026-10-31",
+    "title": "Five more couch themes",
+    "items": [
+      "Pocket: everything in four shades of handheld green, dot-matrix screen and all",
+      "Jewel case: clear CD cases with a hinge, and the disc slides out of the one you pick",
+      "Comic: halftone yellow page, inked panels, speech-bubble shelf titles and a POW! on your pick",
+      "Blueprint: drafting grid, outlined lettering, games as drawings with a dimension line and drawing number",
+      "Bookshelf: games standing on wooden shelves under a warm lamp, with brass shelf plaques",
+      "The theme picker now shows two rows (ten looks)"
+    ]
+  },
+  {
+    "version": "0.19.1",
+    "date": "2026-10-30",
+    "title": "VHS theme",
+    "items": [
+      "New couch mode theme, VHS: games as black rental tape cases with a Cinder Video sticker, a VCR-style PLAY ▶ on-screen display, colour fringing and a tracking line that rolls by now and then",
+      "The Midnight theme is gone (if you had it picked, couch mode goes back to Retro case)"
+    ]
+  },
+  {
+    "version": "0.19.0",
+    "date": "2026-10-30",
+    "title": "Couch mode themes",
+    "items": [
+      "Five looks for couch mode: Retro case, Cartridge (16-bit carts on a pixelated CRT), Modern (clean and rounded), Synthwave (neon grid) and Midnight (pure black)",
+      "Switch while you're in couch mode: press the View button on your controller, T on the keyboard, or the palette at the top. Left/right previews each one live, A keeps it, B goes back",
+      "Your pick is remembered for next time"
+    ]
+  },
+  {
+    "version": "0.18.4",
+    "date": "2026-10-30",
+    "title": "Drag shelves in couch mode",
+    "items": [
+      "Couch mode: click and drag a shelf left or right to scroll through it (flick to go further); drag up or down to switch shelves",
+      "Letting go after a drag never opens the game under the mouse"
+    ]
+  },
+  {
+    "version": "0.18.3",
+    "date": "2026-10-30",
+    "title": "Controllers in couch mode",
+    "items": [
+      "Fixed: couch mode could ignore your controller after going full screen, because the page didn't think it had focus. Cinder now hands focus to the page and checks with Windows that it's the window in front",
+      "Reads every connected controller with a standard layout (Xbox, Elite, PlayStation), so a keyboard knob or other device that shows up first no longer hides your controller",
+      "A press that Steam's desktop controller layout also turns into a key press only counts once"
+    ]
+  },
+  {
+    "version": "0.18.2",
+    "date": "2026-10-30",
+    "title": "Even wider search",
+    "items": [
+      "The search bar now takes all the spare room in the top bar (up to about twice its old size), with just a sliver left to drag the window"
+    ]
+  },
+  {
+    "version": "0.18.1",
+    "date": "2026-10-30",
+    "title": "Wider search",
+    "items": [
+      "The search bar grows to fill the empty space in the top bar (up to a comfortable width), leaving a little room to drag the window"
+    ]
+  },
+  {
+    "version": "0.18.0",
+    "date": "2026-10-30",
+    "title": "Deals, guides, recaps and more",
+    "items": [
+      "Price tracker: wishlist games show their lowest-ever Steam price, with a Lowest price ever tag when it's that low now. Store pages show the lowest price anywhere, cheaper stores right now, and a chart of prices Cinder has seen",
+      "Price alerts: click the bell on a wishlist game (or set it on its store page) and get a notification when it drops to your price",
+      "How long to beat: main story, extras and completionist times from HowLongToBeat on game pages and store pages, with how far your play time gets you",
+      "Achievement help: hidden achievements show their description blurred (click to reveal), Tips under each locked achievement pull the matching part of top Steam guides, and guides open in a reader right in Cinder",
+      "Session recap: when you close a game, a card shows how long you played, achievements you unlocked and your new total (turn it off in Settings → Account)",
+      "Recommendations: Because you played … rows on the Store tab, built from the games you play most"
+    ]
+  },
+  {
+    "version": "0.17.8",
+    "date": "2026-10-30",
+    "title": "Reviewer profiles in Cinder",
+    "items": [
+      "Fixed: every reviewer showed the same picture (Steam's thumbs-up icon) instead of their own avatar",
+      "Clicking a reviewer now opens their profile right in Cinder instead of Steam"
+    ]
+  },
+  {
+    "version": "0.17.7",
+    "date": "2026-10-30",
+    "title": "See who wrote each review",
+    "items": [
+      "Reviews show the reviewer's Steam name, profile picture and how many games they own",
+      "Click a reviewer to open their Steam profile in Steam"
+    ]
+  },
+  {
+    "version": "0.17.6",
+    "date": "2026-10-30",
+    "title": "Reviews show up",
+    "items": [
+      "Fixed: the Reviews tab said \"No reviews here yet\" because Steam's review cards are laid out slightly differently than expected"
+    ]
+  },
+  {
+    "version": "0.17.5",
+    "date": "2026-10-30",
+    "title": "Steam reviews from the Community hub",
+    "items": [
+      "Reviews now load from the game's Steam Community page (the same reviews Steam shows), since Steam's review service sends Cinder its home page instead",
+      "Most helpful, Recent, Positive and Negative, with hours played, posted date and helpful/funny votes"
+    ]
+  },
+  {
+    "version": "0.17.4",
+    "date": "2026-10-30",
+    "title": "Steam reviews, take three",
+    "items": [
+      "Steam's firewall turns away reviews requests that don't come from a real browser. Cinder now fetches them through a hidden browser window (the same engine its own window uses), which closes itself after a minute"
+    ]
+  },
+  {
+    "version": "0.17.3",
+    "date": "2026-10-30",
+    "title": "Steam reviews, take two",
+    "items": [
+      "The overall Steam rating (like Mostly Positive) now comes from Steam's store service, the same one Cinder already uses for game names and art",
+      "Reviews: when Steam answers with its home page instead of reviews, Cinder asks again a different way, then through your Steam client if it's connected",
+      "If reviews still can't load, a Read them in Steam button opens the game's reviews in Steam"
+    ]
+  },
+  {
+    "version": "0.17.2",
+    "date": "2026-10-30",
+    "title": "Reviews fixed, specs, edge-to-edge couch mode",
+    "items": [
+      "Fixed: reviews and the Steam rating failed to load (\"Steam sent something unexpected\")",
+      "The overall Steam rating (like Mostly Positive) now shows right under the game's name on game pages and store pages, and in couch mode",
+      "New Specs tab on game pages and a System requirements section on store pages: minimum and recommended",
+      "Couch mode: true full screen with no thin border (Windows 11's window outline and rounded corners are switched off while it's open)"
+    ]
+  },
+  {
+    "version": "0.17.1",
+    "date": "2026-10-30",
+    "title": "Steam reviews",
+    "items": [
+      "Steam review scores (like \"Very Positive · 91% of 45,123\") on game pages and store pages",
+      "A Reviews tab on game pages and a Reviews section on store pages: most helpful, recent, positive or negative, with hours played and helpful votes; load more as you scroll",
+      "Couch mode now fills the screen edge to edge, with no thin border around it"
+    ]
+  },
+  {
+    "version": "0.17.0",
+    "date": "2026-10-30",
+    "title": "Couch mode, Stats, Storage and more",
+    "items": [
+      "Couch mode: a full-screen, controller-friendly view with your games as retro game cases. Open it with the controller button in the top bar, F11, or your controller's Start button; B or Esc leaves",
+      "Stats tab: hours this week and month, a 30-day chart, streaks, most played, play by weekday and time of day, recent sessions",
+      "Storage tab: every drive with what games take up, biggest and unplayed games, move a game to another drive, uninstall",
+      "Rate games 1–5 stars, set a status (Playing, Backlog, Beaten, 100%, Dropped) and keep notes on each game page; filter and sort by them",
+      "Edit a game's Steam launch options from its game page",
+      "Library redraws are now about 10× faster again on big libraries"
+    ]
+  },
+  {
+    "version": "0.16.0",
+    "date": "2026-10-29",
+    "title": "Smoother and lighter",
+    "items": [
+      "Library redraws about 3–4× faster on big libraries; searching, filtering and favoriting no longer rebuild every cover",
+      "Covers don't fade in again when the library refreshes, and the page doesn't jump while scrolling",
+      "Coming back to Cinder no longer reloads everything twice; Downloads and achievement checks pause while Cinder is hidden",
+      "Steam's large settings file is re-read in the background instead of holding things up",
+      "Cover art never stalls the app while art lookups run",
+      "Fixes: workshop browse could get stuck loading, store pages could show stale results, friends list no longer flashes, settings saved quickly in a row no longer undo each other",
+      "Security: Cinder only answers requests made to your own PC"
+    ]
+  },
+  {
+    "version": "0.15.0",
+    "date": "2026-10-29",
+    "title": "What's new",
+    "items": [
+      "New What's new button in the top bar: every Cinder update in one place, with a dot when there's something you haven't seen"
+    ]
+  },
+  {
+    "version": "0.14.1",
+    "date": "2026-10-29",
+    "title": "Download speed in Mbps",
+    "items": [
+      "Show download speed in MB/s, Mbps or both: click the speed on the Downloads tab, or pick in Settings → Appearance",
+      "Speeds show one decimal place"
+    ]
+  },
+  {
+    "version": "0.14.0",
+    "date": "2026-10-29",
+    "title": "Only run Steam when needed",
+    "items": [
+      "New setting (Settings → Steam): Steam stays closed while you browse in Cinder and starts in the background when you play, update or change status",
+      "Closes Steam after a few idle minutes: no game running, nothing downloading, no Steam window open",
+      "Steam status shows whether it's closed, running, or about to close"
+    ]
+  },
+  {
+    "version": "0.13.1",
+    "date": "2026-10-29",
+    "title": "Workshop on game pages",
+    "items": [
+      "Games with a Steam Workshop get a Workshop button and tab on their game page, with your item count and updates",
+      "Store pages get a Workshop button for games that have one"
+    ]
+  },
+  {
+    "version": "0.13.0",
+    "date": "2026-10-29",
+    "title": "Library layouts",
+    "items": [
+      "Switch the library between Covers, Banners, Tiles, List and Shelves",
+      "Cover-size slider right in the library header",
+      "List view with sortable columns: play time, last played, achievements, size",
+      "New sort: Achievements"
+    ]
+  },
+  {
+    "version": "0.12.0",
+    "date": "2026-10-28",
+    "title": "Steam Workshop",
+    "items": [
+      "Workshop tab: your mods per game, size on disk and updates waiting",
+      "Browse any game's workshop: trending, popular, top rated, newest, search",
+      "Item pages with preview, stats and description; subscribe in Steam, open folder, update"
+    ]
+  },
+  {
+    "version": "0.11.3",
+    "date": "2026-10-28",
+    "title": "Updates that start",
+    "items": [
+      "Update buttons now call Steam the same way Steam's own Update button does",
+      "Cinder checks Steam's download log to confirm an update really started"
+    ]
+  },
+  {
+    "version": "0.11.0",
+    "date": "2026-10-28",
+    "title": "Downloads tab",
+    "items": [
+      "Full Downloads tab: live progress, speed graph, time left, queue, finished list",
+      "Start now, pause, resume, remove, Pause all / Resume all",
+      "Updates available list with Update all"
+    ]
+  },
+  {
+    "version": "0.10.0",
+    "date": "2026-10-28",
+    "title": "Update without launching",
+    "items": [
+      "Update button on covers, game pages, the right-click menu and Downloads",
+      "Downloads badge counts updates waiting"
+    ]
+  },
+  {
+    "version": "0.9.1",
+    "date": "2026-10-28",
+    "title": "Achievements on covers",
+    "items": [
+      "Trophy badge and progress bar on covers while viewing a list (gold at 100%)",
+      "Game card options: what shows under covers, play time and date formats, two-line names, hide ™/®"
+    ]
+  },
+  {
+    "version": "0.9.0",
+    "date": "2026-10-28",
+    "title": "Achievements, lists and profile",
+    "items": [
+      "Achievements tab across all your games: recent, rarest, almost done",
+      "Game lists: your Steam collections plus Cinder lists",
+      "Customize your Cinder profile, with Edit on Steam shortcuts"
+    ]
+  },
+  {
+    "version": "0.8.0",
+    "date": "2026-10-28",
+    "title": "Game pages and alerts",
+    "items": [
+      "Game page tabs for achievements, news and DLC",
+      "Non-Steam games show up and launch",
+      "Wishlist sale alerts"
+    ]
+  },
+  {
+    "version": "0.7.0",
+    "date": "2026-10-28",
+    "title": "While you play",
+    "items": [
+      "Now playing pill with a session timer; Cinder tucks away while you play",
+      "Downloads panel, favorites, hidden games and Pick for me"
+    ]
+  },
+  {
+    "version": "0.6.0",
+    "date": "2026-10-28",
+    "title": "Instant start",
+    "items": [
+      "Installed version that opens instantly, with Start menu and Desktop shortcuts",
+      "Lives in the tray and can start with Windows"
+    ]
+  },
+  {
+    "version": "0.5.0",
+    "date": "2026-10-28",
+    "title": "Status and quiet launching",
+    "items": [
+      "Set your status: Online, Away, Invisible, Offline (checked against what friends see)",
+      "Games launch without Steam's window or its Starting game popup"
+    ]
+  },
+  {
+    "version": "0.4.0",
+    "date": "2026-10-28",
+    "title": "Faster, with art for every game",
+    "items": [
+      "Art for every game from Steam's newer image cache",
+      "Collapsible icon-only sidebar",
+      "Scrollbars match your theme; click and drag to scroll rows"
+    ]
+  },
+  {
+    "version": "0.3.0",
+    "date": "2026-10-28",
+    "title": "Tabs like Steam",
+    "items": [
+      "Store, Wishlist, Friends and Profile tabs",
+      "Quick style options on top of any theme",
+      "Drag the window to the top of the screen to maximize; snap to the sides"
+    ]
+  },
+  {
+    "version": "0.2.0",
+    "date": "2026-10-28",
+    "title": "Built-in updaters",
+    "items": [
+      "Cinder updates itself from GitHub releases",
+      "Update Steam on demand while it otherwise stays frozen"
+    ]
+  },
+  {
+    "version": "0.1.0",
+    "date": "2026-10-28",
+    "title": "Cinder",
+    "items": [
+      "A fast, themeable front end for your Steam library",
+      "Keeps Steam on its current build so Steamidra keeps working"
+    ]
+  }
 ]
